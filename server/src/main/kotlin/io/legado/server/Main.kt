@@ -35,7 +35,9 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Base64
 import java.util.LinkedHashMap
+import java.util.UUID
 import java.util.concurrent.Callable
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -210,6 +212,9 @@ class LegadoHttpServer(
             if (session.method == Method.GET && session.uri == "/") {
                 return cors(redirectToWeb())
             }
+            if (isProtectedEndpoint(session.uri) && store.requiresLocalAuthentication() && !store.isAuthenticated(session.headers["authorization"])) {
+                return cors(unauthorized())
+            }
 
             val result = when (session.method) {
                 Method.GET -> handleGet(session)
@@ -239,6 +244,7 @@ class LegadoHttpServer(
                 )
             )
 
+            "/getAuthState" -> store.getAuthState()
             "/getServerInfo" -> store.getServerInfo()
             "/checkForUpdates" -> store.checkForUpdates()
             "/exportData" -> store.exportData()
@@ -270,6 +276,7 @@ class LegadoHttpServer(
         val post = parsePost(session)
 
         return when (session.uri) {
+            "/authenticate" -> store.authenticate(post.postData)
             "/saveBookSource" -> store.saveSource("bookSources", "bookSourceUrl", post.postData, single = true)
             "/saveBookSources" -> store.saveSource("bookSources", "bookSourceUrl", post.postData, single = false)
             "/deleteBookSources" -> store.deleteSources("bookSources", "bookSourceUrl", post.postData)
@@ -350,6 +357,14 @@ class LegadoHttpServer(
             bytes.size.toLong(),
         )
     }
+
+    private fun unauthorized(): Response {
+        val bytes = gson.toJson(ReturnData.error("Authentication required")).toByteArray(StandardCharsets.UTF_8)
+        return newFixedLengthResponse(Response.Status.UNAUTHORIZED, "application/json; charset=utf-8", ByteArrayInputStream(bytes), bytes.size.toLong())
+    }
+
+    private fun isProtectedEndpoint(uri: String): Boolean = uri !in setOf("/health", "/getAuthState", "/authenticate", "/cover", "/image") &&
+        !uri.contains('.') && !uri.startsWith("/vue/") && !uri.startsWith("/help/")
 
     private fun cors(response: Response): Response {
         response.addHeader("Access-Control-Allow-Origin", "*")
@@ -522,6 +537,7 @@ class LegadoStore(
     private val booksDir = dataDir.resolve("books")
     @Volatile private var sourceCheckClientMode = false
     @Volatile private var sourceCheckClient = buildNetworkClient(false)
+    private val authSessions = ConcurrentHashMap<String, Long>()
     private val appDataKinds = listOf(
         AppDataKind("bookGroups", "书籍分组", "书架分组、排序、刷新策略", "groupId", "Web 可用"),
         AppDataKind("bookmarks", "书签摘录", "阅读器书签、划线、摘录内容", "time", "Web 可用"),
@@ -880,6 +896,29 @@ class LegadoStore(
     @Synchronized
     fun getAppSettings(): ReturnData = ReturnData.ok(readAppSettings())
 
+    fun getAuthState(): ReturnData = ReturnData.ok(mapOf("required" to requiresLocalAuthentication()))
+
+    fun authenticate(postData: String?): ReturnData {
+        val password = parseJson(postData)?.asObjectOrNull()?.string("password").orEmpty()
+        val configured = localPassword()
+        if (configured.isBlank()) return ReturnData.ok(mapOf("token" to "", "expiresAt" to 0L))
+        if (!MessageDigest.isEqual(configured.toByteArray(StandardCharsets.UTF_8), password.toByteArray(StandardCharsets.UTF_8))) return ReturnData.error("Invalid password")
+        val token = UUID.randomUUID().toString().replace("-", "")
+        val expiresAt = System.currentTimeMillis() + Duration.ofDays(30).toMillis()
+        authSessions[token] = expiresAt
+        return ReturnData.ok(mapOf("token" to token, "expiresAt" to expiresAt))
+    }
+
+    fun requiresLocalAuthentication(): Boolean = localPassword().isNotBlank()
+
+    fun isAuthenticated(authorization: String?): Boolean {
+        val token = authorization?.removePrefix("Bearer ")?.trim().orEmpty()
+        val expiresAt = authSessions[token] ?: return false
+        if (expiresAt > System.currentTimeMillis()) return true
+        authSessions.remove(token)
+        return false
+    }
+
     @Synchronized
     fun checkForUpdates(): ReturnData {
         val maintenance = readAppSettings()["maintenance"].asObjectOrNull() ?: JsonObject()
@@ -963,6 +1002,7 @@ class LegadoStore(
         writeAppSettings(mergeDefaults(defaultAppSettings(), settings))
         applyCustomHostsPreference()
         applyHeapDumpPreference()
+        authSessions.clear()
         return ReturnData.ok(readAppSettings())
     }
 
@@ -971,6 +1011,7 @@ class LegadoStore(
         writeAppSettings(defaultAppSettings())
         applyCustomHostsPreference()
         applyHeapDumpPreference()
+        authSessions.clear()
         return ReturnData.ok(readAppSettings())
     }
 
@@ -1924,6 +1965,8 @@ class LegadoStore(
             .orEmpty()
         return configured.takeIf { it.isNotEmpty() }?.take(512) ?: "Legado-Server/1.0"
     }
+
+    private fun localPassword(): String = readAppSettings()["network"].asObjectOrNull()?.string("localPassword")?.trim().orEmpty()
 
     private fun serverVersion(): String = System.getenv("LEGADO_SERVER_VERSION")
         ?.trim()

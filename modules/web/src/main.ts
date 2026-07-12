@@ -3,6 +3,7 @@ import App from './App.vue'
 import router from '@/router'
 import store from '@/store'
 import API from '@api'
+import { setLocalServerToken } from '@/api/axios'
 import { applyAppSettings } from '@/settings/runtime'
 import { ElNotification } from 'element-plus'
 import '@/assets/runtime-theme.css'
@@ -37,8 +38,21 @@ const resumeRecentReading = async () => {
   }
 }
 
-void API.getAppSettings()
+const ensureLocalAuthentication = async () => {
+  const state = await API.getAuthState()
+  if (!state.data.isSuccess || !state.data.data.required) return true
+  const password = window.prompt('此 Legado Server 已启用本地访问密码')
+  if (!password) return false
+  const session = await API.authenticate(password)
+  if (!session.data.isSuccess) return false
+  setLocalServerToken(session.data.data.token)
+  return true
+}
+
+void ensureLocalAuthentication()
+  .then(allowed => allowed ? API.getAppSettings() : undefined)
   .then(async response => {
+    if (!response) return
     if (!response.data.isSuccess) return
     applyAppSettings(response.data.data)
     if (response.data.data.maintenance?.autoUpdateVariant !== false) {

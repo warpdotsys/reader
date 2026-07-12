@@ -264,6 +264,7 @@ import {
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import API from '@api'
+import { setLocalServerToken } from '@/api/axios'
 import type { AppSettings, LeagdoApiResponse } from '@api'
 import { applyAppSettings } from '@/settings/runtime'
 
@@ -624,7 +625,7 @@ const sections: SettingSection[] = [
     fields: [
       f('network.userAgent', 'User-Agent', '服务端图片代理、源检查和 WebDAV 探测请求使用的默认 UA。', 'textarea', 'live'),
       f('network.customHosts', '自定义 Hosts', 'JSON 格式域名到 IP 或 IP 数组映射，保存后写入 JVM Hosts 解析文件。', 'textarea', 'live'),
-      f('network.localPassword', '本地访问密码', 'Web 服务或本地敏感操作密码偏好。', 'password', 'planned'),
+      f('network.localPassword', '本地访问密码', '为数据 API 启用会话认证；浏览器首次访问会要求输入密码，静态页面和健康检查保持公开。', 'password', 'live'),
       f('network.precisionSearch', '精确搜索', '书架搜索仅显示书名或作者完整匹配的结果。', 'boolean', 'live'),
       f('network.Cronet', 'HTTP/2 网络栈', '开启后 WebDAV、源检查和远程图片优先使用 JVM HTTP/2。', 'boolean', 'live'),
       f('network.antiAlias', '抗锯齿', '启用浏览器字体平滑与可读性优化。', 'boolean', 'live'),
@@ -848,7 +849,10 @@ async function loadSettings() {
 async function saveSettings() {
   saving.value = true
   try {
+    const localPassword = String(settings.value.network?.localPassword || '')
     settings.value = unwrap(await API.saveAppSettings(settings.value))
+    if (localPassword) setLocalServerToken(unwrap(await API.authenticate(localPassword)).token)
+    else setLocalServerToken('')
     applyAppSettings(settings.value)
     dirty.value = false
     ElMessage.success('设置已保存')

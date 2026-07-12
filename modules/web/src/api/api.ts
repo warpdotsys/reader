@@ -53,6 +53,9 @@ export type UpdateCheckResult = {
   message: string
 }
 
+export type AuthState = { required: boolean }
+export type AuthSession = { token: string; expiresAt: number }
+
 export type TxtTocRule = {
   id?: string | number
   name: string
@@ -396,6 +399,9 @@ const getServerInfo = () =>
 const checkForUpdates = () =>
   ajax.get<LeagdoApiResponse<UpdateCheckResult>>('checkForUpdates')
 
+const getAuthState = () => ajax.get<LeagdoApiResponse<AuthState>>('getAuthState')
+const authenticate = (password: string) => ajax.post<LeagdoApiResponse<AuthSession>>('authenticate', { password })
+
 const exportData = () =>
   ajax.get<LeagdoApiResponse<ServerExportData>>('exportData')
 
@@ -534,6 +540,8 @@ export default {
 
   getServerInfo,
   checkForUpdates,
+  getAuthState,
+  authenticate,
   exportData,
   importData,
   getBackups,
