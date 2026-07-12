@@ -1,5 +1,5 @@
 plugins {
-    alias libs.plugins.kotlin.jvm
+    id 'org.jetbrains.kotlin.jvm'
     id 'application'
 }
 
@@ -13,16 +13,7 @@ application {
 }
 
 dependencies {
-    implementation(libs.gson)
-    implementation(libs.nanohttpd.nanohttpd)
-    implementation(libs.nanohttpd.websocket)
-}
-
-processResources {
-    from("$rootDir/app/src/main/assets/web") {
-        into 'web'
-    }
-    from("$rootDir/app/src/main/assets/defaultData") {
-        into 'defaultData'
-    }
+    implementation 'com.google.code.gson:gson:2.13.2'
+    implementation 'org.nanohttpd:nanohttpd:2.3.1'
+    implementation 'org.nanohttpd:nanohttpd-websocket:2.3.1'
 }

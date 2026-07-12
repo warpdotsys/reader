@@ -1,121 +1,102 @@
-# [English](English.md) [中文](README.md)
+# Legado Server
 
-![icon_android](https://gitee.com/lyc486/yuedu/raw/master/icon_android.png)
-<a href="https://jb.gg/OpenSourceSupport" target="_blank">
-<img width="24" height="24" src="https://resources.jetbrains.com/storage/products/company/brand/logos/jb_beam.svg?_gl=1*135yekd*_ga*OTY4Mjg4NDYzLjE2Mzk0NTE3MzQ.*_ga_9J976DJZ68*MTY2OTE2MzM5Ny4xMy4wLjE2NjkxNjMzOTcuNjAuMC4w&_ga=2.257292110.451256242.1669085120-968288463.1639451734" alt="idea"/>
-</a>
+`Legado Server` is a Linux command-line web service and browser UI inspired by the data model and user workflows of [warpdotsys/legado](https://github.com/warpdotsys/legado). It is not an Android application and does not contain Android code.
 
-<div align="center">
-<img width="125" height="125" src="https://github.com/gedoor/legado/raw/master/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" alt="legado"/>
-<br>
-阅读Sigma
-<br>
-<a href="https://loyc.xyz/c/legado.html" target="_blank">软件介绍页</a>
-<br>
-阅读Sigma继承自<a href="https://github.com/gedoor/legado" target="_blank">Legado</a>，在其基础上新增更多功能。
-</div>
+It runs a JVM HTTP/WebSocket service, stores data as portable JSON files, and serves a Vue reader, bookshelf, source editor, feature workbench, server console, and settings center from the same process.
 
-## 版本说明
-- 测试版(beta)：包名与原版相同，可覆盖更新，版本更新频繁
-- 正式版(plus)：新的共存包名，安装后是一个新软件，不会覆盖原版，每到一个稳定阶段进行一次更新
-#### 找不到下载地址可以去这里 [下载软件](https://gitee.com/lyc486/legado/releases)
+## Status
 
-[![](https://img.shields.io/badge/-Contents:-696969.svg)](#contents) [![](https://img.shields.io/badge/-Function-F5F5F5.svg)](#Function-主要功能-) [![](https://img.shields.io/badge/-Community-F5F5F5.svg)](#Community-交流社区-) [![](https://img.shields.io/badge/-API-F5F5F5.svg)](#API-) [![](https://img.shields.io/badge/-Other-F5F5F5.svg)](#Other-其他-) [![](https://img.shields.io/badge/-Grateful-F5F5F5.svg)](#Grateful-感谢-) [![](https://img.shields.io/badge/-Interface-F5F5F5.svg)](#Interface-界面-)
+Implemented today:
 
->新用户？
->
->软件不提供内容，需要您自己手动添加，例如导入书源等。
->看看 [官方帮助文档](https://www.yuque.com/legado/wiki)，也许里面就有你要的答案。
+- Bookshelf, reading view, local TXT upload and chapter splitting.
+- Book-source and RSS-source CRUD, import/export, replace rules, TXT TOC rules, and source availability checks.
+- Browser reading preferences, theme/cover preferences, bookmarks, reading records, reader export, local backups, and WebDAV backup upload/check.
+- Server console for backup management, source checks, local book upload, maintenance, update checks, and App-data JSON collections.
+- JSON data directory suitable for bind mounts, backups, and migration between Linux hosts.
 
-# Function-主要功能 [![](https://img.shields.io/badge/-Function-F5F5F5.svg)](#Function-主要功能-)
-[English](English.md)
+Not implemented yet:
 
-<details><summary>中文</summary>
-1.自定义书源，自己设置规则，抓取网页数据，规则简单易懂，软件内有规则说明。<br>
-2.列表书架，网格书架自由切换。<br>
-3.书源规则支持搜索及发现，所有找书看书功能全部自定义，找书更方便。<br>
-4.订阅内容,可以订阅想看的任何内容,看你想看<br>
-5.支持替换净化，去除广告替换内容很方便。<br>
-6.支持本地TXT、EPUB阅读，手动浏览，智能扫描。<br>
-7.支持高度自定义阅读界面，切换字体、颜色、背景、行距、段距、加粗、简繁转换等。<br>
-8.支持多种翻页模式，覆盖、仿真、滑动、滚动等。<br>
-9.软件开源，持续优化，无广告。
-</details>
+- Upstream rule execution, online book search, remote content crawling, and automatic source switching.
+- Android-only integrations such as phone-call state, notifications, content providers, Room migrations, and Android media services.
+- LAN password enforcement. Do not expose this service to an untrusted network.
 
-<a href="#readme">
-    <img src="https://img.shields.io/badge/-返回顶部-orange.svg" alt="#" align="right">
-</a>
+The upstream project remains the reference for Legado data formats and user-facing semantics. This repository documents only behavior that exists in this Linux server.
 
-# Community-交流社区 [![](https://img.shields.io/badge/-Community-F5F5F5.svg)](#Community-交流社区-)
+## Requirements
 
-#### Telegram
-[![Telegram-channel](https://img.shields.io/badge/Σ_Telegram-%E9%A2%91%E9%81%93-blue)](https://t.me/readsigma)
+- JDK 17 or newer to build and run the server.
+- Node.js 20+ and pnpm only when changing the Vue frontend.
+- Docker is optional.
 
-#### WeChat
-[![WeChat-channel](https://img.shields.io/badge/Σ_%e5%be%ae%e4%bf%a1-%e5%85%ac%e4%bc%97%e5%8f%b7-green)](https://mp.weixin.qq.com/s/f54f7yP9HQi6P5Wky8wE1A)  
-<img src="https://open.weixin.qq.com/qr/code?username=legado_plus" width="100">
+## Build
 
-#### Discord
-[![Discord](https://img.shields.io/discord/560731361414086666?color=%235865f2&label=Discord)](https://discord.gg/VtUfRyzRXn)
+Build the frontend first when `modules/web` changes. The build copies static files into `server/src/main/resources/web`.
 
-#### Other
-https://www.yuque.com/legado/wiki/community
+```bash
+cd modules/web
+pnpm install --frozen-lockfile
+pnpm build
 
-<a href="#readme">
-    <img src="https://img.shields.io/badge/-返回顶部-orange.svg" alt="#" align="right">
-</a>
+cd ../..
+./gradlew :server:installDist
+```
 
-# API [![](https://img.shields.io/badge/-API-F5F5F5.svg)](#API-)
-* 阅读3.0 提供了2种方式的API：`Web方式`和`Content Provider方式`。您可以在[这里](api.md)根据需要自行调用。 
-* 可通过url唤起阅读进行一键导入,url格式: legado://import/{path}?src={url}
-* path类型: bookSource,rssSource,replaceRule,textTocRule,httpTTS,theme,readConfig,dictRule,[addToBookshelf](/app/src/main/java/io/legado/app/ui/association/AddToBookshelfDialog.kt)
-* path类型解释: 书源,订阅源,替换规则,本地txt小说目录规则,在线朗读引擎,主题,阅读排版,添加到书架
+The runnable distribution is created under `server/build/install/legado-server`.
 
-<a href="#readme">
-    <img src="https://img.shields.io/badge/-返回顶部-orange.svg" alt="#" align="right">
-</a>
+## Run
 
-# Other-其他 [![](https://img.shields.io/badge/-Other-F5F5F5.svg)](#Other-其他-)
-##### 免责声明
-https://gedoor.github.io/Disclaimer
+```bash
+server/build/install/legado-server/bin/legado-server \
+  --host 0.0.0.0 \
+  --port 1122 \
+  --ws-port 1123 \
+  --data-dir /var/lib/legado-server
+```
 
-##### 阅读3.0
-* [书源规则](https://mgz0227.github.io/The-tutorial-of-Legado/)
-* [更新日志](/app/src/main/assets/updateLog.md)
-* [帮助文档](/app/src/main/assets/web/help/md/appHelp.md)
-* [web端书架](https://github.com/gedoor/legado_web_bookshelf)
-* [web端源编辑](https://github.com/gedoor/legado_web_source_editor)
+Open `http://SERVER_IP:1122/`. The root URL redirects to the Web UI.
 
-<a href="#readme">
-    <img src="https://img.shields.io/badge/-返回顶部-orange.svg" alt="#" align="right">
-</a>
+Options:
 
-# Grateful-感谢 [![](https://img.shields.io/badge/-Grateful-F5F5F5.svg)](#Grateful-感谢-)
-> * org.jsoup:jsoup
-> * cn.wanghaomiao:JsoupXpath
-> * com.jayway.jsonpath:json-path
-> * com.github.gedoor:rhino-android
-> * com.squareup.okhttp3:okhttp
-> * com.github.bumptech.glide:glide
-> * org.nanohttpd:nanohttpd
-> * org.nanohttpd:nanohttpd-websocket
-> * cn.bingoogolapple:bga-qrcode-zxing
-> * com.jaredrummler:colorpicker
-> * org.apache.commons:commons-text
-> * io.noties.markwon:core
-> * io.noties.markwon:image-glide
-> * com.hankcs:hanlp
-> * com.positiondev.epublib:epublib-core
-> * com.github.Moriafly:LyricViewX
-> * io.github.rosemoe:editor
-<a href="#readme">
-    <img src="https://img.shields.io/badge/-返回顶部-orange.svg" alt="#" align="right">
-</a>
+```text
+--host <host>       Bind address. Default: 0.0.0.0
+--port <port>       HTTP port. Default: 1122
+--ws-port <port>    WebSocket port. Default: HTTP port + 1
+--data-dir <path>   Data directory. Default: $XDG_DATA_HOME/legado-server or ~/.local/share/legado-server
+--web-root <path>   Serve Web assets from a directory instead of the bundled assets
+--no-websocket      Disable the compatibility WebSocket listener
+```
 
-# Interface-界面 [![](https://img.shields.io/badge/-Interface-F5F5F5.svg)](#Interface-界面-)
-<img src="https://github.com/gedoor/gedoor.github.io/blob/master/static/img/legado/%E9%98%85%E8%AF%BB%E7%AE%80%E4%BB%8B1.jpg" width="270"><img src="https://github.com/gedoor/gedoor.github.io/blob/master/static/img/legado/%E9%98%85%E8%AF%BB%E7%AE%80%E4%BB%8B2.jpg" width="270"><img src="https://github.com/gedoor/gedoor.github.io/blob/master/static/img/legado/%E9%98%85%E8%AF%BB%E7%AE%80%E4%BB%8B3.jpg" width="270">
-<img src="https://github.com/gedoor/gedoor.github.io/blob/master/static/img/legado/%E9%98%85%E8%AF%BB%E7%AE%80%E4%BB%8B4.jpg" width="270"><img src="https://github.com/gedoor/gedoor.github.io/blob/master/static/img/legado/%E9%98%85%E8%AF%BB%E7%AE%80%E4%BB%8B5.jpg" width="270"><img src="https://github.com/gedoor/gedoor.github.io/blob/master/static/img/legado/%E9%98%85%E8%AF%BB%E7%AE%80%E4%BB%8B6.jpg" width="270">
+`--host 0.0.0.0` exposes the service on the LAN. Put it behind a reverse proxy, firewall, or VPN before exposing it beyond a trusted network.
 
-<a href="#readme">
-    <img src="https://img.shields.io/badge/-返回顶部-orange.svg" alt="#" align="right">
-</a>
+## Data and Backup
+
+The data directory contains JSON collections such as `books.json`, `bookSources.json`, `rssSources.json`, `appSettings.json`, and `bookmarks.json`, plus chapter files and `backups/`.
+
+Use the server console or `GET /exportData` for a portable snapshot. `POST /importData` restores compatible data. The backup UI can also create local snapshots and, when configured, upload them to WebDAV.
+
+## Operations
+
+Smoke test an installed distribution:
+
+```bash
+./server/scripts/smoke-test.sh
+```
+
+Build and run with Docker:
+
+```bash
+docker build -f server/Dockerfile -t legado-server .
+docker run --rm -p 1122:1122 -v legado-data:/var/lib/legado-server legado-server
+```
+
+For systemd, adapt and install [server/packaging/legado-server.service](server/packaging/legado-server.service). The unit expects the distribution under `/opt/legado-server` and data under `/var/lib/legado-server`.
+
+## Development Layout
+
+```text
+server/                         JVM service, packaging, and bundled resources
+server/src/main/resources/web/  Built Vue application served by the service
+modules/web/                    Vue source code and frontend build tooling
+```
+
+No Android module, Android Gradle plugin, mobile resource tree, or Android CI workflow is part of this repository.
