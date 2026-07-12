@@ -1,0 +1,18 @@
+[Unit]
+Description=Legado JVM Web Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=legado
+Group=legado
+Environment=LEGADO_SERVER_DATA=/var/lib/legado-server
+ExecStart=/opt/legado-server/bin/legado-server --host 0.0.0.0 --port 1122
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

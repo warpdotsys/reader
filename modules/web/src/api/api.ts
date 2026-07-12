@@ -1,0 +1,565 @@
+/** https://github.com/gedoor/legado/tree/master/app/src/main/java/io/legado/app/api */
+/** https://github.com/gedoor/legado/tree/master/app/src/main/java/io/legado/app/web */
+
+import type { webReadConfig } from '@/web'
+import ajax from './axios'
+import type {
+  BaseBook,
+  Book,
+  BookChapter,
+  BookProgress,
+  SeachBook,
+} from '@/book'
+import type { Source } from '@/source'
+
+export type LeagdoApiResponse<T> = {
+  isSuccess: boolean
+  errorMsg: string
+  data: T
+}
+
+export type ServerCounts = {
+  books: number
+  bookSources: number
+  rssSources: number
+  replaceRules: number
+  txtTocRules: number
+  settings?: number
+  appData?: number
+  backups?: number
+  sourceChecks?: number
+}
+
+export type ServerInfo = {
+  service: string
+  version?: string
+  dataDir: string
+  counts: ServerCounts
+  networkTransport?: string
+  customHostCount?: number
+  heapDumpOnOom?: boolean
+}
+
+export type UpdateCheckResult = {
+  channel: string
+  currentVersion: string
+  latestVersion?: string
+  releaseName?: string
+  releaseUrl?: string
+  publishedAt?: string
+  newer: boolean
+  latencyMs?: number
+  statusCode?: number
+  message: string
+}
+
+export type TxtTocRule = {
+  id?: string | number
+  name: string
+  rule: string
+  replacement?: string
+  example?: string
+  serialNumber?: number
+  enable?: boolean
+}
+
+export type ReplaceRule = {
+  id?: string | number
+  name: string
+  group?: string
+  pattern: string
+  replacement?: string
+  scope?: string
+  scopeTitle?: boolean
+  scopeContent?: boolean
+  excludeScope?: string
+  isEnabled?: boolean
+  isRegex?: boolean
+  timeoutMillisecond?: number
+  order?: number
+}
+
+export type ServerExportData = {
+  books: unknown[]
+  bookSources: Source[]
+  rssSources: Source[]
+  replaceRules: ReplaceRule[]
+  txtTocRules: TxtTocRule[]
+  appSettings?: AppSettings
+  appData?: Record<string, AppDataItem[]>
+}
+
+export type AppSettings = Record<string, Record<string, unknown>>
+
+export type WebDavTestResult = {
+  ok: boolean
+  statusCode?: number
+  latencyMs: number
+  message: string
+  target?: string
+}
+
+export type ServerBackup = {
+  fileName: string
+  path: string
+  size: number
+  modifiedTime: number
+  remotePath?: string
+}
+
+export type BookExportResult = {
+  fileName: string
+  mime: string
+  base64: string
+  imageCount?: number
+  episodeCount?: number
+}
+
+export type BatchBookExportResult = {
+  parallel: boolean
+  succeeded: number
+  failed: number
+  results: Array<{
+    bookUrl: string
+    isSuccess: boolean
+    errorMsg?: string
+    data?: BookExportResult
+  }>
+}
+
+export type BackupCheckResult = {
+  enabled: boolean
+  configured?: boolean
+  newer: boolean
+  statusCode?: number
+  message?: string
+  localModifiedTime?: number
+  remote?: {
+    fileName: string
+    modifiedTime: number
+    size: number
+    href: string
+  }
+}
+
+export type DirectUploadResult = {
+  downloadUrl: string
+  statusCode: number
+  fileName: string
+  summary?: string
+}
+
+export type MaintenanceResult = {
+  completedAt: string
+  cacheEntriesCleared: number
+  cacheBytesCleared: number
+  jsonFilesCompacted: number
+  jsonBytesSaved: number
+  scheduled: boolean
+  logFile: string
+}
+
+export type SourceCheckReport = {
+  id: string
+  kind: 'bookSource' | 'rssSource' | string
+  sourceName: string
+  sourceUrl: string
+  enabled: boolean
+  ok: boolean
+  statusCode?: number
+  latencyMs: number
+  message: string
+  checkedAt: number
+  timeoutMillis?: number
+}
+
+export type SourceCheckSummary = {
+  total: number
+  ok: number
+  failed: number
+  skipped: number
+  checkedAt: number
+}
+
+export type SourceCheckResult = {
+  summary: SourceCheckSummary
+  reports: SourceCheckReport[]
+}
+
+export type AppDataKind = {
+  kind: string
+  label: string
+  description: string
+  primaryKey: string
+  status: string
+  count: number
+}
+
+export type AppDataItem = Record<string, unknown>
+
+export let legado_http_entry_point = ''
+export let legado_webSocket_entry_point = ''
+
+let wsOnError: typeof WebSocket.prototype.onerror = () => {}
+let wsOnMessage: typeof WebSocket.prototype.onmessage = () => {}
+export const setWebsocketOnMessage = (callback: typeof wsOnMessage) =>
+  (wsOnMessage = callback)
+export const setWebsocketOnError = (callback: typeof wsOnError) => {
+  //WebSocket.prototype.onerror = callback
+  wsOnError = callback
+}
+
+export const setApiEntryPoint = (
+  http_entry_point: string,
+  webSocket_entry_point: string,
+) => {
+  legado_http_entry_point = new URL(http_entry_point).toString()
+  legado_webSocket_entry_point = new URL(webSocket_entry_point).toString()
+  ajax.defaults.baseURL = legado_http_entry_point
+}
+
+// 书架API
+// Http
+const getReadConfig = async (http_url = legado_http_entry_point) => {
+  const { data } = await ajax.get<LeagdoApiResponse<string>>('getReadConfig', {
+    baseURL: http_url.toString(),
+    timeout: 3000,
+  })
+  if (data.isSuccess) {
+    try {
+      return JSON.parse(data.data) as webReadConfig
+    } catch {}
+  }
+}
+const saveReadConfig = (config: webReadConfig) =>
+  ajax.post<LeagdoApiResponse<string>>('saveReadConfig', config)
+
+/** @deprecated: 使用`API.saveBookProgressWithBeacon`以确保在页面或者直接关闭的情况下保存进度 */
+const saveBookProgress = (bookProgress: BookProgress) =>
+  ajax.post('saveBookProgress', bookProgress)
+
+/**主要在直接关闭浏览器情况下可靠发送书籍进度 */
+const saveBookProgressWithBeacon = (bookProgress: BookProgress) => {
+  if (!bookProgress) return
+  // 常规请求可能会被取消 使用Fetch keep-alive 或者 navigator.sendBeacon
+  navigator.sendBeacon(
+    new URL('saveBookProgress', legado_http_entry_point),
+    JSON.stringify(bookProgress),
+  )
+}
+
+const getBookShelf = () => ajax.get<LeagdoApiResponse<Book[]>>('getBookshelf')
+
+const getChapterList = (/** @type {string} */ bookUrl: string) =>
+  ajax.get<LeagdoApiResponse<BookChapter[]>>(
+    'getChapterList?url=' + encodeURIComponent(bookUrl),
+  )
+
+const getBookContent = (
+  /** @type {string} */ bookUrl: string,
+  /** @type {number} */ chapterIndex: number,
+) =>
+  ajax.get<LeagdoApiResponse<string>>(
+    'getBookContent?url=' +
+      encodeURIComponent(bookUrl) +
+      '&index=' +
+      chapterIndex,
+  )
+
+// webSocket
+const search = (
+  searchKey: string,
+  onReceive: (data: SeachBook[]) => void,
+  onFinish: () => void,
+) => {
+  const socket = new WebSocket(
+    new URL('searchBook', legado_webSocket_entry_point),
+  )
+  socket.onerror = wsOnError
+
+  socket.onopen = () => {
+    socket.send(`{"key":"${searchKey}"}`)
+  }
+  socket.onmessage = event => {
+    try {
+      onReceive(JSON.parse(event.data))
+      wsOnMessage?.call(socket, event)
+    } catch {
+      onFinish()
+    }
+  }
+
+  socket.onclose = () => {
+    onFinish()
+  }
+}
+
+const saveBook = (book: BaseBook) =>
+  ajax.post<LeagdoApiResponse<string>>('saveBook', book)
+const exportBook = (bookUrl: string) =>
+  ajax.post<LeagdoApiResponse<BookExportResult>>('exportBook', { bookUrl })
+const exportBookEpisodes = (bookUrl: string) =>
+  ajax.post<LeagdoApiResponse<BookExportResult>>('exportBookEpisodes', { bookUrl })
+const uploadBook = (bookUrl: string) =>
+  ajax.post<LeagdoApiResponse<DirectUploadResult>>('uploadBook', { bookUrl })
+const exportBooks = (bookUrls: string[]) =>
+  ajax.post<LeagdoApiResponse<BatchBookExportResult>>('exportBooks', { bookUrls })
+const deleteBook = (book: BaseBook) =>
+  ajax.post<LeagdoApiResponse<string>>('deleteBook', book)
+
+const isBookSourceRoute = () => /bookSource/i.test(location.hash || location.href)
+
+// 源编辑API
+// Http
+const getSources = () =>
+  isBookSourceRoute() ? ajax.get('getBookSources') : ajax.get('getRssSources')
+
+const saveSource = (data: Source) =>
+  isBookSourceRoute()
+    ? ajax.post<LeagdoApiResponse<string>>('saveBookSource', data)
+    : ajax.post<LeagdoApiResponse<string>>('saveRssSource', data)
+
+const saveSources = (data: Source[]) =>
+  isBookSourceRoute()
+    ? ajax.post<LeagdoApiResponse<Source[]>>('saveBookSources', data)
+    : ajax.post<LeagdoApiResponse<Source[]>>('saveRssSources', data)
+
+const deleteSource = (data: Source[]) =>
+  isBookSourceRoute()
+    ? ajax.post<LeagdoApiResponse<string>>('deleteBookSources', data)
+    : ajax.post<LeagdoApiResponse<string>>('deleteRssSources', data)
+
+// webSocket
+const debug = (
+  /** @type {string} */ sourceUrl: string,
+  /** @type {string} */ searchKey: string,
+  /** @type {(data: string) => void} */ onReceive: (data: string) => void,
+  /** @type {() => void} */ onFinish: () => void,
+) => {
+  const url = new URL(
+    `${isBookSourceRoute() ? 'bookSource' : 'rssSource'}Debug`,
+    legado_webSocket_entry_point,
+  )
+
+  const socket = new WebSocket(url)
+  socket.onerror = wsOnError
+  socket.onopen = () => {
+    socket.send(JSON.stringify({ tag: sourceUrl, key: searchKey }))
+  }
+  socket.onmessage = event => {
+    onReceive(event.data)
+    wsOnMessage?.call(socket, event)
+  }
+
+  socket.onclose = () => {
+    onFinish()
+  }
+}
+
+/**
+ * 从阅读获取需要特定处理的书籍封面
+ * @param {string} coverUrl
+ */
+const getProxyCoverUrl = (coverUrl: string) => {
+  if (coverUrl.startsWith(legado_http_entry_point)) return coverUrl
+  return new URL(
+    'cover?path=' + encodeURIComponent(coverUrl),
+    legado_http_entry_point,
+  ).toString()
+}
+/**
+ * 从阅读获取需要特定处理的图片
+ * @param {string} bookUrl
+ * @param {string} src
+ * @param {number|`${number}`} width
+ */
+const getProxyImageUrl = (
+  bookUrl: string,
+  src: string,
+  width: number | `${number}`,
+) => {
+  if (src.startsWith(legado_http_entry_point)) return src
+  return new URL(
+    'image?path=' +
+      encodeURIComponent(src) +
+      '&url=' +
+      encodeURIComponent(bookUrl) +
+      '&width=' +
+      width,
+    legado_http_entry_point,
+  ).toString()
+}
+
+const getServerInfo = () =>
+  ajax.get<LeagdoApiResponse<ServerInfo>>('getServerInfo')
+
+const checkForUpdates = () =>
+  ajax.get<LeagdoApiResponse<UpdateCheckResult>>('checkForUpdates')
+
+const exportData = () =>
+  ajax.get<LeagdoApiResponse<ServerExportData>>('exportData')
+
+const importData = (data: Partial<ServerExportData>) =>
+  ajax.post<LeagdoApiResponse<Record<string, number>>>('importData', data)
+
+const getBackups = () =>
+  ajax.get<LeagdoApiResponse<ServerBackup[]>>('getBackups')
+
+const createBackup = () =>
+  ajax.post<LeagdoApiResponse<ServerBackup>>('createBackup')
+
+const checkNewBackup = () =>
+  ajax.post<LeagdoApiResponse<BackupCheckResult>>('checkNewBackup')
+
+const restoreBackup = (fileName: string) =>
+  ajax.post<LeagdoApiResponse<Record<string, number>>>('restoreBackup', {
+    fileName,
+  })
+
+const deleteBackup = (fileName: string) =>
+  ajax.post<LeagdoApiResponse<ServerBackup[]>>('deleteBackup', { fileName })
+
+const getSourceChecks = () =>
+  ajax.get<LeagdoApiResponse<SourceCheckReport[]>>('getSourceChecks')
+
+const checkSources = (options: {
+  scope?: 'all' | 'bookSources' | 'rssSources'
+  onlyEnabled?: boolean
+  timeoutMillis?: number
+  limit?: number
+}) => ajax.post<LeagdoApiResponse<SourceCheckResult>>('checkSources', options)
+
+const deleteSourceChecks = () =>
+  ajax.post<LeagdoApiResponse<SourceCheckReport[]>>('deleteSourceChecks')
+
+const getAppSettings = () =>
+  ajax.get<LeagdoApiResponse<AppSettings>>('getAppSettings')
+
+const saveAppSettings = (settings: AppSettings) =>
+  ajax.post<LeagdoApiResponse<AppSettings>>('saveAppSettings', settings)
+
+const resetAppSettings = () =>
+  ajax.post<LeagdoApiResponse<AppSettings>>('resetAppSettings')
+
+const testWebDav = () =>
+  ajax.post<LeagdoApiResponse<WebDavTestResult>>('testWebDav')
+
+const testUploadRule = () =>
+  ajax.post<LeagdoApiResponse<DirectUploadResult>>('testUploadRule')
+
+const runMaintenance = () =>
+  ajax.post<LeagdoApiResponse<MaintenanceResult>>('runMaintenance')
+
+const getAppDataKinds = () =>
+  ajax.get<LeagdoApiResponse<AppDataKind[]>>('getAppDataKinds')
+
+const getAppData = (kind: string) =>
+  ajax.get<LeagdoApiResponse<AppDataItem[]>>(
+    'getAppData?kind=' + encodeURIComponent(kind),
+  )
+
+const saveAppData = (
+  kind: string,
+  data: AppDataItem | AppDataItem[],
+  mode: 'upsert' | 'replace' = 'upsert',
+) =>
+  ajax.post<LeagdoApiResponse<AppDataItem[]>>(
+    'saveAppData?kind=' + encodeURIComponent(kind) + '&mode=' + mode,
+    data,
+  )
+
+const deleteAppData = (kind: string, data: AppDataItem | AppDataItem[]) =>
+  ajax.post<LeagdoApiResponse<AppDataItem[]>>(
+    'deleteAppData?kind=' + encodeURIComponent(kind),
+    data,
+  )
+
+const getTxtTocRules = () =>
+  ajax.get<LeagdoApiResponse<TxtTocRule[]>>('getTxtTocRules')
+
+const saveTxtTocRule = (rule: TxtTocRule) =>
+  ajax.post<LeagdoApiResponse<string>>('saveTxtTocRule', rule)
+
+const deleteTxtTocRule = (rule: Pick<TxtTocRule, 'id'>) =>
+  ajax.post<LeagdoApiResponse<string>>('deleteTxtTocRule', rule)
+
+const getReplaceRules = () =>
+  ajax.get<LeagdoApiResponse<string | ReplaceRule[]>>('getReplaceRules')
+
+const saveReplaceRule = (rule: ReplaceRule) =>
+  ajax.post<LeagdoApiResponse<string>>('saveReplaceRule', rule)
+
+const deleteReplaceRule = (rule: Pick<ReplaceRule, 'id'>) =>
+  ajax.post<LeagdoApiResponse<string>>('deleteReplaceRule', rule)
+
+const testReplaceRule = (rule: ReplaceRule, text: string) =>
+  ajax.post<LeagdoApiResponse<string>>('testReplaceRule', { rule, text })
+
+const addLocalBook = (file: File) => {
+  const data = new FormData()
+  data.append('fileData', file)
+  return ajax.post<LeagdoApiResponse<Book>>(
+    'addLocalBook?fileName=' + encodeURIComponent(file.name),
+    data,
+    {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    },
+  )
+}
+
+export default {
+  getReadConfig,
+  saveReadConfig,
+  saveBookProgress,
+  saveBookProgressWithBeacon,
+  getBookShelf,
+  getChapterList,
+  getBookContent,
+  search,
+  saveBook,
+  exportBook,
+  exportBookEpisodes,
+  uploadBook,
+  exportBooks,
+  deleteBook,
+
+  getSources,
+  saveSources,
+  saveSource,
+  deleteSource,
+  debug,
+
+  getProxyCoverUrl,
+  getProxyImageUrl,
+
+  getServerInfo,
+  checkForUpdates,
+  exportData,
+  importData,
+  getBackups,
+  createBackup,
+  checkNewBackup,
+  restoreBackup,
+  deleteBackup,
+  getSourceChecks,
+  checkSources,
+  deleteSourceChecks,
+  getAppSettings,
+  saveAppSettings,
+  resetAppSettings,
+  testWebDav,
+  testUploadRule,
+  runMaintenance,
+  getAppDataKinds,
+  getAppData,
+  saveAppData,
+  deleteAppData,
+  getTxtTocRules,
+  saveTxtTocRule,
+  deleteTxtTocRule,
+  getReplaceRules,
+  saveReplaceRule,
+  deleteReplaceRule,
+  testReplaceRule,
+  addLocalBook,
+}

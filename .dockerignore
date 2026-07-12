@@ -1,0 +1,9 @@
+.git
+.gradle
+.idea
+**/build
+**/.kotlin
+**/node_modules
+local.properties
+captures
+tmp

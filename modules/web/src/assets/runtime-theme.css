@@ -1,0 +1,43 @@
+:root {
+  --legado-primary: #0f766e;
+  --legado-accent: #e53935;
+  --legado-page-bg: #f5f7fa;
+  --legado-surface-bg: #ffffff;
+  --legado-font-scale: 1;
+  --legado-background-image: none;
+  --legado-background-blur: 0px;
+  --legado-nav-bg: #ffffff;
+  --legado-nav-border: rgba(203, 213, 225, 0.78);
+  --legado-bar-shadow: 0 2px 8px rgba(15, 23, 42, 0.13);
+}
+
+html {
+  font-size: calc(16px * var(--legado-font-scale));
+  background: var(--legado-page-bg);
+}
+
+body {
+  background-color: var(--legado-page-bg);
+  background-image: var(--legado-background-image);
+  background-size: cover;
+  background-attachment: fixed;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  backdrop-filter: blur(var(--legado-background-blur));
+  pointer-events: none;
+}
+
+.legado-ink {
+  filter: grayscale(0.85) contrast(0.92);
+}
+
+.legado-antialias {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
