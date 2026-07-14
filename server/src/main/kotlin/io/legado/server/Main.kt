@@ -2304,9 +2304,9 @@ class LegadoStore(
             .replace("{key}", encodedKey)
             .replace("searchKey", key)
             .replace("%s", encodedKey)
-        val url = substitute(rawUrl).trim()
+        val url = expandSourceVariables(source, substitute(rawUrl)).trim()
         if (!url.startsWith("http://", true) && !url.startsWith("https://", true)) return null
-        val options = runCatching { JsonParser.parseString(substitute(rawOptions)).asObjectOrNull() }.getOrNull()
+        val options = runCatching { JsonParser.parseString(expandSourceVariables(source, substitute(rawOptions))).asObjectOrNull() }.getOrNull()
         val builder = HttpRequest.newBuilder(URI.create(url))
             .timeout(Duration.ofSeconds(15))
             .header("User-Agent", networkUserAgent())
@@ -2324,6 +2324,7 @@ class LegadoStore(
 
     private fun applySourceHeaders(builder: HttpRequest.Builder, source: JsonObject) {
         source.string("header")
+            ?.let { expandSourceVariables(source, it) }
             ?.let { runCatching { JsonParser.parseString(it).asObjectOrNull() }.getOrNull() }
             ?.entrySet()
             ?.forEach { (name, value) -> if (name.isNotBlank()) builder.header(name, value.asString) }
@@ -2373,6 +2374,20 @@ class LegadoStore(
     }
 
     private fun sourceCookieJarEnabled(source: JsonObject): Boolean = source["enabledCookieJar"]?.safeBoolean() == true
+
+    private fun expandSourceVariables(source: JsonObject, value: String): String {
+        if (!value.contains("{{")) return value
+        val sourceUrl = source.string("bookSourceUrl") ?: source.string("sourceUrl").orEmpty()
+        val now = System.currentTimeMillis()
+        val records = readList("cacheRecords")
+            .filter { it["expires"].safeLong().let { expires -> expires <= 0 || expires > now } }
+        return Regex("""\{\{([A-Za-z0-9_.-]+)}}""").replace(value) { match ->
+            val key = match.groupValues[1]
+            val record = records.firstOrNull { it.string("key") == key && it.string("sourceUrl") == sourceUrl }
+                ?: records.firstOrNull { it.string("key") == key && it.string("sourceUrl").isNullOrBlank() }
+            record?.string("value") ?: match.value
+        }
+    }
 
     private fun sourceHasCookieHeader(source: JsonObject): Boolean = source.string("header")
         ?.let { runCatching { JsonParser.parseString(it).asObjectOrNull() }.getOrNull() }
@@ -3093,7 +3108,7 @@ class LegadoStore(
     }
 
     private fun fetchSourceText(source: JsonObject, rawUrl: String): String? {
-        val requestUrl = parseSourceRequestUrl(rawUrl) ?: return null
+        val requestUrl = parseSourceRequestUrl(expandSourceVariables(source, rawUrl)) ?: return null
         return try {
             val builder = HttpRequest.newBuilder(URI.create(requestUrl.url))
                 .timeout(Duration.ofSeconds(20))
