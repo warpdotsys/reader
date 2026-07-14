@@ -703,7 +703,7 @@ const appEntries: AppEntry[] = [
   { label: '阅读记录', summary: '查看本地阅读进度记录', icon: Reading, path: '/features', query: { kind: 'readRecords' } },
   { label: '替换规则', summary: '维护正文替换与测试规则', icon: DocumentCopy, path: '/server', query: { tab: 'replace' } },
   { label: 'TXT 目录规则', summary: '配置 TXT 章节目录解析', icon: Files, path: '/server', query: { tab: 'toc' } },
-  { label: '字典规则', summary: '编辑阅读字典规则数据', icon: Search, path: '/features', query: { kind: 'dictRules' } },
+  { label: '字典规则', summary: '编辑并执行阅读划词字典规则', icon: Search, path: '/features', query: { kind: 'dictRules' } },
   { label: '源检查', summary: '检查书源的可达性与响应', icon: Search, path: '/server', query: { tab: 'sourceCheck' } },
   { label: '主题设置', summary: '调整颜色、模式和阅读主题', icon: Monitor, path: '/settings', query: { section: 'theme' } },
   { label: '主题方案', summary: '管理可复用的主题配置', icon: Setting, path: '/features', query: { kind: 'themeConfigs' } },
@@ -714,9 +714,9 @@ const parityItems = [
   { name: '书架/阅读', state: 'Web 已有基础阅读，设置项继续接入', icon: Reading },
   { name: '书源/RSS 源', state: '管理 UI 已有，规则执行引擎待抽 JVM core', icon: Collection },
   { name: 'TXT/替换规则', state: 'Web 已可管理并被服务端使用', icon: Files },
-  { name: 'App 数据工作台', state: '分组、书签、TTS、Cookie、字典规则等已可在 Web 端落盘管理', icon: SetUp },
+  { name: 'App 数据工作台', state: '分组、书签、TTS、Cookie、字典规则等可在 Web 端管理并执行', icon: SetUp },
   { name: '备份/同步', state: '本地快照可用，WebDAV 协议继续接入', icon: Connection },
-  { name: 'TTS/媒体键', state: '设置已落盘，Linux 音频服务待接入', icon: VideoPlay },
+  { name: 'TTS/媒体键', state: '浏览器系统朗读与 HTTP TTS 音频代理均可用', icon: VideoPlay },
   { name: '漫画/图片处理', state: '配置保留，图像管线待服务化', icon: Monitor },
 ]
 

@@ -191,6 +191,15 @@ export type RssArticleContent = {
   cached: boolean
 }
 
+export type DictionaryResult = {
+  name: string
+  content: string
+  url: string
+  degraded?: string
+  isSuccess: boolean
+  errorMsg?: string
+}
+
 export type SourceCheckReport = {
   id: string
   kind: 'bookSource' | 'rssSource' | string
@@ -342,6 +351,9 @@ const requestHttpTts = (engineId: string, text: string, speed: number) =>
     { engineId, text, speed },
     { responseType: 'blob' },
   )
+
+const lookupDictionary = (text: string, names?: string[]) =>
+  ajax.post<LeagdoApiResponse<DictionaryResult[]>>('lookupDictionary', { text, names })
 
 const saveBook = (book: BaseBook) =>
   ajax.post<LeagdoApiResponse<string>>('saveBook', book)
@@ -569,6 +581,7 @@ export default {
   refreshRssSources,
   getRssArticleContent,
   requestHttpTts,
+  lookupDictionary,
   saveBook,
   exportBook,
   exportBookEpisodes,

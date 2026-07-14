@@ -145,7 +145,7 @@
     <div
       v-if="selectionSpeech.visible"
       class="selection-speech-button"
-      :class="{ 'selection-action-menu': readingPreferences.expandTextMenu || processTextEnabled }"
+      :class="{ 'selection-action-menu': readingPreferences.expandTextMenu || processTextEnabled || dictionaryEnabled }"
       :style="{ left: `${selectionSpeech.x}px`, top: `${selectionSpeech.y}px` }"
       @click.stop
     >
@@ -164,6 +164,13 @@
         @click.stop="searchSelectedText"
       ><Search /></button>
       <button
+        v-if="dictionaryEnabled"
+        type="button"
+        title="查询选中文本"
+        aria-label="查询选中文本"
+        @click.stop="lookupSelectedText"
+      ><Search /></button>
+      <button
         v-if="processTextEnabled"
         type="button"
         title="保存为书签摘录"
@@ -177,6 +184,25 @@
         @click.stop="speakSelectedText"
       ><Headset /></button>
     </div>
+    <el-dialog
+      v-model="dictionaryDialog.visible"
+      :title="`字典：${dictionaryDialog.text}`"
+      width="min(720px, calc(100vw - 24px))"
+      class="dictionary-dialog"
+    >
+      <div v-loading="dictionaryDialog.loading" class="dictionary-results">
+        <el-tabs v-if="dictionaryDialog.results.length" type="border-card">
+          <el-tab-pane v-for="result in dictionaryDialog.results" :key="result.name" :label="result.name">
+            <p v-if="!result.isSuccess" class="dictionary-error">{{ result.errorMsg || '查询失败' }}</p>
+            <p v-else-if="result.degraded" class="dictionary-note">{{ result.degraded }}</p>
+            <pre v-if="result.content" class="dictionary-content">{{ result.content }}</pre>
+            <el-empty v-else-if="result.isSuccess" description="未提取到可显示内容" :image-size="70" />
+            <el-link v-if="result.url" :href="result.url" target="_blank" type="primary">打开原始页面</el-link>
+          </el-tab-pane>
+        </el-tabs>
+        <el-empty v-else-if="!dictionaryDialog.loading" description="没有可用字典结果" />
+      </div>
+    </el-dialog>
     <label
       v-if="readingPreferences.showBrightnessView"
       class="brightness-control"
@@ -282,7 +308,7 @@
 import jump from '@/plugins/jump'
 import settings from '@/config/themeConfig'
 import API from '@api'
-import type { AppDataItem, AppSettings } from '@api'
+import type { AppDataItem, AppSettings, DictionaryResult } from '@api'
 import type { Book, SeachBook } from '@/book'
 import { useLoading } from '@/hooks/loading'
 import { useThrottleFn } from '@vueuse/shared'
@@ -299,6 +325,7 @@ const sourceCandidates = ref<SeachBook[]>([])
 let autoSourceChangeAttempted = false
 const appSettings = ref<AppSettings>({})
 const readStyles = ref<AppDataItem[]>([])
+const dictionaryRules = ref<AppDataItem[]>([])
 // loading spinner
 const { isLoading, loadingWrapper } = useLoading(content, '正在获取信息')
 const store = useBookStore()
@@ -539,6 +566,15 @@ const aloudPreferences = computed(() => {
 const speechActive = ref(false)
 const speechLoading = ref(false)
 const selectionSpeech = reactive({ visible: false, text: '', x: 0, y: 0 })
+const dictionaryDialog = reactive({
+  visible: false,
+  loading: false,
+  text: '',
+  results: [] as DictionaryResult[],
+})
+const dictionaryEnabled = computed(() =>
+  dictionaryRules.value.some(rule => rule.enabled !== false && String(rule.urlRule || '').trim()),
+)
 let speechTimer: ReturnType<typeof setTimeout> | null = null
 let speechSegments: string[] = []
 let speechSegmentIndex = 0
@@ -759,7 +795,8 @@ function handleTextSelection(event: MouseEvent) {
     !selection?.rangeCount ||
     (aloudPreferences.value.selectionMode === '0' &&
       !readingPreferences.value.expandTextMenu &&
-      !processTextEnabled.value)
+      !processTextEnabled.value &&
+      !dictionaryEnabled.value)
   ) {
     selectionSpeech.visible = false
     return
@@ -776,6 +813,7 @@ function handleTextSelection(event: MouseEvent) {
   const menuWidth =
     (readingPreferences.value.expandTextMenu ? 88 : 0) +
     (processTextEnabled.value ? 44 : 0) +
+    (dictionaryEnabled.value ? 44 : 0) +
     44
   selectionSpeech.x = Math.min(window.innerWidth - menuWidth - 8, Math.max(8, event.clientX + 8))
   selectionSpeech.y = Math.min(window.innerHeight - 48, Math.max(8, event.clientY + 8))
@@ -787,6 +825,26 @@ function speakSelectedText() {
   selectionSpeech.visible = false
   window.getSelection()?.removeAllRanges()
   speakText(text)
+}
+
+async function lookupSelectedText() {
+  const text = selectionSpeech.text.trim()
+  if (!text) return
+  selectionSpeech.visible = false
+  window.getSelection()?.removeAllRanges()
+  dictionaryDialog.visible = true
+  dictionaryDialog.loading = true
+  dictionaryDialog.text = text
+  dictionaryDialog.results = []
+  try {
+    const response = await API.lookupDictionary(text)
+    if (!response.data.isSuccess) throw new Error(response.data.errorMsg || '字典查询失败')
+    dictionaryDialog.results = response.data.data || []
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '字典查询失败')
+  } finally {
+    dictionaryDialog.loading = false
+  }
 }
 
 async function copySelectedText() {
@@ -1736,12 +1794,14 @@ const ignoreKeyPress = (event: KeyboardEvent) => {
 }
 async function loadAppPreferences() {
   try {
-    const [response, stylesResponse] = await Promise.all([
+    const [response, stylesResponse, dictionaryResponse] = await Promise.all([
       API.getAppSettings(),
       API.getAppData('readStyles'),
+      API.getAppData('dictRules'),
     ])
     if (response.data.isSuccess) appSettings.value = response.data.data
     if (stylesResponse.data.isSuccess) readStyles.value = stylesResponse.data.data
+    if (dictionaryResponse.data.isSuccess) dictionaryRules.value = dictionaryResponse.data.data
   } catch {
     // Reading remains functional with its existing local configuration.
   }
@@ -2277,6 +2337,24 @@ onBeforeRouteLeave(async (to, from, next) => {
     background: #666;
   }
 }
+
+.dictionary-results {
+  min-height: 140px;
+}
+
+.dictionary-content {
+  max-height: min(52vh, 520px);
+  margin: 0 0 14px;
+  overflow: auto;
+  color: #1f2937;
+  font: inherit;
+  line-height: 1.75;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.dictionary-error { color: #b91c1c; }
+.dictionary-note { color: #a16207; font-size: 13px; line-height: 1.55; }
 
 @media screen and (max-width: 776px) {
   .chapter-wrapper {

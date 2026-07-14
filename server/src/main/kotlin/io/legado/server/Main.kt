@@ -295,6 +295,7 @@ class LegadoHttpServer(
             "/refreshRssSources" -> store.refreshRssSources(post.postData)
             "/getRssArticleContent" -> store.getRssArticleContent(post.postData)
             "/requestHttpTts" -> throw AudioResponse(store.requestHttpTts(post.postData))
+            "/lookupDictionary" -> store.lookupDictionary(post.postData)
             "/findBookSourceCandidates" -> store.findBookSourceCandidates(post.postData)
             "/changeBookSource" -> store.changeBookSource(post.postData)
             "/autoChangeBookSource" -> store.autoChangeBookSource(post.postData)
@@ -560,7 +561,7 @@ class LegadoStore(
         AppDataKind("readRecords", "阅读记录", "最近阅读、阅读时长和入口历史", "id", "配置保留"),
         AppDataKind("httpTTS", "HTTP TTS", "在线朗读引擎、请求头和登录脚本", "id", "Web 可用"),
         AppDataKind("cookies", "Cookie 管理", "启用 Cookie Jar 的书源登录 Cookie", "url", "Web 可用"),
-        AppDataKind("dictRules", "字典规则", "划词字典查询规则", "name", "Linux 需实现"),
+        AppDataKind("dictRules", "字典规则", "划词字典查询规则", "name", "Web 可用"),
         AppDataKind("rssArticles", "RSS 文章缓存", "订阅源规则解析后的文章列表、分组和阅读状态", "link", "Web 可用"),
         AppDataKind("rssReadRecords", "RSS 阅读记录", "订阅阅读进度和已读记录", "record", "配置保留"),
         AppDataKind("rssStars", "RSS 收藏", "订阅文章收藏和星标", "link", "配置保留"),
@@ -1593,6 +1594,86 @@ class LegadoStore(
         record.addProperty("lastUseTime", System.currentTimeMillis())
         writeList("cookies", cookies)
     }
+
+    @Synchronized
+    fun lookupDictionary(postData: String?): ReturnData {
+        val payload = parseJson(postData)?.asObjectOrNull() ?: return ReturnData.error("Expected JSON object")
+        val text = payload.string("text")?.trim().orEmpty()
+        if (text.isBlank()) return ReturnData.error("text is required")
+        if (text.length > 256) return ReturnData.error("Dictionary lookup text exceeds 256 characters")
+        val requestedNames = payload["names"].asArrayOrNull()
+            ?.mapNotNull { runCatching { it.asString.trim() }.getOrNull()?.takeIf(String::isNotBlank) }
+            ?.toSet()
+            .orEmpty()
+        val rules = readList("dictRules")
+            .asSequence()
+            .filter { it["enabled"]?.safeBoolean() != false }
+            .filter { requestedNames.isEmpty() || it.string("name") in requestedNames }
+            .sortedBy { it["sortNumber"].safeInt() }
+            .take(12)
+            .toList()
+        if (rules.isEmpty()) return ReturnData.error("No enabled dictionary rules")
+        return ReturnData.ok(rules.map { rule -> lookupDictionaryRule(rule, text) })
+    }
+
+    private fun lookupDictionaryRule(rule: JsonObject, text: String): Map<String, Any> {
+        val name = rule.string("name").orEmpty().ifBlank { "Dictionary" }
+        return try {
+            val url = expandDictionaryUrl(rule.string("urlRule").orEmpty(), text)
+            val request = parseSourceRequestUrl(url) ?: throw IllegalArgumentException("urlRule must use HTTP or HTTPS")
+            val builder = HttpRequest.newBuilder(URI.create(request.url))
+                .timeout(Duration.ofSeconds(20))
+                .header("User-Agent", networkUserAgent())
+            parseHttpTtsHeaders(rule.string("header")).forEach { (header, value) -> builder.header(header, value) }
+            val response = networkClient().send(builder.GET().build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
+            if (response.statusCode() !in 200..299) throw IllegalArgumentException("HTTP ${response.statusCode()}")
+            val extracted = extractDictionaryContent(response.body(), rule.string("showRule"))
+            mapOf(
+                "name" to name,
+                "content" to extracted.first,
+                "url" to request.url,
+                "degraded" to extracted.second.orEmpty(),
+                "isSuccess" to true,
+            )
+        } catch (error: Exception) {
+            mapOf(
+                "name" to name,
+                "content" to "",
+                "url" to "",
+                "degraded" to "",
+                "isSuccess" to false,
+                "errorMsg" to (error.message ?: error.javaClass.simpleName),
+            )
+        }
+    }
+
+    private fun expandDictionaryUrl(template: String, text: String): String {
+        if (template.isBlank()) throw IllegalArgumentException("Dictionary urlRule is empty")
+        val key = encodeUrlComponent(text)
+        return template
+            .replace("{{key}}", key)
+            .replace("{{searchKey}}", key)
+            .replace("{key}", key)
+            .replace("%s", key)
+    }
+
+    private fun extractDictionaryContent(body: String, rule: String?): Pair<String, String?> {
+        if (rule.isNullOrBlank()) return readableDictionaryText(body) to null
+        if (rule.contains("@js:", true)) {
+            return readableDictionaryText(body) to "Android JavaScript display rule was not executed; showing readable page text."
+        }
+        val legacyTagRule = rule.trim().takeIf { it.startsWith("tag.", true) }
+        val extracted = if (legacyTagRule != null) {
+            val selector = legacyTagRule.substringAfter("tag.").substringBefore('@').trim()
+            Jsoup.parse(body).selectFirst(selector)?.text().orEmpty()
+        } else {
+            extractRuleValue(body, rule)
+        }
+        return readableDictionaryText(extracted) to null
+    }
+
+    private fun readableDictionaryText(value: String): String =
+        Jsoup.parseBodyFragment(value).text().replace(Regex("\\s+"), " ").trim().take(50_000)
 
     private fun searchBookSources(key: String, group: String = ""): List<JsonObject> {
         val sources = readList("bookSources")

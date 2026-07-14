@@ -407,8 +407,8 @@ const featureGroups: FeatureGroup[] = [
   {
     name: '规则工具',
     description: '替换规则、TXT 目录规则、字典规则和检查源配置。',
-    coverage: '替换/TXT 可用，字典规则已可落盘',
-    status: '部分可用',
+    coverage: '替换/TXT/划词字典均可执行，JavaScript 规则降级为可读正文。',
+    status: 'Web 可用',
     tone: 'tone-amber',
     icon: Search,
     actions: [
