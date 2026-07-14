@@ -270,7 +270,7 @@
         >
           <strong>{{ candidate.originName }}</strong>
           <span>{{ candidate.name }}<template v-if="candidate.author"> · {{ candidate.author }}</template></span>
-          <small>{{ candidate.latestChapterTitle || candidate.intro || candidate.bookUrl }}</small>
+          <small>{{ candidateSummary(candidate) }}</small>
         </button>
       </div>
       <el-empty v-else description="没有找到可用的匹配书源" />
@@ -1101,6 +1101,10 @@ async function openSourceCandidates() {
   } finally {
     sourceCandidatesLoading.value = false
   }
+}
+function candidateSummary(candidate: SeachBook) {
+  const detail = candidate.latestChapterTitle || candidate.intro || candidate.bookUrl
+  return [candidate.chapterWordCountText, detail].filter(Boolean).join(' · ')
 }
 async function switchBookSource(candidate: SeachBook) {
   try {

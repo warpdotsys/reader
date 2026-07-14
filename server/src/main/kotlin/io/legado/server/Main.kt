@@ -1386,6 +1386,7 @@ class LegadoStore(
             .filter { it.string("origin") != book.string("origin") }
             .filter { !changeSourceCheckAuthor() || compatibleAuthors(book.string("author"), it.string("author")) }
             .distinctBy { "${it.string("origin")}\u0000${it.string("bookUrl")}" }
+        if (loadSourceWordCount()) candidates.forEach(::loadCandidateWordCount)
         return ReturnData.ok(candidates)
     }
 
@@ -1510,13 +1511,33 @@ class LegadoStore(
         )
     }
 
-    private fun findAlternativeSourceCandidate(book: JsonObject): JsonObject? =
+    private fun findAlternativeSourceCandidate(book: JsonObject): JsonObject? {
+        val candidate =
         searchBookSources(book.string("name").orEmpty())
             .firstOrNull { result ->
                 sameBookTitle(result.string("name"), book.string("name")) &&
                     result.string("origin") != book.string("origin") &&
                     (!changeSourceCheckAuthor() || compatibleAuthors(book.string("author"), result.string("author")))
             }
+        if (candidate != null && loadSourceWordCount()) loadCandidateWordCount(candidate)
+        return candidate
+    }
+
+    private fun loadCandidateWordCount(candidate: JsonObject) {
+        val source = readList("bookSources").firstOrNull {
+            it.string("bookSourceUrl") == candidate.string("origin") && it["enabled"]?.safeBoolean() != false
+        } ?: return
+        val chapters = loadRemoteChapters(candidate, source)
+        val latest = chapters.lastOrNull() ?: return
+        val content = loadRemoteChapterContent(latest, source) ?: return
+        val count = content.count { !it.isWhitespace() }
+        if (count <= 0) return
+        candidate.addProperty("chapterWordCount", count)
+        candidate.addProperty("chapterWordCountText", "$count 字")
+        if (candidate.string("latestChapterTitle").isNullOrBlank()) {
+            candidate.addProperty("latestChapterTitle", latest.string("title") ?: "")
+        }
+    }
 
     private fun sameBookTitle(left: String?, right: String?): Boolean =
         left?.trim()?.equals(right?.trim(), ignoreCase = true) == true
@@ -1542,6 +1563,9 @@ class LegadoStore(
 
     private fun batchChangeSourceDelay(): Int = readAppSettings()["network"]
         .asObjectOrNull()?.get("batchChangeSourceDelay")?.safeIntOrNull()?.coerceIn(0, 30000) ?: 0
+
+    private fun loadSourceWordCount(): Boolean = readAppSettings()["network"]
+        .asObjectOrNull()?.get("changeSourceLoadWordCount")?.safeBoolean() == true
 
     private fun searchSource(source: JsonObject, key: String): List<JsonObject> {
         val startedAt = System.nanoTime()
