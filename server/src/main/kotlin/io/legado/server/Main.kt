@@ -233,6 +233,8 @@ class LegadoHttpServer(
             cors(image.response)
         } catch (audio: AudioResponse) {
             cors(audio.response)
+        } catch (download: DownloadResponse) {
+            cors(download.response)
         } catch (error: Exception) {
             cors(json(ReturnData.error(error.message ?: error.javaClass.simpleName)))
         }
@@ -271,6 +273,7 @@ class LegadoHttpServer(
             )
 
             "/getReadConfig" -> store.getReadConfig()
+            "/downloadTaskFile" -> throw DownloadResponse(store.downloadTaskFile(parameters.first("id")))
             "/cover", "/image" -> throw ImageResponse(imageProxy.get(parameters.first("path")))
             else -> null
         }
@@ -416,6 +419,7 @@ private data class EpubImage(val fileName: String, val mime: String, val bytes: 
 
 class ImageResponse(val response: NanoHTTPD.Response) : RuntimeException()
 class AudioResponse(val response: NanoHTTPD.Response) : RuntimeException()
+class DownloadResponse(val response: NanoHTTPD.Response) : RuntimeException()
 
 class ImageProxy(
     private val userAgent: () -> String,
@@ -1766,6 +1770,29 @@ class LegadoStore(
             update(task)
             task.addProperty("updatedAt", System.currentTimeMillis())
             writeList("downloadTasks", tasks)
+        }
+    }
+
+    @Synchronized
+    fun downloadTaskFile(taskId: String?): NanoHTTPD.Response {
+        if (taskId.isNullOrBlank()) throw IllegalArgumentException("id is required")
+        val task = readList("downloadTasks").firstOrNull { it.string("id") == taskId }
+            ?: throw IllegalArgumentException("Download task not found")
+        if (task.string("status") != "done") throw IllegalArgumentException("Download task is not complete")
+        val target = task.string("path")?.let(Paths::get)?.toAbsolutePath()?.normalize()
+            ?: throw IllegalArgumentException("Download task has no file")
+        if (!target.startsWith(downloadsDir.toAbsolutePath().normalize()) || !target.isRegularFile()) {
+            throw IllegalArgumentException("Download task file is unavailable")
+        }
+        val fileName = target.fileName.toString().replace('"', '_').replace('\r', '_').replace('\n', '_')
+        return NanoHTTPD.newFixedLengthResponse(
+            NanoHTTPD.Response.Status.OK,
+            "text/plain; charset=utf-8",
+            Files.newInputStream(target),
+            Files.size(target),
+        ).apply {
+            addHeader("Content-Disposition", "attachment; filename=\"$fileName\"")
+            addHeader("Cache-Control", "no-store")
         }
     }
 

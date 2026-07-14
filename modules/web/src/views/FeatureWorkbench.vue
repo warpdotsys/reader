@@ -203,6 +203,12 @@
               <el-button :icon="EditPen" text @click="openEditEditor(row)" />
               <el-button :icon="Files" text @click="openJsonEditor(row)" />
               <el-button
+                v-if="activeKind?.kind === 'downloadTasks' && row.status === 'done'"
+                :icon="Download"
+                text
+                @click="downloadTaskFile(row)"
+              />
+              <el-button
                 :icon="Delete"
                 text
                 type="danger"
@@ -830,6 +836,23 @@ function downloadJson(data: unknown, fileName: string) {
   anchor.download = fileName.replace(/[:.]/g, '-')
   anchor.click()
   URL.revokeObjectURL(url)
+}
+
+async function downloadTaskFile(task: AppDataItem) {
+  const id = String(task.id || '')
+  if (!id) return
+  try {
+    const response = await API.getDownloadTaskFile(id)
+    const name = `${String(task.name || 'book').replace(/[\\/:*?"<>|]/g, '_')}.txt`
+    const url = URL.createObjectURL(response.data)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = name
+    anchor.click()
+    URL.revokeObjectURL(url)
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '下载离线文件失败')
+  }
 }
 
 onMounted(() => {
