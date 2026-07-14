@@ -364,6 +364,9 @@ const getDownloadTaskFile = (taskId: string) =>
 const lookupDictionary = (text: string, names?: string[]) =>
   ajax.post<LeagdoApiResponse<DictionaryResult[]>>('lookupDictionary', { text, names })
 
+const applyThemeConfig = (themeName: string) =>
+  ajax.post<LeagdoApiResponse<AppSettings>>('applyThemeConfig', { themeName })
+
 const saveBook = (book: BaseBook) =>
   ajax.post<LeagdoApiResponse<string>>('saveBook', book)
 const exportBook = (bookUrl: string) =>
@@ -594,6 +597,7 @@ export default {
   cancelBookDownload,
   getDownloadTaskFile,
   lookupDictionary,
+  applyThemeConfig,
   saveBook,
   exportBook,
   exportBookEpisodes,

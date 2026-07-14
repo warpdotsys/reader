@@ -203,6 +203,13 @@
               <el-button :icon="EditPen" text @click="openEditEditor(row)" />
               <el-button :icon="Files" text @click="openJsonEditor(row)" />
               <el-button
+                v-if="activeKind?.kind === 'themeConfigs'"
+                :icon="Check"
+                text
+                type="success"
+                @click="applyThemeConfig(row)"
+              />
+              <el-button
                 v-if="activeKind?.kind === 'downloadTasks' && row.status === 'done'"
                 :icon="Download"
                 text
@@ -311,6 +318,7 @@
 import type { Component } from 'vue'
 import {
   Collection,
+  Check,
   Connection,
   DataAnalysis,
   Delete,
@@ -336,6 +344,7 @@ import type {
   LeagdoApiResponse,
   ServerInfo,
 } from '@api'
+import { applyAppSettings } from '@/settings/runtime'
 import {
   appDataProfiles,
   createAppDataTemplate,
@@ -883,6 +892,18 @@ async function cancelDownloadTask(task: AppDataItem) {
     ElMessage.success('已取消下载任务')
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '取消下载任务失败')
+  }
+}
+
+async function applyThemeConfig(config: AppDataItem) {
+  const themeName = String(config.themeName || '').trim()
+  if (!themeName) return
+  try {
+    const settings = unwrap(await API.applyThemeConfig(themeName))
+    applyAppSettings(settings)
+    ElMessage.success(`已应用主题：${themeName}`)
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '应用主题失败')
   }
 }
 

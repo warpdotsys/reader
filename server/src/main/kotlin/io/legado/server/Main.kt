@@ -299,6 +299,7 @@ class LegadoHttpServer(
             "/getRssArticleContent" -> store.getRssArticleContent(post.postData)
             "/requestHttpTts" -> throw AudioResponse(store.requestHttpTts(post.postData))
             "/lookupDictionary" -> store.lookupDictionary(post.postData)
+            "/applyThemeConfig" -> store.applyThemeConfig(post.postData)
             "/startBookDownload" -> store.startBookDownload(post.postData)
             "/cancelBookDownload" -> store.cancelBookDownload(post.postData)
             "/findBookSourceCandidates" -> store.findBookSourceCandidates(post.postData)
@@ -577,7 +578,7 @@ class LegadoStore(
         AppDataKind("rssStars", "RSS 收藏", "订阅文章收藏和星标", "link", "Web 可用"),
         AppDataKind("cacheRecords", "缓存记录", "通用缓存、源变量和临时数据", "key", "配置保留"),
         AppDataKind("downloadTasks", "下载任务", "离线下载、缓存书籍、媒体下载队列", "id", "Web 可用"),
-        AppDataKind("themeConfigs", "主题方案", "Android 主题方案列表", "themeName", "配置保留"),
+        AppDataKind("themeConfigs", "主题方案", "Android 主题方案列表", "themeName", "Web 可用"),
         AppDataKind("readStyles", "阅读样式", "阅读排版方案、背景、字体和提示栏", "name", "Web 可用"),
     )
 
@@ -1329,6 +1330,38 @@ class LegadoStore(
         }
         if (kind.kind == "rssArticles") syncRssArticleMetadata(readList("rssArticles"))
         return ReturnData.ok(readList(kind.kind))
+    }
+
+    @Synchronized
+    fun applyThemeConfig(postData: String?): ReturnData {
+        val payload = parseJson(postData)?.asObjectOrNull() ?: return ReturnData.error("Expected JSON object")
+        val themeName = payload.string("themeName")?.trim().orEmpty()
+        if (themeName.isBlank()) return ReturnData.error("themeName is required")
+        val config = readList("themeConfigs").firstOrNull { it.string("themeName") == themeName }
+            ?: return ReturnData.error("Theme config not found")
+        val settings = readAppSettings()
+        val theme = settings["theme"].asObjectOrNull() ?: JsonObject().also { settings.add("theme", it) }
+        val night = config["isNight"]?.safeBoolean() == true
+        config.string("colorPrimary")?.takeIf(String::isNotBlank)?.let {
+            theme.addProperty(if (night) "colorPrimaryNight" else "colorPrimary", it)
+        }
+        config.string("colorAccent")?.takeIf(String::isNotBlank)?.let {
+            theme.addProperty(if (night) "colorAccentNight" else "colorAccent", it)
+        }
+        config.string("backgroundColor")?.takeIf(String::isNotBlank)?.let {
+            theme.addProperty(if (night) "colorBackgroundNight" else "colorBackground", it)
+        }
+        config.string("textColor")?.takeIf(String::isNotBlank)?.let {
+            theme.addProperty(if (night) "textColorNight" else "textColor", it)
+        }
+        config.string("config")?.let { raw ->
+            val extra = runCatching { JsonParser.parseString(raw).asObjectOrNull() }.getOrNull()
+            extra?.entrySet()?.forEach { (key, value) -> theme.add(key, value.deepCopy()) }
+        }
+        val main = settings["main"].asObjectOrNull() ?: JsonObject().also { settings.add("main", it) }
+        main.addProperty("themeMode", if (night) "2" else "1")
+        writeAppSettings(settings)
+        return ReturnData.ok(settings)
     }
 
     @Synchronized
