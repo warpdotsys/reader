@@ -348,31 +348,25 @@ const deleteSource = (data: Source[]) =>
     ? ajax.post<LeagdoApiResponse<string>>('deleteBookSources', data)
     : ajax.post<LeagdoApiResponse<string>>('deleteRssSources', data)
 
-// webSocket
 const debug = (
   /** @type {string} */ sourceUrl: string,
   /** @type {string} */ searchKey: string,
   /** @type {(data: string) => void} */ onReceive: (data: string) => void,
   /** @type {() => void} */ onFinish: () => void,
 ) => {
-  const url = new URL(
-    `${isBookSourceRoute() ? 'bookSource' : 'rssSource'}Debug`,
-    legado_webSocket_entry_point,
-  )
-
-  const socket = new WebSocket(url)
-  socket.onerror = wsOnError
-  socket.onopen = () => {
-    socket.send(JSON.stringify({ tag: sourceUrl, key: searchKey }))
-  }
-  socket.onmessage = event => {
-    onReceive(event.data)
-    wsOnMessage?.call(socket, event)
-  }
-
-  socket.onclose = () => {
-    onFinish()
-  }
+  ajax
+    .post<LeagdoApiResponse<unknown>>('debugSource', {
+      kind: isBookSourceRoute() ? 'book' : 'rss',
+      sourceUrl,
+      key: searchKey,
+    })
+    .then(({ data }) => {
+      onReceive(data.isSuccess ? JSON.stringify(data.data, null, 2) : data.errorMsg)
+    })
+    .catch(() => {
+      ;(wsOnError as unknown as (event: Event) => void)(new Event('error'))
+    })
+    .finally(onFinish)
 }
 
 /**

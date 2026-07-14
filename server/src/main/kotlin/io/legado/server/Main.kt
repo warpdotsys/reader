@@ -288,6 +288,7 @@ class LegadoHttpServer(
             "/deleteReplaceRule" -> store.deleteReplaceRule(post.postData)
             "/testReplaceRule" -> store.testReplaceRule(post.postData)
             "/searchBooks" -> store.searchBooks(post.postData)
+            "/debugSource" -> store.debugSource(post.postData)
             "/findBookSourceCandidates" -> store.findBookSourceCandidates(post.postData)
             "/changeBookSource" -> store.changeBookSource(post.postData)
             "/autoChangeBookSource" -> store.autoChangeBookSource(post.postData)
@@ -1354,6 +1355,52 @@ class LegadoStore(
         if (key.isBlank()) return ReturnData.error("key is required")
         val group = payload.string("group")?.trim().orEmpty()
         return ReturnData.ok(searchBookSources(key, group))
+    }
+
+    @Synchronized
+    fun debugSource(postData: String?): ReturnData {
+        val payload = parseJson(postData)?.asObjectOrNull() ?: return ReturnData.error("Expected JSON object")
+        val kind = payload.string("kind").orEmpty().lowercase()
+        val sourceUrl = payload.string("sourceUrl")?.trim().orEmpty()
+        if (sourceUrl.isBlank()) return ReturnData.error("sourceUrl is required")
+        return if (kind == "rss") {
+            val source = readList("rssSources").firstOrNull { it.string("sourceUrl") == sourceUrl }
+                ?: return ReturnData.error("RSS source not found")
+            val started = System.nanoTime()
+            val response = try {
+                val request = HttpRequest.newBuilder(URI.create(sourceUrl))
+                    .timeout(Duration.ofSeconds(15))
+                    .header("User-Agent", networkUserAgent())
+                    .GET()
+                    .build()
+                networkClient().send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
+            } catch (error: Exception) {
+                return ReturnData.error(error.message ?: error.javaClass.simpleName)
+            }
+            ReturnData.ok(mapOf(
+                "kind" to "rss",
+                "sourceName" to (source.string("sourceName") ?: ""),
+                "statusCode" to response.statusCode(),
+                "latencyMs" to ((System.nanoTime() - started) / 1_000_000).coerceAtLeast(0),
+                "bodyPreview" to response.body().take(8192),
+                "message" to "RSS connection response; RSS article rule execution is not available yet.",
+            ))
+        } else {
+            val source = readList("bookSources").firstOrNull { it.string("bookSourceUrl") == sourceUrl }
+                ?: return ReturnData.error("Book source not found")
+            val key = payload.string("key")?.trim().orEmpty()
+            if (key.isBlank()) return ReturnData.error("key is required for book source debugging")
+            val started = System.nanoTime()
+            val results = searchSource(source, key)
+            ReturnData.ok(mapOf(
+                "kind" to "book",
+                "sourceName" to (source.string("bookSourceName") ?: ""),
+                "searchKey" to key,
+                "latencyMs" to ((System.nanoTime() - started) / 1_000_000).coerceAtLeast(0),
+                "resultCount" to results.size,
+                "results" to results,
+            ))
+        }
     }
 
     private fun searchBookSources(key: String, group: String = ""): List<JsonObject> {
