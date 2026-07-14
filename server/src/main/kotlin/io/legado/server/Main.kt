@@ -1430,10 +1430,7 @@ class LegadoStore(
         val builder = HttpRequest.newBuilder(URI.create(url))
             .timeout(Duration.ofSeconds(15))
             .header("User-Agent", networkUserAgent())
-        source.string("header")
-            ?.let { runCatching { JsonParser.parseString(it).asObjectOrNull() }.getOrNull() }
-            ?.entrySet()
-            ?.forEach { (name, value) -> if (name.isNotBlank()) builder.header(name, value.asString) }
+        applySourceHeaders(builder, source)
         options?.get("headers")?.asObjectOrNull()?.entrySet()?.forEach { (name, value) ->
             if (name.isNotBlank()) builder.header(name, value.asString)
         }
@@ -1442,6 +1439,13 @@ class LegadoStore(
             else -> builder.GET()
         }
         return SourceSearchRequest(builder.build(), url)
+    }
+
+    private fun applySourceHeaders(builder: HttpRequest.Builder, source: JsonObject) {
+        source.string("header")
+            ?.let { runCatching { JsonParser.parseString(it).asObjectOrNull() }.getOrNull() }
+            ?.entrySet()
+            ?.forEach { (name, value) -> if (name.isNotBlank()) builder.header(name, value.asString) }
     }
 
     private fun extractRuleValues(input: String, rule: String): List<String> {
@@ -1965,9 +1969,19 @@ class LegadoStore(
     @Synchronized
     fun getChapterList(bookUrl: String?): ReturnData {
         if (bookUrl.isNullOrBlank()) return ReturnData.error("Parameter url is required")
-        val chapters = readChapterList(bookUrl)
+        var chapters = readChapterList(bookUrl)
+        if (chapters.isEmpty()) {
+            val book = readList("books").firstOrNull { it.string("bookUrl") == bookUrl }
+                ?: return ReturnData.error("Book not found")
+            val source = sourceForBook(book) ?: return ReturnData.error("This book has no portable remote source rule")
+            chapters = loadRemoteChapters(book, source)
+            if (chapters.isNotEmpty()) {
+                writeChapterList(bookUrl, chapters)
+                updateBookChapterCount(bookUrl, chapters.size)
+            }
+        }
         return if (chapters.isEmpty()) {
-            ReturnData.error("No chapters saved for this book")
+            ReturnData.error("No chapters found; this source may require an unsupported JavaScript, CSS, or XPath rule")
         } else {
             ReturnData.ok(chapters.map { it.withoutInternalContent() })
         }
@@ -1989,9 +2003,75 @@ class LegadoStore(
     fun getBookContent(bookUrl: String?, index: Int?): ReturnData {
         if (bookUrl.isNullOrBlank()) return ReturnData.error("Parameter url is required")
         if (index == null) return ReturnData.error("Parameter index is required")
-        val chapter = readChapterList(bookUrl).firstOrNull { it["index"].safeInt() == index }
+        var chapters = readChapterList(bookUrl)
+        if (chapters.isEmpty()) {
+            val result = getChapterList(bookUrl)
+            if (!result.isSuccess) return result
+            chapters = readChapterList(bookUrl)
+        }
+        val chapter = chapters.firstOrNull { it["index"].safeInt() == index }
             ?: return ReturnData.error("Chapter not found")
-        return ReturnData.ok(chapter.string("content") ?: "")
+        chapter.string("content")?.let { return ReturnData.ok(it) }
+        val book = readList("books").firstOrNull { it.string("bookUrl") == bookUrl }
+            ?: return ReturnData.error("Book not found")
+        val source = sourceForBook(book) ?: return ReturnData.error("This book has no portable remote source rule")
+        val content = loadRemoteChapterContent(chapter, source)
+            ?: return ReturnData.error("Unable to load chapter content with this source rule")
+        chapter.addProperty("content", content)
+        writeChapterList(bookUrl, chapters)
+        return ReturnData.ok(content)
+    }
+
+    private fun sourceForBook(book: JsonObject): JsonObject? {
+        val origin = book.string("origin").orEmpty()
+        if (origin.isBlank() || origin == "local") return null
+        return readList("bookSources").firstOrNull { it.string("bookSourceUrl") == origin }
+    }
+
+    private fun loadRemoteChapters(book: JsonObject, source: JsonObject): List<JsonObject> {
+        val rule = source["ruleToc"].asObjectOrNull() ?: return emptyList()
+        val tocUrl = book.string("tocUrl")?.ifBlank { book.string("bookUrl") }.orEmpty()
+        val response = fetchSourceText(source, tocUrl) ?: return emptyList()
+        val entries = extractRuleValues(response, rule.string("chapterList").orEmpty())
+        val bookUrl = book.string("bookUrl").orEmpty()
+        return entries.mapIndexedNotNull { index, entry ->
+            val title = extractRuleValue(entry, rule.string("chapterName")).trim()
+            val chapterUrl = resolveSearchUrl(tocUrl, extractRuleValue(entry, rule.string("chapterUrl")).trim())
+            if (title.isBlank() || chapterUrl.isBlank()) return@mapIndexedNotNull null
+            JsonObject().apply {
+                addProperty("url", chapterUrl)
+                addProperty("title", title)
+                addProperty("isVolume", false)
+                addProperty("baseUrl", tocUrl)
+                addProperty("bookUrl", bookUrl)
+                addProperty("index", index)
+                addProperty("isVip", false)
+                addProperty("isPay", false)
+                extractRuleValue(entry, rule.string("chapterTag")).trim().takeIf(String::isNotBlank)
+                    ?.let { addProperty("tag", it) }
+            }
+        }
+    }
+
+    private fun loadRemoteChapterContent(chapter: JsonObject, source: JsonObject): String? {
+        val response = fetchSourceText(source, chapter.string("url").orEmpty()) ?: return null
+        val rule = source["ruleContent"].asObjectOrNull()?.string("content")
+        if (rule.isNullOrBlank()) return response
+        return extractRuleValue(response, rule).takeIf(String::isNotBlank)
+    }
+
+    private fun fetchSourceText(source: JsonObject, url: String): String? {
+        if (!url.startsWith("http://", true) && !url.startsWith("https://", true)) return null
+        return try {
+            val builder = HttpRequest.newBuilder(URI.create(url))
+                .timeout(Duration.ofSeconds(20))
+                .header("User-Agent", networkUserAgent())
+            applySourceHeaders(builder, source)
+            val response = networkClient().send(builder.GET().build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
+            response.body().takeIf { response.statusCode() in 200..299 }
+        } catch (_: Exception) {
+            null
+        }
     }
 
     @Synchronized
