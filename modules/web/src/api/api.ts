@@ -352,6 +352,9 @@ const requestHttpTts = (engineId: string, text: string, speed: number) =>
     { responseType: 'blob' },
   )
 
+const startBookDownload = (bookUrl: string) =>
+  ajax.post<LeagdoApiResponse<AppDataItem>>('startBookDownload', { bookUrl })
+
 const lookupDictionary = (text: string, names?: string[]) =>
   ajax.post<LeagdoApiResponse<DictionaryResult[]>>('lookupDictionary', { text, names })
 
@@ -581,6 +584,7 @@ export default {
   refreshRssSources,
   getRssArticleContent,
   requestHttpTts,
+  startBookDownload,
   lookupDictionary,
   saveBook,
   exportBook,

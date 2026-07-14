@@ -78,6 +78,15 @@
         <button
           class="tool-icon auto-read-button"
           type="button"
+          title="离线缓存整本书"
+          @click.stop="startOfflineDownload"
+        >
+          <Download />
+          <div class="icon-text">离线</div>
+        </button>
+        <button
+          class="tool-icon auto-read-button"
+          type="button"
           title="分章导出 ZIP"
           @click.stop="downloadEpisodeArchive"
         >
@@ -890,6 +899,16 @@ async function downloadCurrentBook() {
     downloadExportResult(response.data.data)
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '导出失败')
+  }
+}
+
+async function startOfflineDownload() {
+  try {
+    const response = await API.startBookDownload(store.readingBook.bookUrl)
+    if (!response.data.isSuccess) throw new Error(response.data.errorMsg || '无法创建离线下载任务')
+    ElMessage.success('已创建离线下载任务，可在功能页查看进度')
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '无法创建离线下载任务')
   }
 }
 

@@ -296,6 +296,7 @@ class LegadoHttpServer(
             "/getRssArticleContent" -> store.getRssArticleContent(post.postData)
             "/requestHttpTts" -> throw AudioResponse(store.requestHttpTts(post.postData))
             "/lookupDictionary" -> store.lookupDictionary(post.postData)
+            "/startBookDownload" -> store.startBookDownload(post.postData)
             "/findBookSourceCandidates" -> store.findBookSourceCandidates(post.postData)
             "/changeBookSource" -> store.changeBookSource(post.postData)
             "/autoChangeBookSource" -> store.autoChangeBookSource(post.postData)
@@ -551,10 +552,14 @@ class LegadoStore(
     private val gson: Gson,
 ) {
     private val booksDir = dataDir.resolve("books")
+    private val downloadsDir = dataDir.resolve("downloads")
     @Volatile private var sourceCheckClientMode = false
     @Volatile private var sourceCheckClient = buildNetworkClient(false)
     private val authSessions = ConcurrentHashMap<String, Long>()
     private val sourceCookieLock = Any()
+    private val downloadExecutor = Executors.newFixedThreadPool(2) { runnable ->
+        Thread(runnable, "legado-download").apply { isDaemon = true }
+    }
     private val appDataKinds = listOf(
         AppDataKind("bookGroups", "书籍分组", "书架分组、排序、刷新策略", "groupId", "Web 可用"),
         AppDataKind("bookmarks", "书签摘录", "阅读器书签、划线、摘录内容", "time", "Web 可用"),
@@ -566,7 +571,7 @@ class LegadoStore(
         AppDataKind("rssReadRecords", "RSS 阅读记录", "订阅阅读进度和已读记录", "record", "配置保留"),
         AppDataKind("rssStars", "RSS 收藏", "订阅文章收藏和星标", "link", "配置保留"),
         AppDataKind("cacheRecords", "缓存记录", "通用缓存、源变量和临时数据", "key", "配置保留"),
-        AppDataKind("downloadTasks", "下载任务", "离线下载、缓存书籍、媒体下载队列", "id", "Linux 需实现"),
+        AppDataKind("downloadTasks", "下载任务", "离线下载、缓存书籍、媒体下载队列", "id", "Web 可用"),
         AppDataKind("themeConfigs", "主题方案", "Android 主题方案列表", "themeName", "配置保留"),
         AppDataKind("readStyles", "阅读样式", "阅读排版方案、背景、字体和提示栏", "name", "Web 可用"),
     )
@@ -574,6 +579,7 @@ class LegadoStore(
     init {
         Files.createDirectories(dataDir)
         Files.createDirectories(booksDir)
+        Files.createDirectories(downloadsDir)
         seedDefaultData()
         applyCustomHostsPreference()
         applyHeapDumpPreference()
@@ -1674,6 +1680,94 @@ class LegadoStore(
 
     private fun readableDictionaryText(value: String): String =
         Jsoup.parseBodyFragment(value).text().replace(Regex("\\s+"), " ").trim().take(50_000)
+
+    @Synchronized
+    fun startBookDownload(postData: String?): ReturnData {
+        val payload = parseJson(postData)?.asObjectOrNull() ?: return ReturnData.error("Expected JSON object")
+        val bookUrl = payload.string("bookUrl")?.trim().orEmpty()
+        if (bookUrl.isBlank()) return ReturnData.error("bookUrl is required")
+        val book = readList("books").firstOrNull { it.string("bookUrl") == bookUrl }
+            ?: return ReturnData.error("Book not found")
+        val active = readList("downloadTasks").firstOrNull {
+            it.string("bookUrl") == bookUrl && it.string("kind") == "book" && it.string("status") in setOf("queued", "running")
+        }
+        if (active != null) return ReturnData.ok(active)
+        val task = JsonObject().apply {
+            addProperty("id", UUID.randomUUID().toString())
+            addProperty("kind", "book")
+            addProperty("bookUrl", bookUrl)
+            addProperty("name", book.string("name") ?: "Book")
+            addProperty("status", "queued")
+            addProperty("progress", 0)
+            addProperty("updatedAt", System.currentTimeMillis())
+        }
+        val tasks = readList("downloadTasks")
+        tasks.add(task)
+        writeList("downloadTasks", tasks)
+        val taskId = task.string("id").orEmpty()
+        downloadExecutor.submit { runBookDownload(taskId, bookUrl) }
+        return ReturnData.ok(task)
+    }
+
+    private fun runBookDownload(taskId: String, bookUrl: String) {
+        updateDownloadTask(taskId) { task ->
+            task.addProperty("status", "running")
+            task.addProperty("progress", 1)
+            task.remove("error")
+        }
+        try {
+            val toc = getChapterList(bookUrl)
+            if (!toc.isSuccess) throw IllegalStateException(toc.errorMsg)
+            val chapters = synchronized(this) { readChapterList(bookUrl).sortedBy { it["index"].safeInt() } }
+            if (chapters.isEmpty()) throw IllegalStateException("No chapters available for download")
+            if (chapters.size > 3_000) throw IllegalStateException("Book exceeds the 3000 chapter offline download limit")
+            val book = synchronized(this) { readList("books").firstOrNull { it.string("bookUrl") == bookUrl } }
+                ?: throw IllegalStateException("Book not found")
+            val content = buildString {
+                append(book.string("name") ?: "Book").append('\n')
+                book.string("author")?.takeIf(String::isNotBlank)?.let { append(it).append('\n') }
+                append('\n')
+                chapters.forEachIndexed { position, chapter ->
+                    val index = chapter["index"].safeInt()
+                    val result = getBookContent(bookUrl, index)
+                    if (!result.isSuccess) throw IllegalStateException("Chapter ${position + 1}: ${result.errorMsg}")
+                    val body = result.data as? String ?: throw IllegalStateException("Chapter ${position + 1}: invalid content")
+                    append(chapter.string("title") ?: "Chapter ${position + 1}").append("\n\n")
+                    append(body.trim()).append("\n\n")
+                    updateDownloadTask(taskId) { task ->
+                        task.addProperty("progress", ((position + 1) * 100 / chapters.size).coerceIn(1, 99))
+                        task.addProperty("chapterCount", chapters.size)
+                    }
+                }
+            }
+            val baseName = (book.string("name") ?: "book")
+                .replace(Regex("[\\\\/:*?\"<>|]"), "_").trim().ifEmpty { "book" }
+            val target = downloadsDir.resolve("$baseName-${System.currentTimeMillis()}.txt").normalize()
+            if (!target.startsWith(downloadsDir)) throw IllegalStateException("Invalid download target")
+            writeStringAtomic(target, content)
+            updateDownloadTask(taskId) { task ->
+                task.addProperty("status", "done")
+                task.addProperty("progress", 100)
+                task.addProperty("path", target.toAbsolutePath().normalize().toString())
+                task.addProperty("size", Files.size(target))
+            }
+        } catch (error: Exception) {
+            updateDownloadTask(taskId) { task ->
+                task.addProperty("status", "failed")
+                task.addProperty("error", error.message ?: error.javaClass.simpleName)
+            }
+        }
+    }
+
+    private fun updateDownloadTask(taskId: String, update: (JsonObject) -> Unit) {
+        synchronized(this) {
+            val tasks = readList("downloadTasks")
+            val task = tasks.firstOrNull { it.string("id") == taskId } ?: return
+            update(task)
+            task.addProperty("updatedAt", System.currentTimeMillis())
+            writeList("downloadTasks", tasks)
+        }
+    }
 
     private fun searchBookSources(key: String, group: String = ""): List<JsonObject> {
         val sources = readList("bookSources")
