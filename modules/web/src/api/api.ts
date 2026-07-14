@@ -186,6 +186,11 @@ export type RssRefreshResult = {
   }>
 }
 
+export type RssArticleContent = {
+  content: string
+  cached: boolean
+}
+
 export type SourceCheckReport = {
   id: string
   kind: 'bookSource' | 'rssSource' | string
@@ -327,6 +332,9 @@ const batchChangeBookSources = (bookUrls?: string[]) =>
 
 const refreshRssSources = (sourceUrls?: string[]) =>
   ajax.post<LeagdoApiResponse<RssRefreshResult>>('refreshRssSources', { sourceUrls })
+
+const getRssArticleContent = (link: string) =>
+  ajax.post<LeagdoApiResponse<RssArticleContent>>('getRssArticleContent', { link })
 
 const saveBook = (book: BaseBook) =>
   ajax.post<LeagdoApiResponse<string>>('saveBook', book)
@@ -552,6 +560,7 @@ export default {
   autoChangeBookSource,
   batchChangeBookSources,
   refreshRssSources,
+  getRssArticleContent,
   saveBook,
   exportBook,
   exportBookEpisodes,

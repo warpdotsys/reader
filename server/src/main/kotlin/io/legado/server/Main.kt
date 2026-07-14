@@ -291,6 +291,7 @@ class LegadoHttpServer(
             "/searchBooks" -> store.searchBooks(post.postData)
             "/debugSource" -> store.debugSource(post.postData)
             "/refreshRssSources" -> store.refreshRssSources(post.postData)
+            "/getRssArticleContent" -> store.getRssArticleContent(post.postData)
             "/findBookSourceCandidates" -> store.findBookSourceCandidates(post.postData)
             "/changeBookSource" -> store.changeBookSource(post.postData)
             "/autoChangeBookSource" -> store.autoChangeBookSource(post.postData)
@@ -1424,6 +1425,33 @@ class LegadoStore(
         ))
     }
 
+    @Synchronized
+    fun getRssArticleContent(postData: String?): ReturnData {
+        val payload = parseJson(postData)?.asObjectOrNull() ?: return ReturnData.error("Expected JSON object")
+        val link = payload.string("link")?.trim().orEmpty()
+        if (link.isBlank()) return ReturnData.error("link is required")
+        val articles = readList("rssArticles")
+        val article = articles.firstOrNull { it.string("link") == link }
+            ?: return ReturnData.error("RSS article not found")
+        article.string("articleContent")?.takeIf(String::isNotBlank)?.let { cached ->
+            return ReturnData.ok(mapOf("content" to cached, "cached" to true))
+        }
+        val sourceUrl = article.string("sourceUrl").orEmpty()
+        val source = readList("rssSources").firstOrNull { it.string("sourceUrl") == sourceUrl }
+            ?: return ReturnData.error("RSS source not found")
+        if (!isAllowedRssContentUrl(source, link)) return ReturnData.error("Article URL is blocked by this RSS source")
+        val body = fetchSourceText(source, link)
+            ?: return ReturnData.error("Unable to load RSS article")
+        val content = extractRssArticleContent(source, body)
+            .ifBlank { article.string("content").orEmpty() }
+            .ifBlank { article.string("description").orEmpty() }
+        if (content.isBlank()) return ReturnData.error("No readable article content was found")
+        article.addProperty("articleContent", content)
+        article.addProperty("articleContentFetchedAt", System.currentTimeMillis())
+        writeList("rssArticles", articles)
+        return ReturnData.ok(mapOf("content" to content, "cached" to false))
+    }
+
     private fun searchBookSources(key: String, group: String = ""): List<JsonObject> {
         val sources = readList("bookSources")
             .asSequence()
@@ -1477,7 +1505,7 @@ class LegadoStore(
             runCatching { Jsoup.parse(body, "", Parser.xmlParser()).select("item, entry").map { it.outerHtml() } }
                 .getOrDefault(emptyList())
         } else {
-            extractRuleValues(body, articleRule)
+            extractRssRuleValues(body, articleRule)
         }
         return entries.mapNotNull { entry ->
             val title = rssRuleValue(entry, source.string("ruleTitle"), "title@text").trim()
@@ -1497,7 +1525,7 @@ class LegadoStore(
                     .takeIf(String::isNotBlank)?.let { addProperty("description", it) }
                 rssRuleValue(entry, source.string("ruleImage"), "enclosure@url").trim()
                     .takeIf(String::isNotBlank)?.let { addProperty("image", resolveSearchUrl(sourceUrl, it)) }
-                rssRuleValue(entry, source.string("ruleContent"), "content@text").trim()
+                rssRuleValue(entry, null, "content@text").trim()
                     .takeIf(String::isNotBlank)?.let { addProperty("content", it) }
                 addProperty("isRead", false)
                 addProperty("starred", false)
@@ -1507,7 +1535,7 @@ class LegadoStore(
     }
 
     private fun rssRuleValue(entry: String, configured: String?, fallback: String): String {
-        if (!configured.isNullOrBlank()) return extractRuleValue(entry, configured)
+        if (!configured.isNullOrBlank()) return extractRssRuleValue(entry, configured)
         val (selector, attribute) = cssRuleParts(fallback)
         return runCatching {
             val element = Jsoup.parse(entry, "", Parser.xmlParser()).selectFirst(selector) ?: return ""
@@ -1517,6 +1545,67 @@ class LegadoStore(
                 else -> element.attr(attribute)
             }
         }.getOrDefault("")
+    }
+
+    private fun extractRssRuleValues(input: String, rule: String): List<String> {
+        if (rule.isBlank() || rule.contains("@js:", true)) return emptyList()
+        if (rule.trimStart().startsWith("$") || !isCssRule(rule) && !isXpathRule(rule)) return extractRuleValues(input, rule)
+        return runCatching {
+            if (isXpathRule(rule)) {
+                Jsoup.parse(input, "", Parser.xmlParser()).selectXpath(xpathRuleParts(rule).first).map { it.outerHtml() }
+            } else {
+                Jsoup.parse(input, "", Parser.xmlParser()).select(cssSelector(rule)).map { it.outerHtml() }
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    private fun extractRssRuleValue(input: String, rule: String): String {
+        if (rule.isBlank() || rule.contains("@js:", true)) return ""
+        if (rule.trimStart().startsWith("$") || !isCssRule(rule) && !isXpathRule(rule)) return extractRuleValue(input, rule)
+        return runCatching {
+            val (selector, attribute) = if (isXpathRule(rule)) xpathRuleParts(rule) else cssRuleParts(rule)
+            val document = Jsoup.parse(input, "", Parser.xmlParser())
+            val element = (if (isXpathRule(rule)) document.selectXpath(selector).firstOrNull() else document.selectFirst(selector))
+                ?: return ""
+            when (attribute?.lowercase()) {
+                null, "text" -> element.text()
+                "owntext" -> element.ownText()
+                "html" -> element.html()
+                "outerhtml" -> element.outerHtml()
+                else -> element.attr(attribute)
+            }
+        }.getOrDefault("")
+    }
+
+    private fun extractRssArticleContent(source: JsonObject, body: String): String {
+        val configuredRule = source.string("ruleContent")
+        if (!configuredRule.isNullOrBlank()) return extractRuleValue(body, configuredRule).trim()
+        val document = Jsoup.parse(body)
+        return document.selectFirst("article, main, .article, .post, .entry, .content, #content")
+            ?.text()
+            ?.trim()
+            .orEmpty()
+            .ifBlank { document.body().text().trim() }
+    }
+
+    private fun isAllowedRssContentUrl(source: JsonObject, rawUrl: String): Boolean {
+        val url = rawUrl.substringBefore(",{").trim()
+        val host = runCatching { URI.create(url).host?.lowercase().orEmpty() }.getOrDefault("")
+        if (host.isBlank()) return false
+        val isMatch = { list: String? ->
+            list.orEmpty().split(',').map(String::trim).filter(String::isNotBlank).any { entry ->
+                val normalized = entry.substringBefore("/").substringAfter("://", entry).lowercase()
+                normalized == "*" || wildcardMatches(host, normalized)
+            }
+        }
+        if (isMatch(source.string("contentBlacklist"))) return false
+        val whitelist = source.string("contentWhitelist")?.trim().orEmpty()
+        return whitelist.isBlank() || isMatch(whitelist)
+    }
+
+    private fun wildcardMatches(value: String, pattern: String): Boolean {
+        val expression = pattern.split('*').joinToString(".*") { Regex.escape(it) }
+        return Regex("^$expression$").matches(value)
     }
 
     @Synchronized

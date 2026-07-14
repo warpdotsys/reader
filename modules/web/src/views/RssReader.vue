@@ -45,8 +45,12 @@
         </div>
         <h2>{{ selectedArticle.title }}</h2>
         <img v-if="selectedArticle.image" :src="selectedArticle.image" :alt="selectedArticle.title" @error="hideBrokenImage" />
-        <p class="rss-description">{{ selectedArticle.content || selectedArticle.description || '此文章没有可用摘要。' }}</p>
+        <div v-loading="contentLoading" class="rss-content-area">
+          <p v-if="contentError" class="rss-content-error">{{ contentError }}</p>
+          <p class="rss-description">{{ articleText || '此文章没有可用正文或摘要。' }}</p>
+        </div>
         <div class="rss-detail-actions">
+          <el-button :icon="Reading" :loading="contentLoading" @click="loadArticleContent(selectedArticle)">读取全文</el-button>
           <el-button :icon="selectedArticle.isRead ? CircleCheck : Reading" @click="toggleRead(selectedArticle)">
             {{ selectedArticle.isRead ? '标记未读' : '标记已读' }}
           </el-button>
@@ -75,6 +79,7 @@ type RssArticle = AppDataItem & {
   pubDate?: string
   description?: string
   content?: string
+  articleContent?: string
   image?: string
   isRead?: boolean
   starred?: boolean
@@ -90,6 +95,9 @@ const sourceFilter = ref('')
 const searchText = ref('')
 const unreadOnly = ref(false)
 const starredOnly = ref(false)
+const contentLoading = ref(false)
+const contentError = ref('')
+const articleText = computed(() => selectedArticle.value?.articleContent || selectedArticle.value?.content || selectedArticle.value?.description || '')
 
 const sourceOptions = computed(() => {
   const sources = new Map<string, string>()
@@ -131,6 +139,7 @@ function hideBrokenImage(event: Event) {
 function selectArticle(article: RssArticle) {
   selectedLink.value = article.link
   if (!article.isRead) void updateArticle(article, { isRead: true, readAt: Date.now() })
+  void loadArticleContent(article)
 }
 function openArticle(link: string) {
   if (link) window.open(link, '_blank', 'noopener,noreferrer')
@@ -154,6 +163,22 @@ async function toggleStar(article: RssArticle) {
     await updateArticle(article, { starred: !article.starred })
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '保存文章状态失败')
+  }
+}
+async function loadArticleContent(article: RssArticle) {
+  if (article.articleContent) return
+  contentLoading.value = true
+  contentError.value = ''
+  try {
+    const response = await API.getRssArticleContent(article.link)
+    if (!response.data.isSuccess) throw new Error(response.data.errorMsg || '读取文章正文失败')
+    const content = response.data.data.content
+    const index = articles.value.findIndex(item => item.link === article.link)
+    if (index >= 0) articles.value[index] = { ...articles.value[index], articleContent: content }
+  } catch (error) {
+    contentError.value = error instanceof Error ? error.message : '读取文章正文失败，当前显示订阅摘要。'
+  } finally {
+    contentLoading.value = false
   }
 }
 async function loadArticles() {
@@ -252,6 +277,8 @@ onMounted(loadArticles)
 .rss-detail-panel h2 { margin: 12px 0 18px; font-size: 25px; line-height: 1.35; }
 .rss-detail-panel img { display: block; max-width: min(100%, 720px); max-height: 360px; margin: 0 0 20px; object-fit: contain; }
 .rss-description { max-width: 780px; margin: 0 0 28px; color: #334155; font-size: 16px; line-height: 1.85; white-space: pre-wrap; overflow-wrap: anywhere; }
+.rss-content-area { max-width: 780px; min-height: 64px; }
+.rss-content-error { margin: 0 0 12px; color: #b45309; font-size: 13px; line-height: 1.6; }
 .starred :deep(svg) { color: #b45309; fill: currentColor; }
 
 @media (max-width: 760px) {
