@@ -295,6 +295,9 @@ const findBookSourceCandidates = (bookUrl: string) =>
 const changeBookSource = (bookUrl: string, candidate: SeachBook) =>
   ajax.post<LeagdoApiResponse<Book>>('changeBookSource', { bookUrl, candidate })
 
+const autoChangeBookSource = (bookUrl: string) =>
+  ajax.post<LeagdoApiResponse<Book>>('autoChangeBookSource', { bookUrl })
+
 const saveBook = (book: BaseBook) =>
   ajax.post<LeagdoApiResponse<string>>('saveBook', book)
 const exportBook = (bookUrl: string) =>
@@ -522,6 +525,7 @@ export default {
   search,
   findBookSourceCandidates,
   changeBookSource,
+  autoChangeBookSource,
   saveBook,
   exportBook,
   exportBookEpisodes,

@@ -528,7 +528,7 @@ const sections: SettingSection[] = [
       f('read.keyPageOnLongPress', '长按按键翻页', '键盘或遥控器按键重复事件连续翻页。', 'boolean', 'live'),
       f('read.pageTouchSlop', '触控容差', '移动距离超过阈值时不触发九宫格点击，减少误触。', 'number', 'live', undefined, 0, 60),
       f('read.pageTouchClick', '点击触发阈值', '限制连续点击触发间隔，数值越高越不易重复翻页。', 'number', 'live', undefined, 0, 60),
-      f('read.autoChangeSource', '自动换源', '内容失败时自动换源。', 'boolean', 'planned'),
+      f('read.autoChangeSource', '自动换源', '正文获取失败时自动切换到首个匹配的可用书源。', 'boolean', 'live'),
       f('read.selectText', '允许选择文字', '正文是否允许选择。', 'boolean', 'live'),
       f('read.expandTextMenu', '展开文本菜单', '选中正文后直接显示复制、搜索和朗读工具。', 'boolean', 'live'),
       f('read.optimizeRender', '优化长章节渲染', '使用浏览器延迟渲染屏幕外章节，减少长内容布局开销。', 'boolean', 'live'),

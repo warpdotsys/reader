@@ -283,7 +283,7 @@ import jump from '@/plugins/jump'
 import settings from '@/config/themeConfig'
 import API from '@api'
 import type { AppDataItem, AppSettings } from '@api'
-import type { SeachBook } from '@/book'
+import type { Book, SeachBook } from '@/book'
 import { useLoading } from '@/hooks/loading'
 import { useThrottleFn } from '@vueuse/shared'
 import { isNullOrBlank } from '@/utils/utils'
@@ -296,6 +296,7 @@ const sourceSwitchVisible = ref(false)
 const sourceCandidatesLoading = ref(false)
 const sourceSwitching = ref(false)
 const sourceCandidates = ref<SeachBook[]>([])
+let autoSourceChangeAttempted = false
 const appSettings = ref<AppSettings>({})
 const readStyles = ref<AppDataItem[]>([])
 // loading spinner
@@ -1117,18 +1118,35 @@ async function switchBookSource(candidate: SeachBook) {
     const response = await API.changeBookSource(store.readingBook.bookUrl, candidate)
     if (!response.data.isSuccess) throw new Error(response.data.errorMsg || '换源失败')
     const book = response.data.data
-    sessionStorage.setItem('bookUrl', book.bookUrl)
-    sessionStorage.setItem('bookName', book.name)
-    sessionStorage.setItem('bookAuthor', book.author)
-    sessionStorage.setItem('chapterIndex', String(book.durChapterIndex || 0))
-    sessionStorage.setItem('chapterPos', String(book.durChapterPos || 0))
-    sessionStorage.setItem('isSeachBook', 'false')
+    persistSwitchedBook(book)
     ElMessage.success(`已切换到 ${book.originName || candidate.originName}`)
     window.setTimeout(() => window.location.reload(), 300)
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '换源失败')
   } finally {
     sourceSwitching.value = false
+  }
+}
+function persistSwitchedBook(book: Book) {
+  sessionStorage.setItem('bookUrl', book.bookUrl)
+  sessionStorage.setItem('bookName', book.name)
+  sessionStorage.setItem('bookAuthor', book.author)
+  sessionStorage.setItem('chapterIndex', String(book.durChapterIndex || 0))
+  sessionStorage.setItem('chapterPos', String(book.durChapterPos || 0))
+  sessionStorage.setItem('isSeachBook', 'false')
+}
+async function tryAutoChangeSource() {
+  if (appSettings.value.read?.autoChangeSource === false || autoSourceChangeAttempted) return false
+  autoSourceChangeAttempted = true
+  try {
+    const response = await API.autoChangeBookSource(store.readingBook.bookUrl)
+    if (!response.data.isSuccess) return false
+    persistSwitchedBook(response.data.data)
+    ElMessage.warning(`正文获取失败，已切换到 ${response.data.data.originName || '备用书源'}`)
+    window.setTimeout(() => window.location.reload(), 300)
+    return true
+  } catch {
+    return false
   }
 }
 const chapterAddition = (index: number) => {
@@ -1202,7 +1220,8 @@ const getContent = (index: number, reloadChapter = true, chapterPos = 0) => {
         store.setShowContent(true)
         void prefetchChapters(index)
       },
-      err => {
+      async err => {
+        if (await tryAutoChangeSource()) return
         const content = ['获取章节内容失败！']
         chapterData.value.push({ index, content, title })
         store.setShowContent(true)

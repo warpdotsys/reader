@@ -289,6 +289,7 @@ class LegadoHttpServer(
             "/searchBooks" -> store.searchBooks(post.postData)
             "/findBookSourceCandidates" -> store.findBookSourceCandidates(post.postData)
             "/changeBookSource" -> store.changeBookSource(post.postData)
+            "/autoChangeBookSource" -> store.autoChangeBookSource(post.postData)
             "/saveTxtTocRule" -> store.saveTxtTocRule(post.postData)
             "/deleteTxtTocRule" -> store.deleteTxtTocRule(post.postData)
             "/saveBook" -> store.saveBook(post.postData)
@@ -1439,6 +1440,26 @@ class LegadoStore(
         return ReturnData.ok(switched)
     }
 
+    @Synchronized
+    fun autoChangeBookSource(postData: String?): ReturnData {
+        if (!autoChangeSourceEnabled()) return ReturnData.error("Automatic source change is disabled")
+        val payload = parseJson(postData)?.asObjectOrNull() ?: return ReturnData.error("Expected JSON object")
+        val bookUrl = payload.string("bookUrl") ?: return ReturnData.error("bookUrl is required")
+        val book = readList("books").firstOrNull { it.string("bookUrl") == bookUrl }
+            ?: return ReturnData.error("Book not found")
+        val candidate = searchBookSources(book.string("name").orEmpty())
+            .firstOrNull { result ->
+                sameBookTitle(result.string("name"), book.string("name")) &&
+                    result.string("origin") != book.string("origin") &&
+                    (!changeSourceCheckAuthor() || compatibleAuthors(book.string("author"), result.string("author")))
+            } ?: return ReturnData.error("No matching alternative source found")
+        val request = JsonObject().apply {
+            addProperty("bookUrl", bookUrl)
+            add("candidate", candidate.deepCopy())
+        }
+        return changeBookSource(gson.toJson(request))
+    }
+
     private fun sameBookTitle(left: String?, right: String?): Boolean =
         left?.trim()?.equals(right?.trim(), ignoreCase = true) == true
 
@@ -1457,6 +1478,9 @@ class LegadoStore(
 
     private fun preloadSourceToc(): Boolean = readAppSettings()["network"]
         .asObjectOrNull()?.get("changeSourceLoadToc")?.safeBoolean() == true
+
+    private fun autoChangeSourceEnabled(): Boolean = readAppSettings()["read"]
+        .asObjectOrNull()?.get("autoChangeSource")?.safeBoolean() != false
 
     private fun searchSource(source: JsonObject, key: String): List<JsonObject> {
         val startedAt = System.nanoTime()
