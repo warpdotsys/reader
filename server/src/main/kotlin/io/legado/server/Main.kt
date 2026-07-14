@@ -286,6 +286,7 @@ class LegadoHttpServer(
             "/saveReplaceRule" -> store.saveReplaceRule(post.postData)
             "/deleteReplaceRule" -> store.deleteReplaceRule(post.postData)
             "/testReplaceRule" -> store.testReplaceRule(post.postData)
+            "/searchBooks" -> store.searchBooks(post.postData)
             "/saveTxtTocRule" -> store.saveTxtTocRule(post.postData)
             "/deleteTxtTocRule" -> store.deleteTxtTocRule(post.postData)
             "/saveBook" -> store.saveBook(post.postData)
@@ -1333,6 +1334,177 @@ class LegadoStore(
         val item = readList(kind).firstOrNull { it.string(key) == url }
             ?: return ReturnData.error("Source not found")
         return ReturnData.ok(item)
+    }
+
+    /**
+     * Executes the portable portion of a book-source search rule.  Android's
+     * WebView/JavaScript, CSS and XPath rule dialects deliberately stay out of
+     * this server; JSONPath and regular-expression sources remain usable on a
+     * plain JVM.
+     */
+    fun searchBooks(postData: String?): ReturnData {
+        val payload = parseJson(postData)?.asObjectOrNull() ?: return ReturnData.error("Expected JSON object")
+        val key = payload.string("key")?.trim().orEmpty()
+        if (key.isBlank()) return ReturnData.error("key is required")
+        val group = payload.string("group")?.trim().orEmpty()
+        val sources = readList("bookSources")
+            .asSequence()
+            .filter { it["enabled"]?.safeBoolean() != false }
+            .filter { group.isBlank() || it.string("bookSourceGroup")?.split(',')?.any { value -> value.trim() == group } == true }
+            .filter { !it.string("searchUrl").isNullOrBlank() && it["ruleSearch"].asObjectOrNull() != null }
+            .take(80)
+            .toList()
+        if (sources.isEmpty()) return ReturnData.ok(emptyList<JsonObject>())
+
+        val workers = networkThreadCount().coerceIn(1, minOf(12, sources.size))
+        val executor = Executors.newFixedThreadPool(workers)
+        return try {
+            val results = executor.invokeAll(sources.map { source ->
+                Callable { searchSource(source, key) }
+            }).flatMap { future -> runCatching { future.get() }.getOrDefault(emptyList()) }
+            ReturnData.ok(results)
+        } finally {
+            executor.shutdown()
+        }
+    }
+
+    private fun searchSource(source: JsonObject, key: String): List<JsonObject> {
+        val startedAt = System.nanoTime()
+        val rule = source["ruleSearch"].asObjectOrNull() ?: return emptyList()
+        val searchUrl = source.string("searchUrl").orEmpty()
+        val requestSpec = sourceSearchRequest(source, searchUrl, key) ?: return emptyList()
+        return try {
+            val response = networkClient().send(requestSpec.request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
+            if (response.statusCode() !in 200..299) return emptyList()
+            val latency = ((System.nanoTime() - startedAt) / 1_000_000).coerceAtLeast(0)
+            val responseBody = response.body()
+            val listRule = rule.string("bookList").orEmpty()
+            val entries = extractRuleValues(responseBody, listRule)
+            entries.mapNotNull { entry ->
+                val name = extractRuleValue(entry, rule.string("name")).trim()
+                val bookUrl = resolveSearchUrl(requestSpec.baseUrl, extractRuleValue(entry, rule.string("bookUrl")).trim())
+                if (name.isBlank() || bookUrl.isBlank()) return@mapNotNull null
+                JsonObject().apply {
+                    addProperty("name", name)
+                    addProperty("author", extractRuleValue(entry, rule.string("author")).trim())
+                    addProperty("bookUrl", bookUrl)
+                    addProperty("kind", extractRuleValue(entry, rule.string("kind")).trim())
+                    addProperty("wordCount", extractRuleValue(entry, rule.string("wordCount")).trim())
+                    addProperty("origin", source.string("bookSourceUrl") ?: "")
+                    addProperty("originName", source.string("bookSourceName") ?: "")
+                    addProperty("type", source["bookSourceType"].safeInt())
+                    val cover = resolveSearchUrl(requestSpec.baseUrl, extractRuleValue(entry, rule.string("coverUrl")).trim())
+                    if (cover.isNotBlank()) addProperty("coverUrl", cover)
+                    val intro = extractRuleValue(entry, rule.string("intro")).trim()
+                    if (intro.isNotBlank()) addProperty("intro", intro)
+                    val latest = extractRuleValue(entry, rule.string("lastChapter")).trim()
+                    if (latest.isNotBlank()) addProperty("latestChapterTitle", latest)
+                    addProperty("tocUrl", bookUrl)
+                    addProperty("time", System.currentTimeMillis())
+                    addProperty("originOrder", source["customOrder"].safeInt())
+                    addProperty("chapterWordCount", 0)
+                    addProperty("respondTime", latency)
+                }
+            }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    private data class SourceSearchRequest(val request: HttpRequest, val baseUrl: String)
+
+    private fun sourceSearchRequest(source: JsonObject, rawSearchUrl: String, key: String): SourceSearchRequest? {
+        val separator = rawSearchUrl.indexOf(",{")
+        val rawUrl = if (separator >= 0) rawSearchUrl.substring(0, separator) else rawSearchUrl
+        val rawOptions = if (separator >= 0) rawSearchUrl.substring(separator + 1) else ""
+        val encodedKey = URLEncoder.encode(key, StandardCharsets.UTF_8).replace("+", "%20")
+        fun substitute(value: String): String = value
+            .replace("{{key}}", encodedKey)
+            .replace("{{searchKey}}", encodedKey)
+            .replace("{key}", encodedKey)
+            .replace("searchKey", key)
+            .replace("%s", encodedKey)
+        val url = substitute(rawUrl).trim()
+        if (!url.startsWith("http://", true) && !url.startsWith("https://", true)) return null
+        val options = runCatching { JsonParser.parseString(substitute(rawOptions)).asObjectOrNull() }.getOrNull()
+        val builder = HttpRequest.newBuilder(URI.create(url))
+            .timeout(Duration.ofSeconds(15))
+            .header("User-Agent", networkUserAgent())
+        source.string("header")
+            ?.let { runCatching { JsonParser.parseString(it).asObjectOrNull() }.getOrNull() }
+            ?.entrySet()
+            ?.forEach { (name, value) -> if (name.isNotBlank()) builder.header(name, value.asString) }
+        options?.get("headers")?.asObjectOrNull()?.entrySet()?.forEach { (name, value) ->
+            if (name.isNotBlank()) builder.header(name, value.asString)
+        }
+        when (options?.string("method")?.uppercase()) {
+            "POST" -> builder.POST(HttpRequest.BodyPublishers.ofString(options["body"]?.let { gson.toJson(it) } ?: "", StandardCharsets.UTF_8))
+            else -> builder.GET()
+        }
+        return SourceSearchRequest(builder.build(), url)
+    }
+
+    private fun extractRuleValues(input: String, rule: String): List<String> {
+        if (rule.isBlank() || rule.contains("@js:", true)) return emptyList()
+        if (rule.trimStart().startsWith("$")) {
+            val root = runCatching { JsonParser.parseString(input) }.getOrNull() ?: return emptyList()
+            return jsonPath(root, rule).map { gson.toJson(it) }
+        }
+        return runCatching {
+            Regex(rule, setOf(RegexOption.DOT_MATCHES_ALL)).findAll(input)
+                .map { match -> match.groups.drop(1).firstOrNull { it != null }?.value ?: match.value }
+                .toList()
+        }.getOrDefault(emptyList())
+    }
+
+    private fun extractRuleValue(input: String, rule: String?): String {
+        if (rule.isNullOrBlank() || rule.contains("@js:", true)) return ""
+        if (rule.trimStart().startsWith("$")) {
+            val root = runCatching { JsonParser.parseString(input) }.getOrNull() ?: return ""
+            val value = jsonPath(root, rule).firstOrNull() ?: return ""
+            return if (value.isJsonPrimitive) value.asString else gson.toJson(value)
+        }
+        return runCatching {
+            val match = Regex(rule, setOf(RegexOption.DOT_MATCHES_ALL)).find(input) ?: return ""
+            match.groups.drop(1).firstOrNull { it != null }?.value ?: match.value
+        }.getOrDefault("")
+    }
+
+    /** Minimal JSONPath: $.field.nested, [index], [*], and dot traversal. */
+    private fun jsonPath(root: JsonElement, expression: String): List<JsonElement> {
+        val tokens = Regex("""(?:^|\.)([A-Za-z0-9_-]+)|\[([0-9*]+)]""")
+            .findAll(expression.removePrefix("$"))
+            .map { it.groupValues[1].ifBlank { "[${it.groupValues[2]}]" } }
+            .toList()
+        var values: List<JsonElement> = listOf(root)
+        for (token in tokens) {
+            val next = mutableListOf<JsonElement>()
+            for (value in values) {
+                when {
+                    token.startsWith("[") -> {
+                        val index = token.removePrefix("[").removeSuffix("]")
+                        val array = value.asArrayOrNull() ?: continue
+                        if (index == "*") {
+                            array.forEach { next.add(it) }
+                        } else {
+                            val item = index.toIntOrNull()?.let { i -> if (i in 0 until array.size()) array[i] else null }
+                            if (item != null) next.add(item)
+                        }
+                    }
+                    value.isJsonObject -> value.asJsonObject[token]?.let(next::add)
+                    value.isJsonArray -> value.asJsonArray.forEach { item ->
+                        item.asObjectOrNull()?.get(token)?.let(next::add)
+                    }
+                }
+            }
+            values = next
+        }
+        return values
+    }
+
+    private fun resolveSearchUrl(baseUrl: String, candidate: String): String {
+        if (candidate.isBlank()) return ""
+        return runCatching { URI.create(baseUrl).resolve(candidate).toString() }.getOrDefault(candidate)
     }
 
     @Synchronized

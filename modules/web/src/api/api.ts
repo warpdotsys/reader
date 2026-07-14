@@ -269,32 +269,24 @@ const getBookContent = (
       chapterIndex,
   )
 
-// webSocket
+// HTTP. The Linux server executes portable source rules directly; this keeps
+// search available even when the optional compatibility WebSocket is disabled.
 const search = (
   searchKey: string,
   onReceive: (data: SeachBook[]) => void,
   onFinish: () => void,
 ) => {
-  const socket = new WebSocket(
-    new URL('searchBook', legado_webSocket_entry_point),
-  )
-  socket.onerror = wsOnError
-
-  socket.onopen = () => {
-    socket.send(`{"key":"${searchKey}"}`)
+  const notifyError = () => {
+    ;(wsOnError as unknown as (event: Event) => void)(new Event('error'))
   }
-  socket.onmessage = event => {
-    try {
-      onReceive(JSON.parse(event.data))
-      wsOnMessage?.call(socket, event)
-    } catch {
-      onFinish()
-    }
-  }
-
-  socket.onclose = () => {
-    onFinish()
-  }
+  ajax
+    .post<LeagdoApiResponse<SeachBook[]>>('searchBooks', { key: searchKey })
+    .then(({ data }) => {
+      if (data.isSuccess) onReceive(data.data || [])
+      else notifyError()
+    })
+    .catch(notifyError)
+    .finally(onFinish)
 }
 
 const saveBook = (book: BaseBook) =>
