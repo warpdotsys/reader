@@ -174,6 +174,18 @@ export type BatchSourceChangeResult = {
   }>
 }
 
+export type RssRefreshResult = {
+  attempted: number
+  succeeded: number
+  articleCount: number
+  results: Array<{
+    sourceUrl: string
+    sourceName: string
+    articleCount: number
+    isSuccess: boolean
+  }>
+}
+
 export type SourceCheckReport = {
   id: string
   kind: 'bookSource' | 'rssSource' | string
@@ -312,6 +324,9 @@ const autoChangeBookSource = (bookUrl: string) =>
 
 const batchChangeBookSources = (bookUrls?: string[]) =>
   ajax.post<LeagdoApiResponse<BatchSourceChangeResult>>('batchChangeBookSources', { bookUrls })
+
+const refreshRssSources = (sourceUrls?: string[]) =>
+  ajax.post<LeagdoApiResponse<RssRefreshResult>>('refreshRssSources', { sourceUrls })
 
 const saveBook = (book: BaseBook) =>
   ajax.post<LeagdoApiResponse<string>>('saveBook', book)
@@ -536,6 +551,7 @@ export default {
   changeBookSource,
   autoChangeBookSource,
   batchChangeBookSources,
+  refreshRssSources,
   saveBook,
   exportBook,
   exportBookEpisodes,

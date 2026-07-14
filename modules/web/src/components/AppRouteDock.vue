@@ -51,7 +51,7 @@ const navItems = computed<NavItem[]>(() => {
   return [
     { label: labels.shelf, path: '/', icon: Reading },
     { label: labels.sources, path: '/bookSource', icon: Collection },
-    ...(main.showRss !== false ? [{ label: labels.rss, path: '/rssSource', icon: Link }] : []),
+    ...(main.showRss !== false ? [{ label: labels.rss, path: '/rss', icon: Link }] : []),
     ...(main.showDiscovery !== false ? [{ label: labels.features, path: '/features', icon: SetUp }] : []),
     { label: labels.settings, path: '/settings', icon: Setting },
     { label: labels.server, path: '/server', icon: DataAnalysis },

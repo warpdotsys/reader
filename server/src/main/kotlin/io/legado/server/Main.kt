@@ -290,6 +290,7 @@ class LegadoHttpServer(
             "/testReplaceRule" -> store.testReplaceRule(post.postData)
             "/searchBooks" -> store.searchBooks(post.postData)
             "/debugSource" -> store.debugSource(post.postData)
+            "/refreshRssSources" -> store.refreshRssSources(post.postData)
             "/findBookSourceCandidates" -> store.findBookSourceCandidates(post.postData)
             "/changeBookSource" -> store.changeBookSource(post.postData)
             "/autoChangeBookSource" -> store.autoChangeBookSource(post.postData)
@@ -1393,6 +1394,34 @@ class LegadoStore(
                 "results" to results,
             ))
         }
+    }
+
+    @Synchronized
+    fun refreshRssSources(postData: String?): ReturnData {
+        val payload = parseJson(postData)?.asObjectOrNull() ?: JsonObject()
+        val requested = payload["sourceUrls"].asArrayOrNull()
+            ?.mapNotNull { runCatching { it.asString.trim() }.getOrNull()?.takeIf(String::isNotBlank) }
+            ?.toSet()
+            .orEmpty()
+        val sources = readList("rssSources")
+            .filter { it["enabled"]?.safeBoolean() != false }
+            .filter { requested.isEmpty() || it.string("sourceUrl") in requested }
+            .take(100)
+        val results = sources.map { source ->
+            val articles = refreshRssSource(source)
+            mapOf(
+                "sourceUrl" to (source.string("sourceUrl") ?: ""),
+                "sourceName" to (source.string("sourceName") ?: ""),
+                "articleCount" to articles.size,
+                "isSuccess" to articles.isNotEmpty(),
+            )
+        }
+        return ReturnData.ok(mapOf(
+            "attempted" to results.size,
+            "succeeded" to results.count { it["isSuccess"] == true },
+            "articleCount" to results.sumOf { it["articleCount"] as Int },
+            "results" to results,
+        ))
     }
 
     private fun searchBookSources(key: String, group: String = ""): List<JsonObject> {

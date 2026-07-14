@@ -87,7 +87,7 @@ void ensureLocalAuthentication()
     const destination = {
       bookshelf: '/',
       explore: '/features',
-      rss: '/rssSource',
+      rss: '/rss',
       my: '/settings',
     }[home]
     if (destination && destination !== '/') await router.replace(destination)
