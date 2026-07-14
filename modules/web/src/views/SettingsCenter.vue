@@ -642,7 +642,7 @@ const sections: SettingSection[] = [
       f('network.changeSourceLoadInfo', '换源加载详情', '手动换源时同步候选书源的封面、简介和最新章节。', 'boolean', 'live'),
       f('network.changeSourceLoadToc', '换源加载目录', '手动换源成功后立即获取并缓存新书源目录。', 'boolean', 'live'),
       f('network.changeSourceLoadWordCount', '换源加载字数', '换源时加载字数。', 'boolean', 'planned'),
-      f('network.batchChangeSourceDelay', '批量换源延迟', '批量换源请求间隔。', 'number', 'planned', undefined, 0, 30000, 100),
+      f('network.batchChangeSourceDelay', '批量换源延迟', '书架批量换源时两本书之间的请求间隔。', 'number', 'live', undefined, 0, 30000, 100),
     ],
   },
   {

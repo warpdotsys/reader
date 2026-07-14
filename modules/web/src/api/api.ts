@@ -162,6 +162,18 @@ export type MaintenanceResult = {
   logFile: string
 }
 
+export type BatchSourceChangeResult = {
+  attempted: number
+  succeeded: number
+  failed: number
+  delayMillis: number
+  results: Array<{
+    bookUrl: string
+    isSuccess: boolean
+    errorMsg: string
+  }>
+}
+
 export type SourceCheckReport = {
   id: string
   kind: 'bookSource' | 'rssSource' | string
@@ -297,6 +309,9 @@ const changeBookSource = (bookUrl: string, candidate: SeachBook) =>
 
 const autoChangeBookSource = (bookUrl: string) =>
   ajax.post<LeagdoApiResponse<Book>>('autoChangeBookSource', { bookUrl })
+
+const batchChangeBookSources = (bookUrls?: string[]) =>
+  ajax.post<LeagdoApiResponse<BatchSourceChangeResult>>('batchChangeBookSources', { bookUrls })
 
 const saveBook = (book: BaseBook) =>
   ajax.post<LeagdoApiResponse<string>>('saveBook', book)
@@ -526,6 +541,7 @@ export default {
   findBookSourceCandidates,
   changeBookSource,
   autoChangeBookSource,
+  batchChangeBookSources,
   saveBook,
   exportBook,
   exportBookEpisodes,

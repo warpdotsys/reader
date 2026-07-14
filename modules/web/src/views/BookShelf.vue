@@ -80,6 +80,15 @@
         >
           <el-icon :class="{ spinning: refreshingShelf }"><Refresh /></el-icon>
         </button>
+        <button
+          class="batch-source-button"
+          type="button"
+          :disabled="batchChanging || shelf.length === 0"
+          :title="batchChanging ? '正在批量换源' : '批量更换书架书源'"
+          @click="batchChangeSources"
+        >
+          {{ batchChanging ? '换源中' : '批量换源' }}
+        </button>
       </div>
       <div
         v-if="bookGroups.length > 0 && groupStyle !== '2'"
@@ -197,6 +206,7 @@ const books = shallowRef<Book[] | SeachBook[]>([])
 const shelf = computed(() => store.shelf)
 const appSettings = ref<AppSettings>({})
 const refreshingShelf = ref(false)
+const batchChanging = ref(false)
 const lastRefreshSummary = ref('')
 const autoRefreshShelf = computed(() => appSettings.value.main?.auto_refresh === true)
 const onlyUpdateRead = computed(() => appSettings.value.main?.onlyUpdateRead === true)
@@ -576,6 +586,33 @@ async function refreshBookshelf(showMessage = true) {
   }
 }
 
+async function batchChangeSources() {
+  if (batchChanging.value || shelf.value.length === 0) return
+  try {
+    await ElMessageBox.confirm(
+      `将依次为书架中的 ${shelf.value.length} 本书搜索并切换备用书源。无匹配书源的书籍会保持不变。`,
+      '批量换源',
+      { confirmButtonText: '开始换源', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return
+  }
+  batchChanging.value = true
+  try {
+    const response = await API.batchChangeBookSources(shelf.value.map(book => book.bookUrl))
+    if (!response.data.isSuccess) throw new Error(response.data.errorMsg || '批量换源失败')
+    const result = response.data.data
+    store.shelf = []
+    await store.loadBookShelf()
+    lastRefreshSummary.value = `换源完成 ${result.succeeded}/${result.attempted}${result.failed ? `，失败 ${result.failed} 本` : ''}`
+    ;(result.failed ? ElMessage.warning : ElMessage.success)(lastRefreshSummary.value)
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '批量换源失败')
+  } finally {
+    batchChanging.value = false
+  }
+}
+
 async function initializeShelf() {
   await Promise.all([loadAppPreferences(), loadShelf()])
   if (autoRefreshShelf.value) await refreshBookshelf(false)
@@ -741,6 +778,14 @@ onUnmounted(() => {
       button:disabled {
         cursor: wait;
         opacity: 0.65;
+      }
+
+      .batch-source-button {
+        display: inline-flex;
+        width: auto;
+        min-width: 74px;
+        padding: 0 10px;
+        white-space: nowrap;
       }
 
       .spinning {

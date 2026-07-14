@@ -290,6 +290,7 @@ class LegadoHttpServer(
             "/findBookSourceCandidates" -> store.findBookSourceCandidates(post.postData)
             "/changeBookSource" -> store.changeBookSource(post.postData)
             "/autoChangeBookSource" -> store.autoChangeBookSource(post.postData)
+            "/batchChangeBookSources" -> store.batchChangeBookSources(post.postData)
             "/saveTxtTocRule" -> store.saveTxtTocRule(post.postData)
             "/deleteTxtTocRule" -> store.deleteTxtTocRule(post.postData)
             "/saveBook" -> store.saveBook(post.postData)
@@ -1447,18 +1448,75 @@ class LegadoStore(
         val bookUrl = payload.string("bookUrl") ?: return ReturnData.error("bookUrl is required")
         val book = readList("books").firstOrNull { it.string("bookUrl") == bookUrl }
             ?: return ReturnData.error("Book not found")
-        val candidate = searchBookSources(book.string("name").orEmpty())
-            .firstOrNull { result ->
-                sameBookTitle(result.string("name"), book.string("name")) &&
-                    result.string("origin") != book.string("origin") &&
-                    (!changeSourceCheckAuthor() || compatibleAuthors(book.string("author"), result.string("author")))
-            } ?: return ReturnData.error("No matching alternative source found")
+        val candidate = findAlternativeSourceCandidate(book)
+            ?: return ReturnData.error("No matching alternative source found")
         val request = JsonObject().apply {
             addProperty("bookUrl", bookUrl)
             add("candidate", candidate.deepCopy())
         }
         return changeBookSource(gson.toJson(request))
     }
+
+    @Synchronized
+    fun batchChangeBookSources(postData: String?): ReturnData {
+        val payload = parseJson(postData)?.asObjectOrNull() ?: JsonObject()
+        val requested = payload["bookUrls"].asArrayOrNull()
+            ?.mapNotNull { element -> runCatching { element.asString.trim() }.getOrNull()?.takeIf(String::isNotBlank) }
+            ?.distinct()
+            ?.take(200)
+            ?: readList("books").mapNotNull { it.string("bookUrl") }.take(200)
+        if (requested.isEmpty()) return ReturnData.error("No bookshelf books to change")
+        val delay = batchChangeSourceDelay()
+        val results = mutableListOf<Map<String, Any?>>()
+        for ((index, bookUrl) in requested.withIndex()) {
+            val book = readList("books").firstOrNull { it.string("bookUrl") == bookUrl }
+            val candidate = book?.let(::findAlternativeSourceCandidate)
+            val outcome = if (book == null) {
+                ReturnData.error("Book not found")
+            } else if (candidate == null) {
+                ReturnData.error("No matching alternative source found")
+            } else {
+                val request = JsonObject().apply {
+                    addProperty("bookUrl", bookUrl)
+                    add("candidate", candidate.deepCopy())
+                }
+                changeBookSource(gson.toJson(request))
+            }
+            results.add(
+                mapOf(
+                    "bookUrl" to bookUrl,
+                    "isSuccess" to outcome.isSuccess,
+                    "errorMsg" to outcome.errorMsg,
+                    "data" to outcome.data,
+                )
+            )
+            if (delay > 0 && index < requested.lastIndex) {
+                try {
+                    Thread.sleep(delay.toLong())
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    break
+                }
+            }
+        }
+        return ReturnData.ok(
+            mapOf(
+                "attempted" to results.size,
+                "succeeded" to results.count { it["isSuccess"] == true },
+                "failed" to results.count { it["isSuccess"] != true },
+                "delayMillis" to delay,
+                "results" to results,
+            )
+        )
+    }
+
+    private fun findAlternativeSourceCandidate(book: JsonObject): JsonObject? =
+        searchBookSources(book.string("name").orEmpty())
+            .firstOrNull { result ->
+                sameBookTitle(result.string("name"), book.string("name")) &&
+                    result.string("origin") != book.string("origin") &&
+                    (!changeSourceCheckAuthor() || compatibleAuthors(book.string("author"), result.string("author")))
+            }
 
     private fun sameBookTitle(left: String?, right: String?): Boolean =
         left?.trim()?.equals(right?.trim(), ignoreCase = true) == true
@@ -1481,6 +1539,9 @@ class LegadoStore(
 
     private fun autoChangeSourceEnabled(): Boolean = readAppSettings()["read"]
         .asObjectOrNull()?.get("autoChangeSource")?.safeBoolean() != false
+
+    private fun batchChangeSourceDelay(): Int = readAppSettings()["network"]
+        .asObjectOrNull()?.get("batchChangeSourceDelay")?.safeIntOrNull()?.coerceIn(0, 30000) ?: 0
 
     private fun searchSource(source: JsonObject, key: String): List<JsonObject> {
         val startedAt = System.nanoTime()
