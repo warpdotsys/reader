@@ -1415,6 +1415,7 @@ class LegadoStore(
         if (newBookUrl != oldBookUrl && books.any { it.string("bookUrl") == newBookUrl }) {
             return ReturnData.error("The candidate book is already on the bookshelf")
         }
+        if (loadSourceDetails()) enrichCandidateBookInfo(candidate, source)
 
         val switched = original.deepCopy()
         for (key in listOf("bookUrl", "tocUrl", "origin", "originName", "type", "originOrder")) {
@@ -1440,6 +1441,22 @@ class LegadoStore(
         books[index] = switched
         writeList("books", books)
         return ReturnData.ok(switched)
+    }
+
+    private fun enrichCandidateBookInfo(candidate: JsonObject, source: JsonObject) {
+        val rule = source["ruleBookInfo"].asObjectOrNull() ?: return
+        val detailUrl = candidate.string("bookUrl").orEmpty()
+        val detail = fetchSourceText(source, detailUrl) ?: return
+        for (field in listOf("name", "author", "kind", "wordCount", "intro")) {
+            val value = extractRuleValue(detail, rule.string(field)).trim()
+            if (value.isNotBlank()) candidate.addProperty(field, value)
+        }
+        val cover = extractRuleValue(detail, rule.string("coverUrl")).trim()
+        if (cover.isNotBlank()) candidate.addProperty("coverUrl", resolveSearchUrl(detailUrl, cover))
+        val toc = extractRuleValue(detail, rule.string("tocUrl")).trim()
+        if (toc.isNotBlank()) candidate.addProperty("tocUrl", resolveSearchUrl(detailUrl, toc))
+        val latest = extractRuleValue(detail, rule.string("lastChapter")).trim()
+        if (latest.isNotBlank()) candidate.addProperty("latestChapterTitle", latest)
     }
 
     @Synchronized
@@ -2268,6 +2285,7 @@ class LegadoStore(
         val tocRule = source["ruleBookInfo"].asObjectOrNull()?.string("tocUrl")
         if (tocRule.isNullOrBlank()) return fallback
         val detailUrl = book.string("bookUrl").orEmpty()
+        if (fallback.isNotBlank() && fallback != detailUrl) return fallback
         val detail = fetchSourceText(source, detailUrl) ?: return fallback
         val extracted = extractRuleValue(detail, tocRule).trim()
         return resolveSearchUrl(detailUrl, extracted).ifBlank { fallback }

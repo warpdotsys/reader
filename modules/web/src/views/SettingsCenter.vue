@@ -639,7 +639,7 @@ const sections: SettingSection[] = [
       f('network.importKeepEnable', '导入保留启用状态', '同 URL 源导入时保留本地启用状态。', 'boolean', 'live'),
       f('network.importShowComment', '导入显示注释', '导入完成后展示源注释摘要。', 'boolean', 'live'),
       f('network.changeSourceCheckAuthor', '换源校验作者', '手动换源候选必须与原书作者匹配。', 'boolean', 'live'),
-      f('network.changeSourceLoadInfo', '换源加载详情', '手动换源时同步候选书源的封面、简介和最新章节。', 'boolean', 'live'),
+      f('network.changeSourceLoadInfo', '换源加载详情', '手动换源时读取候选详情页并同步封面、简介、最新章节和目录地址。', 'boolean', 'live'),
       f('network.changeSourceLoadToc', '换源加载目录', '手动换源成功后立即获取并缓存新书源目录。', 'boolean', 'live'),
       f('network.changeSourceLoadWordCount', '换源加载字数', '换源候选额外读取最新章节并显示字数。', 'boolean', 'live'),
       f('network.batchChangeSourceDelay', '批量换源延迟', '书架批量换源时两本书之间的请求间隔。', 'number', 'live', undefined, 0, 30000, 100),
