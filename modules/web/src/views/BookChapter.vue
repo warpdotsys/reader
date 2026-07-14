@@ -254,6 +254,26 @@
         <div><dt>当前章节</dt><dd>{{ catalog[chapterIndex]?.title || '-' }}</dd></div>
         <div><dt>阅读进度</dt><dd>{{ chapterIndex + 1 }} / {{ catalog.length }}</dd></div>
       </dl>
+      <div class="book-info-actions">
+        <el-button :loading="sourceCandidatesLoading" @click="openSourceCandidates">更换书源</el-button>
+      </div>
+    </el-dialog>
+    <el-dialog v-model="sourceSwitchVisible" title="更换书源" width="min(620px, calc(100vw - 24px))">
+      <div v-if="sourceCandidates.length" class="source-candidate-list">
+        <button
+          v-for="candidate in sourceCandidates"
+          :key="`${candidate.origin}-${candidate.bookUrl}`"
+          class="source-candidate"
+          type="button"
+          :disabled="sourceSwitching"
+          @click="switchBookSource(candidate)"
+        >
+          <strong>{{ candidate.originName }}</strong>
+          <span>{{ candidate.name }}<template v-if="candidate.author"> · {{ candidate.author }}</template></span>
+          <small>{{ candidate.latestChapterTitle || candidate.intro || candidate.bookUrl }}</small>
+        </button>
+      </div>
+      <el-empty v-else description="没有找到可用的匹配书源" />
     </el-dialog>
   </div>
 </template>
@@ -263,6 +283,7 @@ import jump from '@/plugins/jump'
 import settings from '@/config/themeConfig'
 import API from '@api'
 import type { AppDataItem, AppSettings } from '@api'
+import type { SeachBook } from '@/book'
 import { useLoading } from '@/hooks/loading'
 import { useThrottleFn } from '@vueuse/shared'
 import { isNullOrBlank } from '@/utils/utils'
@@ -271,6 +292,10 @@ import { CopyDocument, Document, Download, FolderOpened, Headset, Search, Sunny,
 const content = ref()
 const imagePreviewUrl = ref('')
 const bookInfoVisible = ref(false)
+const sourceSwitchVisible = ref(false)
+const sourceCandidatesLoading = ref(false)
+const sourceSwitching = ref(false)
+const sourceCandidates = ref<SeachBook[]>([])
 const appSettings = ref<AppSettings>({})
 const readStyles = ref<AppDataItem[]>([])
 // loading spinner
@@ -1062,6 +1087,50 @@ const router = useRouter()
 const toShelf = () => {
   router.push('/')
 }
+async function openSourceCandidates() {
+  sourceCandidatesLoading.value = true
+  sourceCandidates.value = []
+  try {
+    const response = await API.findBookSourceCandidates(store.readingBook.bookUrl)
+    if (!response.data.isSuccess) throw new Error(response.data.errorMsg || '无法查询书源')
+    sourceCandidates.value = response.data.data
+    sourceSwitchVisible.value = true
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '无法查询书源')
+  } finally {
+    sourceCandidatesLoading.value = false
+  }
+}
+async function switchBookSource(candidate: SeachBook) {
+  try {
+    await ElMessageBox.confirm(
+      `将《${store.readingBook.name}》切换到「${candidate.originName}」吗？`,
+      '更换书源',
+      { confirmButtonText: '切换', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return
+  }
+  sourceSwitching.value = true
+  try {
+    await store.saveBookProgress()
+    const response = await API.changeBookSource(store.readingBook.bookUrl, candidate)
+    if (!response.data.isSuccess) throw new Error(response.data.errorMsg || '换源失败')
+    const book = response.data.data
+    sessionStorage.setItem('bookUrl', book.bookUrl)
+    sessionStorage.setItem('bookName', book.name)
+    sessionStorage.setItem('bookAuthor', book.author)
+    sessionStorage.setItem('chapterIndex', String(book.durChapterIndex || 0))
+    sessionStorage.setItem('chapterPos', String(book.durChapterPos || 0))
+    sessionStorage.setItem('isSeachBook', 'false')
+    ElMessage.success(`已切换到 ${book.originName || candidate.originName}`)
+    window.setTimeout(() => window.location.reload(), 300)
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '换源失败')
+  } finally {
+    sourceSwitching.value = false
+  }
+}
 const chapterAddition = (index: number) => {
   const chapter = catalog.value.find(item => item.index === index)
   return chapter?.tag || ''
@@ -1830,6 +1899,60 @@ onBeforeRouteLeave(async (to, from, next) => {
     margin: 0;
     color: #1e293b;
     overflow-wrap: anywhere;
+  }
+}
+
+.book-info-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.source-candidate-list {
+  display: grid;
+  gap: 8px;
+  max-height: min(58vh, 520px);
+  overflow: auto;
+}
+
+.source-candidate {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #d7dee8;
+  border-radius: 6px;
+  background: #fff;
+  color: #1e293b;
+  cursor: pointer;
+  text-align: left;
+
+  strong {
+    color: #0f766e;
+    font-size: 14px;
+  }
+
+  span,
+  small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  small {
+    color: #64748b;
+  }
+
+  &:hover:not(:disabled),
+  &:focus-visible {
+    border-color: #0f766e;
+    background: #f0fdfa;
+    outline: none;
+  }
+
+  &:disabled {
+    cursor: wait;
+    opacity: 0.6;
   }
 }
 

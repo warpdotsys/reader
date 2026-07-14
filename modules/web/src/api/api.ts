@@ -289,6 +289,12 @@ const search = (
     .finally(onFinish)
 }
 
+const findBookSourceCandidates = (bookUrl: string) =>
+  ajax.post<LeagdoApiResponse<SeachBook[]>>('findBookSourceCandidates', { bookUrl })
+
+const changeBookSource = (bookUrl: string, candidate: SeachBook) =>
+  ajax.post<LeagdoApiResponse<Book>>('changeBookSource', { bookUrl, candidate })
+
 const saveBook = (book: BaseBook) =>
   ajax.post<LeagdoApiResponse<string>>('saveBook', book)
 const exportBook = (bookUrl: string) =>
@@ -514,6 +520,8 @@ export default {
   getChapterList,
   getBookContent,
   search,
+  findBookSourceCandidates,
+  changeBookSource,
   saveBook,
   exportBook,
   exportBookEpisodes,

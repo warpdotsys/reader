@@ -287,6 +287,8 @@ class LegadoHttpServer(
             "/deleteReplaceRule" -> store.deleteReplaceRule(post.postData)
             "/testReplaceRule" -> store.testReplaceRule(post.postData)
             "/searchBooks" -> store.searchBooks(post.postData)
+            "/findBookSourceCandidates" -> store.findBookSourceCandidates(post.postData)
+            "/changeBookSource" -> store.changeBookSource(post.postData)
             "/saveTxtTocRule" -> store.saveTxtTocRule(post.postData)
             "/deleteTxtTocRule" -> store.deleteTxtTocRule(post.postData)
             "/saveBook" -> store.saveBook(post.postData)
@@ -1347,6 +1349,10 @@ class LegadoStore(
         val key = payload.string("key")?.trim().orEmpty()
         if (key.isBlank()) return ReturnData.error("key is required")
         val group = payload.string("group")?.trim().orEmpty()
+        return ReturnData.ok(searchBookSources(key, group))
+    }
+
+    private fun searchBookSources(key: String, group: String = ""): List<JsonObject> {
         val sources = readList("bookSources")
             .asSequence()
             .filter { it["enabled"]?.safeBoolean() != false }
@@ -1354,19 +1360,103 @@ class LegadoStore(
             .filter { !it.string("searchUrl").isNullOrBlank() && it["ruleSearch"].asObjectOrNull() != null }
             .take(80)
             .toList()
-        if (sources.isEmpty()) return ReturnData.ok(emptyList<JsonObject>())
+        if (sources.isEmpty()) return emptyList()
 
         val workers = networkThreadCount().coerceIn(1, minOf(12, sources.size))
         val executor = Executors.newFixedThreadPool(workers)
         return try {
-            val results = executor.invokeAll(sources.map { source ->
+            executor.invokeAll(sources.map { source ->
                 Callable { searchSource(source, key) }
             }).flatMap { future -> runCatching { future.get() }.getOrDefault(emptyList()) }
-            ReturnData.ok(results)
         } finally {
             executor.shutdown()
         }
     }
+
+    @Synchronized
+    fun findBookSourceCandidates(postData: String?): ReturnData {
+        val payload = parseJson(postData)?.asObjectOrNull() ?: return ReturnData.error("Expected JSON object")
+        val bookUrl = payload.string("bookUrl") ?: return ReturnData.error("bookUrl is required")
+        val book = readList("books").firstOrNull { it.string("bookUrl") == bookUrl }
+            ?: return ReturnData.error("Book not found")
+        val candidates = searchBookSources(book.string("name").orEmpty())
+            .filter { sameBookTitle(it.string("name"), book.string("name")) }
+            .filter { it.string("origin") != book.string("origin") }
+            .filter { !changeSourceCheckAuthor() || compatibleAuthors(book.string("author"), it.string("author")) }
+            .distinctBy { "${it.string("origin")}\u0000${it.string("bookUrl")}" }
+        return ReturnData.ok(candidates)
+    }
+
+    @Synchronized
+    fun changeBookSource(postData: String?): ReturnData {
+        val payload = parseJson(postData)?.asObjectOrNull() ?: return ReturnData.error("Expected JSON object")
+        val oldBookUrl = payload.string("bookUrl") ?: return ReturnData.error("bookUrl is required")
+        val candidate = payload["candidate"].asObjectOrNull() ?: return ReturnData.error("candidate is required")
+        val books = readList("books")
+        val original = books.firstOrNull { it.string("bookUrl") == oldBookUrl }
+            ?: return ReturnData.error("Book not found")
+        val newBookUrl = candidate.string("bookUrl")?.trim().orEmpty()
+        val newOrigin = candidate.string("origin")?.trim().orEmpty()
+        if (!newBookUrl.startsWith("http://", true) && !newBookUrl.startsWith("https://", true)) {
+            return ReturnData.error("candidate bookUrl must use HTTP or HTTPS")
+        }
+        val source = readList("bookSources").firstOrNull {
+            it.string("bookSourceUrl") == newOrigin && it["enabled"]?.safeBoolean() != false
+        } ?: return ReturnData.error("Candidate source is not enabled or no longer exists")
+        if (!sameBookTitle(original.string("name"), candidate.string("name"))) {
+            return ReturnData.error("Candidate title does not match the bookshelf book")
+        }
+        if (changeSourceCheckAuthor() && !compatibleAuthors(original.string("author"), candidate.string("author"))) {
+            return ReturnData.error("Candidate author does not match the bookshelf book")
+        }
+        if (newBookUrl != oldBookUrl && books.any { it.string("bookUrl") == newBookUrl }) {
+            return ReturnData.error("The candidate book is already on the bookshelf")
+        }
+
+        val switched = original.deepCopy()
+        for (key in listOf("bookUrl", "tocUrl", "origin", "originName", "type", "originOrder")) {
+            candidate[key]?.let { switched.add(key, it.deepCopy()) }
+        }
+        if (loadSourceDetails()) {
+            for (key in listOf("coverUrl", "intro", "kind", "wordCount", "latestChapterTitle")) {
+                candidate[key]?.let { switched.add(key, it.deepCopy()) }
+            }
+        }
+        switched.addProperty("lastCheckTime", System.currentTimeMillis())
+        switched.withBookDefaults()
+
+        if (preloadSourceToc()) {
+            val chapters = loadRemoteChapters(switched, source)
+            if (chapters.isNotEmpty()) {
+                writeChapterList(newBookUrl, chapters)
+                switched.addProperty("totalChapterNum", chapters.size)
+                switched.addProperty("latestChapterTitle", chapters.last().string("title") ?: "")
+            }
+        }
+        val index = books.indexOfFirst { it.string("bookUrl") == oldBookUrl }
+        books[index] = switched
+        writeList("books", books)
+        return ReturnData.ok(switched)
+    }
+
+    private fun sameBookTitle(left: String?, right: String?): Boolean =
+        left?.trim()?.equals(right?.trim(), ignoreCase = true) == true
+
+    private fun compatibleAuthors(left: String?, right: String?): Boolean {
+        val first = left?.trim().orEmpty()
+        val second = right?.trim().orEmpty()
+        return first.isNotBlank() && second.isNotBlank() &&
+            (first.equals(second, ignoreCase = true) || first.contains(second, true) || second.contains(first, true))
+    }
+
+    private fun changeSourceCheckAuthor(): Boolean = readAppSettings()["network"]
+        .asObjectOrNull()?.get("changeSourceCheckAuthor")?.safeBoolean() == true
+
+    private fun loadSourceDetails(): Boolean = readAppSettings()["network"]
+        .asObjectOrNull()?.get("changeSourceLoadInfo")?.safeBoolean() == true
+
+    private fun preloadSourceToc(): Boolean = readAppSettings()["network"]
+        .asObjectOrNull()?.get("changeSourceLoadToc")?.safeBoolean() == true
 
     private fun searchSource(source: JsonObject, key: String): List<JsonObject> {
         val startedAt = System.nanoTime()
