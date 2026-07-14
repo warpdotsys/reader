@@ -1671,6 +1671,12 @@ class LegadoStore(
             val root = runCatching { JsonParser.parseString(input) }.getOrNull() ?: return emptyList()
             return jsonPath(root, rule).map { gson.toJson(it) }
         }
+        if (isXpathRule(rule)) {
+            val expression = xpathRuleParts(rule).first
+            if (expression.isBlank()) return emptyList()
+            return runCatching { Jsoup.parseBodyFragment(input).body().selectXpath(expression).map { it.outerHtml() } }
+                .getOrDefault(emptyList())
+        }
         if (isCssRule(rule)) {
             val selector = cssSelector(rule)
             if (selector.isBlank()) return emptyList()
@@ -1690,6 +1696,19 @@ class LegadoStore(
             val root = runCatching { JsonParser.parseString(input) }.getOrNull() ?: return ""
             val value = jsonPath(root, rule).firstOrNull() ?: return ""
             return if (value.isJsonPrimitive) value.asString else gson.toJson(value)
+        }
+        if (isXpathRule(rule)) {
+            return runCatching {
+                val (expression, attribute) = xpathRuleParts(rule)
+                val element = Jsoup.parseBodyFragment(input).body().selectXpath(expression).firstOrNull() ?: return ""
+                when (attribute?.lowercase()) {
+                    null, "text" -> element.text()
+                    "owntext" -> element.ownText()
+                    "html" -> element.html()
+                    "outerhtml" -> element.outerHtml()
+                    else -> element.attr(attribute)
+                }
+            }.getOrDefault("")
         }
         if (isCssRule(rule)) {
             return runCatching {
@@ -1712,8 +1731,20 @@ class LegadoStore(
         }.getOrDefault("")
     }
 
+    private fun isXpathRule(rawRule: String): Boolean {
+        val rule = rawRule.trim()
+        return rule.startsWith("@xpath:", true) || rule.startsWith("//") || rule.startsWith(".//")
+    }
+
+    private fun xpathRuleParts(rawRule: String): Pair<String, String?> {
+        val rule = if (rawRule.trim().startsWith("@xpath:", true)) rawRule.trim().substring(7).trim() else rawRule.trim()
+        if (rule.endsWith("/text()")) return rule.removeSuffix("/text()") to "text"
+        val attribute = Regex("""/@([A-Za-z_:][-A-Za-z0-9_:.]*)$""").find(rule)
+        return if (attribute != null) rule.removeSuffix(attribute.value) to attribute.groupValues[1] else rule to null
+    }
+
     private fun isCssRule(rawRule: String): Boolean {
-        val rule = rawRule.trim().removePrefix("@css:").trim()
+        val rule = if (rawRule.trim().startsWith("@css:", true)) rawRule.trim().substring(5).trim() else rawRule.trim()
         if (rawRule.trim().startsWith("@css:", true)) return true
         if (rule.isBlank() || rule.startsWith("@xpath:", true) || rule.startsWith("@regex:", true)) return false
         if (Regex("""[\\(){}|]""").containsMatchIn(rule)) return false
@@ -1724,7 +1755,7 @@ class LegadoStore(
     private fun cssSelector(rawRule: String): String = cssRuleParts(rawRule).first
 
     private fun cssRuleParts(rawRule: String): Pair<String, String?> {
-        val rule = rawRule.trim().removePrefix("@css:").trim()
+        val rule = if (rawRule.trim().startsWith("@css:", true)) rawRule.trim().substring(5).trim() else rawRule.trim()
         val marker = rule.lastIndexOf('@')
         if (marker <= 0) return rule to null
         val selector = rule.substring(0, marker).trim()
