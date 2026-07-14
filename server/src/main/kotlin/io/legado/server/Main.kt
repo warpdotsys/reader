@@ -300,6 +300,7 @@ class LegadoHttpServer(
             "/requestHttpTts" -> throw AudioResponse(store.requestHttpTts(post.postData))
             "/lookupDictionary" -> store.lookupDictionary(post.postData)
             "/startBookDownload" -> store.startBookDownload(post.postData)
+            "/cancelBookDownload" -> store.cancelBookDownload(post.postData)
             "/findBookSourceCandidates" -> store.findBookSourceCandidates(post.postData)
             "/changeBookSource" -> store.changeBookSource(post.postData)
             "/autoChangeBookSource" -> store.autoChangeBookSource(post.postData)
@@ -1713,13 +1714,30 @@ class LegadoStore(
         return ReturnData.ok(task)
     }
 
+    @Synchronized
+    fun cancelBookDownload(postData: String?): ReturnData {
+        val payload = parseJson(postData)?.asObjectOrNull() ?: return ReturnData.error("Expected JSON object")
+        val taskId = payload.string("id")?.trim().orEmpty()
+        if (taskId.isBlank()) return ReturnData.error("id is required")
+        val tasks = readList("downloadTasks")
+        val task = tasks.firstOrNull { it.string("id") == taskId } ?: return ReturnData.error("Download task not found")
+        if (task.string("status") !in setOf("queued", "running")) return ReturnData.ok(task)
+        task.addProperty("status", "cancelled")
+        task.addProperty("updatedAt", System.currentTimeMillis())
+        writeList("downloadTasks", tasks)
+        return ReturnData.ok(task)
+    }
+
     private fun runBookDownload(taskId: String, bookUrl: String) {
         updateDownloadTask(taskId) { task ->
-            task.addProperty("status", "running")
-            task.addProperty("progress", 1)
-            task.remove("error")
+            if (task.string("status") != "cancelled") {
+                task.addProperty("status", "running")
+                task.addProperty("progress", 1)
+                task.remove("error")
+            }
         }
         try {
+            if (downloadTaskCancelled(taskId)) return
             val toc = getChapterList(bookUrl)
             if (!toc.isSuccess) throw IllegalStateException(toc.errorMsg)
             val chapters = synchronized(this) { readChapterList(bookUrl).sortedBy { it["index"].safeInt() } }
@@ -1732,6 +1750,7 @@ class LegadoStore(
                 book.string("author")?.takeIf(String::isNotBlank)?.let { append(it).append('\n') }
                 append('\n')
                 chapters.forEachIndexed { position, chapter ->
+                    if (downloadTaskCancelled(taskId)) return
                     val index = chapter["index"].safeInt()
                     val result = getBookContent(bookUrl, index)
                     if (!result.isSuccess) throw IllegalStateException("Chapter ${position + 1}: ${result.errorMsg}")
@@ -1744,6 +1763,7 @@ class LegadoStore(
                     }
                 }
             }
+            if (downloadTaskCancelled(taskId)) return
             val baseName = (book.string("name") ?: "book")
                 .replace(Regex("[\\\\/:*?\"<>|]"), "_").trim().ifEmpty { "book" }
             val target = downloadsDir.resolve("$baseName-${System.currentTimeMillis()}.txt").normalize()
@@ -1771,6 +1791,10 @@ class LegadoStore(
             task.addProperty("updatedAt", System.currentTimeMillis())
             writeList("downloadTasks", tasks)
         }
+    }
+
+    private fun downloadTaskCancelled(taskId: String): Boolean = synchronized(this) {
+        readList("downloadTasks").firstOrNull { it.string("id") == taskId }?.string("status") == "cancelled"
     }
 
     @Synchronized

@@ -209,6 +209,13 @@
                 @click="downloadTaskFile(row)"
               />
               <el-button
+                v-if="activeKind?.kind === 'downloadTasks' && ['queued', 'running'].includes(String(row.status))"
+                :icon="VideoPause"
+                text
+                type="warning"
+                @click="cancelDownloadTask(row)"
+              />
+              <el-button
                 :icon="Delete"
                 text
                 type="danger"
@@ -318,6 +325,7 @@ import {
   SetUp,
   Setting,
   Upload,
+  VideoPause,
   VideoPlay,
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -480,6 +488,7 @@ const rawEditor = ref(false)
 const searchText = ref('')
 const formDraft = ref<Record<string, any>>({})
 const dataInput = ref<HTMLInputElement>()
+let downloadTaskPoller: ReturnType<typeof setInterval> | null = null
 
 const activeKind = computed(() =>
   kinds.value.find(kind => kind.kind === selectedKindName.value),
@@ -561,7 +570,17 @@ watch(selectedKindName, async value => {
       await router.replace({ query: { ...route.query, kind: value } })
     }
   }
+  syncDownloadTaskPolling()
 })
+
+function syncDownloadTaskPolling() {
+  if (downloadTaskPoller) clearInterval(downloadTaskPoller)
+  downloadTaskPoller = null
+  if (selectedKindName.value !== 'downloadTasks') return
+  downloadTaskPoller = setInterval(() => {
+    if (!loading.value && !editorOpen.value) void loadAppData()
+  }, 1500)
+}
 
 async function refreshAll() {
   loading.value = true
@@ -855,9 +874,25 @@ async function downloadTaskFile(task: AppDataItem) {
   }
 }
 
+async function cancelDownloadTask(task: AppDataItem) {
+  const id = String(task.id || '')
+  if (!id) return
+  try {
+    unwrap(await API.cancelBookDownload(id))
+    await loadAppData()
+    ElMessage.success('已取消下载任务')
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '取消下载任务失败')
+  }
+}
+
 onMounted(() => {
   document.title = 'App 功能工作台'
   refreshAll()
+})
+
+onUnmounted(() => {
+  if (downloadTaskPoller) clearInterval(downloadTaskPoller)
 })
 </script>
 

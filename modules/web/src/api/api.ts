@@ -355,6 +355,9 @@ const requestHttpTts = (engineId: string, text: string, speed: number) =>
 const startBookDownload = (bookUrl: string) =>
   ajax.post<LeagdoApiResponse<AppDataItem>>('startBookDownload', { bookUrl })
 
+const cancelBookDownload = (id: string) =>
+  ajax.post<LeagdoApiResponse<AppDataItem>>('cancelBookDownload', { id })
+
 const getDownloadTaskFile = (taskId: string) =>
   ajax.get<Blob>('downloadTaskFile?id=' + encodeURIComponent(taskId), { responseType: 'blob' })
 
@@ -588,6 +591,7 @@ export default {
   getRssArticleContent,
   requestHttpTts,
   startBookDownload,
+  cancelBookDownload,
   getDownloadTaskFile,
   lookupDictionary,
   saveBook,
