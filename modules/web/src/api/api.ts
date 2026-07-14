@@ -336,6 +336,13 @@ const refreshRssSources = (sourceUrls?: string[]) =>
 const getRssArticleContent = (link: string) =>
   ajax.post<LeagdoApiResponse<RssArticleContent>>('getRssArticleContent', { link })
 
+const requestHttpTts = (engineId: string, text: string, speed: number) =>
+  ajax.post<Blob>(
+    'requestHttpTts',
+    { engineId, text, speed },
+    { responseType: 'blob' },
+  )
+
 const saveBook = (book: BaseBook) =>
   ajax.post<LeagdoApiResponse<string>>('saveBook', book)
 const exportBook = (bookUrl: string) =>
@@ -561,6 +568,7 @@ export default {
   batchChangeBookSources,
   refreshRssSources,
   getRssArticleContent,
+  requestHttpTts,
   saveBook,
   exportBook,
   exportBookEpisodes,

@@ -581,7 +581,7 @@ const sections: SettingSection[] = [
       f('aloud.ttsFollowSys', '跟随系统语速', '使用浏览器系统语音的默认语速。', 'boolean', 'live'),
       f('aloud.ttsSpeechRate', '朗读语速', '关闭跟随系统后映射为浏览器朗读语速。', 'number', 'live', undefined, 1, 10),
       f('aloud.ttsTimer', '定时停止', '朗读达到指定分钟数后自动停止。', 'number', 'live', undefined, 0, 240),
-      f('aloud.ttsEngine', 'TTS 引擎', '按名称、URI 或语言匹配浏览器系统语音。', 'text', 'live'),
+      f('aloud.ttsEngine', 'TTS 引擎', '按名称、URI 或语言匹配浏览器系统语音；填写 http:<HTTP TTS ID> 使用服务端音频朗读。', 'text', 'live'),
     ],
   },
   {

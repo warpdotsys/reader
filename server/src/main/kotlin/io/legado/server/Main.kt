@@ -231,6 +231,8 @@ class LegadoHttpServer(
             }
         } catch (image: ImageResponse) {
             cors(image.response)
+        } catch (audio: AudioResponse) {
+            cors(audio.response)
         } catch (error: Exception) {
             cors(json(ReturnData.error(error.message ?: error.javaClass.simpleName)))
         }
@@ -292,6 +294,7 @@ class LegadoHttpServer(
             "/debugSource" -> store.debugSource(post.postData)
             "/refreshRssSources" -> store.refreshRssSources(post.postData)
             "/getRssArticleContent" -> store.getRssArticleContent(post.postData)
+            "/requestHttpTts" -> throw AudioResponse(store.requestHttpTts(post.postData))
             "/findBookSourceCandidates" -> store.findBookSourceCandidates(post.postData)
             "/changeBookSource" -> store.changeBookSource(post.postData)
             "/autoChangeBookSource" -> store.autoChangeBookSource(post.postData)
@@ -410,6 +413,7 @@ private data class JsonCompactionResult(val files: Int, val bytesSaved: Long)
 private data class EpubImage(val fileName: String, val mime: String, val bytes: ByteArray)
 
 class ImageResponse(val response: NanoHTTPD.Response) : RuntimeException()
+class AudioResponse(val response: NanoHTTPD.Response) : RuntimeException()
 
 class ImageProxy(
     private val userAgent: () -> String,
@@ -539,6 +543,7 @@ class ImageProxy(
 
 data class ImageCachePolicy(val maxBytes: Long, val maxEntries: Int, val expireAfterMillis: Long)
 data class RemoteBackup(val fileName: String, val modifiedTime: Long, val size: Long, val href: String)
+private const val maxHttpTtsBytes = 20L * 1024 * 1024
 
 class LegadoStore(
     val dataDir: Path,
@@ -553,7 +558,7 @@ class LegadoStore(
         AppDataKind("bookGroups", "书籍分组", "书架分组、排序、刷新策略", "groupId", "Web 可用"),
         AppDataKind("bookmarks", "书签摘录", "阅读器书签、划线、摘录内容", "time", "Web 可用"),
         AppDataKind("readRecords", "阅读记录", "最近阅读、阅读时长和入口历史", "id", "配置保留"),
-        AppDataKind("httpTTS", "HTTP TTS", "在线朗读引擎、请求头和登录脚本", "id", "Linux 需实现"),
+        AppDataKind("httpTTS", "HTTP TTS", "在线朗读引擎、请求头和登录脚本", "id", "Web 可用"),
         AppDataKind("cookies", "Cookie 管理", "启用 Cookie Jar 的书源登录 Cookie", "url", "Web 可用"),
         AppDataKind("dictRules", "字典规则", "划词字典查询规则", "name", "Linux 需实现"),
         AppDataKind("rssArticles", "RSS 文章缓存", "订阅源规则解析后的文章列表、分组和阅读状态", "link", "Web 可用"),
@@ -1450,6 +1455,143 @@ class LegadoStore(
         article.addProperty("articleContentFetchedAt", System.currentTimeMillis())
         writeList("rssArticles", articles)
         return ReturnData.ok(mapOf("content" to content, "cached" to false))
+    }
+
+    @Synchronized
+    fun requestHttpTts(postData: String?): NanoHTTPD.Response {
+        val payload = parseJson(postData)?.asObjectOrNull() ?: throw IllegalArgumentException("Expected JSON object")
+        val engineId = payload.string("engineId")?.trim().orEmpty()
+        val text = payload.string("text")?.trim().orEmpty()
+        val speed = payload["speed"].safeIntOrNull()?.coerceIn(5, 50) ?: 25
+        if (engineId.isBlank()) throw IllegalArgumentException("engineId is required")
+        if (text.isBlank()) throw IllegalArgumentException("text is required")
+        if (text.length > 12_000) throw IllegalArgumentException("TTS text exceeds 12000 characters")
+        val engine = readList("httpTTS").firstOrNull { it.string("id") == engineId }
+            ?: throw IllegalArgumentException("HTTP TTS engine not found")
+        if (!engine.string("loginUrl").isNullOrBlank()) {
+            throw IllegalArgumentException("This HTTP TTS engine requires an Android JavaScript login flow")
+        }
+        val requestTemplate = expandHttpTtsTemplate(engine.string("url").orEmpty(), text, speed)
+        val requestUrl = parseSourceRequestUrl(requestTemplate)
+            ?: throw IllegalArgumentException("HTTP TTS URL must use HTTP or HTTPS")
+        val configuredHeaders = parseHttpTtsHeaders(engine.string("header"))
+        val builder = HttpRequest.newBuilder(URI.create(requestUrl.url))
+            .timeout(Duration.ofSeconds(45))
+            .header("User-Agent", networkUserAgent())
+        configuredHeaders.forEach { (name, value) -> builder.header(name, value) }
+        applyHttpTtsCookies(builder, engine)
+        requestUrl.options?.get("headers")?.asObjectOrNull()?.entrySet()?.forEach { (name, value) ->
+            if (name.isNotBlank()) builder.header(name, value.asString)
+        }
+        val method = requestUrl.options?.string("method")?.uppercase().orEmpty()
+        if (method == "POST") {
+            val body = requestBodyText(requestUrl.options)
+            val hasContentType = configuredHeaders.keys.any { it.equals("content-type", true) } ||
+                requestUrl.options?.get("headers")?.asObjectOrNull()?.keySet()?.any { it.equals("content-type", true) } == true
+            if (!hasContentType) {
+                val contentType = if (requestUrl.options?.get("body")?.isJsonPrimitive == true &&
+                    requestUrl.options["body"].asJsonPrimitive.isString
+                ) "application/x-www-form-urlencoded; charset=utf-8" else "application/json; charset=utf-8"
+                builder.header("Content-Type", contentType)
+            }
+            builder.POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
+        } else {
+            builder.GET()
+        }
+        val response = try {
+            networkClient().send(builder.build(), HttpResponse.BodyHandlers.ofByteArray())
+        } catch (error: Exception) {
+            throw IllegalArgumentException("HTTP TTS request failed: ${error.message ?: error.javaClass.simpleName}")
+        }
+        captureHttpTtsCookies(response, engine)
+        if (response.statusCode() !in 200..299) {
+            val message = response.body().toString(StandardCharsets.UTF_8).take(500).replace(Regex("\\s+"), " ")
+            throw IllegalArgumentException("HTTP TTS returned HTTP ${response.statusCode()}${if (message.isBlank()) "" else ": $message"}")
+        }
+        if (response.body().size > maxHttpTtsBytes) throw IllegalArgumentException("HTTP TTS audio exceeds 20 MiB")
+        val responseMime = response.headers().firstValue("content-type").orElse("").substringBefore(';').trim()
+        val configuredMime = engine.string("contentType")?.substringBefore(';')?.trim().orEmpty()
+        val mime = responseMime.takeIf { it.startsWith("audio/", true) || it == "application/octet-stream" }
+            ?: configuredMime.takeIf { it.startsWith("audio/", true) }
+            ?: "application/octet-stream"
+        return NanoHTTPD.newFixedLengthResponse(
+            NanoHTTPD.Response.Status.OK,
+            mime,
+            ByteArrayInputStream(response.body()),
+            response.body().size.toLong(),
+        ).apply {
+            addHeader("Cache-Control", "no-store")
+        }
+    }
+
+    private fun expandHttpTtsTemplate(template: String, text: String, speed: Int): String {
+        if (template.isBlank()) throw IllegalArgumentException("HTTP TTS URL is empty")
+        val encoded = encodeUrlComponent(text)
+        val doubleEncoded = encodeUrlComponent(encoded)
+        val jsonText = gson.toJson(text).removePrefix("\"").removeSuffix("\"")
+        val baiduSpeed = ((speed + 5) / 10 + 4).toString()
+        val aliyunSpeed = (speed * 20 - 400).toString()
+        return template
+            .replace("{{java.encodeURI(java.encodeURI(speakText))}}", doubleEncoded)
+            .replace("{{java.encodeURI(speakText)}}", encoded)
+            .replace("{{String((speakSpeed + 5) / 10 + 4)}}", baiduSpeed)
+            .replace("{{String((speakSpeed) * 20 - 400)}}", aliyunSpeed)
+            .replace("{{speakSpeed}}", speed.toString())
+            .replace("{{speakText}}", jsonText)
+    }
+
+    private fun requestBodyText(options: JsonObject?): String {
+        val body = options?.get("body") ?: return ""
+        return if (body.isJsonPrimitive && body.asJsonPrimitive.isString) body.asString else gson.toJson(body)
+    }
+
+    private fun encodeUrlComponent(value: String): String =
+        URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20")
+
+    private fun parseHttpTtsHeaders(rawHeaders: String?): Map<String, String> {
+        if (rawHeaders.isNullOrBlank()) return emptyMap()
+        val parsed = runCatching { JsonParser.parseString(rawHeaders).asObjectOrNull() }.getOrNull()
+            ?: throw IllegalArgumentException("HTTP TTS headers must be a JSON object")
+        return parsed.entrySet().associate { (name, value) ->
+            if (name.isBlank()) throw IllegalArgumentException("HTTP TTS header name is empty")
+            name to value.asString
+        }
+    }
+
+    private fun applyHttpTtsCookies(builder: HttpRequest.Builder, engine: JsonObject) {
+        if (engine["enabledCookieJar"]?.safeBoolean() != true) return
+        val sourceUrl = engine.string("url").orEmpty().substringBefore(",{")
+        val sourceHost = runCatching { URI.create(sourceUrl).host.orEmpty() }.getOrDefault("")
+        val cookie = readList("cookies").firstOrNull { item ->
+            val url = item.string("url").orEmpty()
+            url == "httpTts:${engine.string("id")}" || url == sourceUrl ||
+                runCatching { URI.create(url).host.orEmpty() == sourceHost }.getOrDefault(false)
+        }?.string("cookie").orEmpty()
+        if (cookie.isNotBlank()) builder.header("Cookie", cookie.take(8192))
+    }
+
+    private fun captureHttpTtsCookies(response: HttpResponse<*>, engine: JsonObject) {
+        if (engine["enabledCookieJar"]?.safeBoolean() != true) return
+        val updates = response.headers().allValues("set-cookie")
+            .map { it.substringBefore(';').trim() }
+            .filter { '=' in it }
+        if (updates.isEmpty()) return
+        val key = "httpTts:${engine.string("id")}"
+        val cookies = readList("cookies")
+        val record = cookies.firstOrNull { it.string("url") == key } ?: JsonObject().also(cookies::add)
+        val values = record.string("cookie").orEmpty().split(';').mapNotNull { pair ->
+            val index = pair.indexOf('=')
+            pair.takeIf { index > 0 }?.let { it.substring(0, index).trim() to it.substring(index + 1).trim() }
+        }.toMap(LinkedHashMap())
+        updates.forEach { pair ->
+            val index = pair.indexOf('=')
+            values[pair.substring(0, index).trim()] = pair.substring(index + 1).trim()
+        }
+        record.addProperty("url", key)
+        record.addProperty("sourceName", engine.string("name") ?: "HTTP TTS")
+        record.addProperty("cookie", values.entries.joinToString("; ") { "${it.key}=${it.value}" }.take(8192))
+        record.addProperty("lastUseTime", System.currentTimeMillis())
+        writeList("cookies", cookies)
     }
 
     private fun searchBookSources(key: String, group: String = ""): List<JsonObject> {

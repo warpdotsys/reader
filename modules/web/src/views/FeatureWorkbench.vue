@@ -433,8 +433,8 @@ const featureGroups: FeatureGroup[] = [
   {
     name: '朗读与媒体',
     description: 'HTTP TTS、朗读按键、音频焦点、漫画和视频配置。',
-    coverage: '配置与数据可保存，Linux 播放服务待实现',
-    status: 'Linux 需实现',
+    coverage: '浏览器系统朗读与 HTTP TTS 音频代理可用，漫画和下载任务继续实现。',
+    status: '部分可用',
     tone: 'tone-violet',
     icon: VideoPlay,
     actions: [

@@ -518,6 +518,8 @@ const enhancedProgressSync = computed(
 )
 const aloudPreferences = computed(() => {
   const aloud = appSettings.value.aloud || {}
+  const engine = String(aloud.ttsEngine ?? '').trim()
+  const httpEngine = /^(?:http|httptts):(.+)$/i.exec(engine)
   return {
     selectionMode: String(appSettings.value.read?.contentReadAloudMod ?? '0'),
     byPage: aloud.readAloudByPage === true,
@@ -530,10 +532,12 @@ const aloudPreferences = computed(() => {
     followSystemRate: aloud.ttsFollowSys !== false,
     speechRate: Math.min(10, Math.max(1, Number(aloud.ttsSpeechRate ?? 5))),
     timerMinutes: Math.min(240, Math.max(0, Number(aloud.ttsTimer ?? 0))),
-    engine: String(aloud.ttsEngine ?? '').trim().toLowerCase(),
+    engine: engine.toLowerCase(),
+    httpTtsId: httpEngine?.[1]?.trim() || '',
   }
 })
 const speechActive = ref(false)
+const speechLoading = ref(false)
 const selectionSpeech = reactive({ visible: false, text: '', x: 0, y: 0 })
 let speechTimer: ReturnType<typeof setTimeout> | null = null
 let speechSegments: string[] = []
@@ -541,6 +545,8 @@ let speechSegmentIndex = 0
 let speechGeneration = 0
 let speechWakeLock: WakeLockSentinelLike | null = null
 let speechPausedByVisibility = false
+let httpTtsAudio: HTMLAudioElement | null = null
+let httpTtsAudioUrl = ''
 
 async function releaseSpeechWakeLock() {
   if (!speechWakeLock) return
@@ -574,6 +580,15 @@ function setMediaPlaybackState(state: MediaSessionPlaybackState) {
 function stopSpeechReading() {
   speechGeneration += 1
   window.speechSynthesis?.cancel()
+  if (httpTtsAudio) {
+    httpTtsAudio.onended = null
+    httpTtsAudio.onerror = null
+    httpTtsAudio.pause()
+    httpTtsAudio = null
+  }
+  if (httpTtsAudioUrl) URL.revokeObjectURL(httpTtsAudioUrl)
+  httpTtsAudioUrl = ''
+  speechLoading.value = false
   speechActive.value = false
   speechSegments = []
   speechSegmentIndex = 0
@@ -586,7 +601,7 @@ function stopSpeechReading() {
 
 function speechVoice() {
   const configured = aloudPreferences.value.engine
-  if (!configured || !window.speechSynthesis) return undefined
+  if (!configured || aloudPreferences.value.httpTtsId || !window.speechSynthesis) return undefined
   return window.speechSynthesis.getVoices().find(voice =>
     [voice.name, voice.voiceURI, voice.lang].some(value =>
       value.toLowerCase().includes(configured),
@@ -595,6 +610,10 @@ function speechVoice() {
 }
 
 function speakCurrentSegment(generation: number) {
+  if (aloudPreferences.value.httpTtsId) {
+    void speakHttpTtsSegment(generation)
+    return
+  }
   const normalized = speechSegments[speechSegmentIndex]?.replace(/\s+/g, ' ').trim()
   if (!normalized || generation !== speechGeneration) {
     stopSpeechReading()
@@ -624,6 +643,72 @@ function speakCurrentSegment(generation: number) {
     if (generation === speechGeneration) stopSpeechReading()
   }
   window.speechSynthesis.speak(utterance)
+}
+
+async function ttsErrorMessage(error: unknown) {
+  const payload = (error as { response?: { data?: unknown } })?.response?.data
+  if (payload instanceof Blob) {
+    try {
+      const parsed = JSON.parse(await payload.text()) as { errorMsg?: string }
+      if (parsed.errorMsg) return parsed.errorMsg
+    } catch {
+      // Keep the transport error below when a non-JSON response was returned.
+    }
+  }
+  return error instanceof Error ? error.message : 'HTTP TTS 请求失败'
+}
+
+async function speakHttpTtsSegment(generation: number) {
+  const engineId = aloudPreferences.value.httpTtsId
+  const normalized = speechSegments[speechSegmentIndex]?.replace(/\s+/g, ' ').trim()
+  if (!engineId || !normalized || generation !== speechGeneration) {
+    stopSpeechReading()
+    return
+  }
+  speechLoading.value = true
+  try {
+    const response = await API.requestHttpTts(
+      engineId,
+      normalized,
+      Math.round(aloudPreferences.value.speechRate * 5),
+    )
+    if (generation !== speechGeneration) return
+    const blob = response.data
+    if (!blob.size) throw new Error('HTTP TTS 返回了空音频')
+    httpTtsAudioUrl = URL.createObjectURL(blob)
+    const audio = new Audio(httpTtsAudioUrl)
+    httpTtsAudio = audio
+    audio.onplay = () => {
+      if (generation !== speechGeneration) return
+      speechActive.value = true
+      setMediaPlaybackState('playing')
+      document.dispatchEvent(new Event('legado:speech-start'))
+      void acquireSpeechWakeLock()
+    }
+    audio.onended = () => {
+      if (generation !== speechGeneration) return
+      URL.revokeObjectURL(httpTtsAudioUrl)
+      httpTtsAudioUrl = ''
+      httpTtsAudio = null
+      speechSegmentIndex += 1
+      if (speechSegmentIndex < speechSegments.length) speakCurrentSegment(generation)
+      else stopSpeechReading()
+    }
+    audio.onerror = () => {
+      if (generation === speechGeneration) {
+        ElMessage.error('HTTP TTS 音频播放失败')
+        stopSpeechReading()
+      }
+    }
+    await audio.play()
+  } catch (error) {
+    if (generation === speechGeneration) {
+      ElMessage.error(await ttsErrorMessage(error))
+      stopSpeechReading()
+    }
+  } finally {
+    if (generation === speechGeneration) speechLoading.value = false
+  }
 }
 
 function speakSegments(segments: string[], startIndex = 0) {
@@ -662,7 +747,7 @@ function currentSpeechSegments() {
 }
 
 function toggleSpeechReading() {
-  if (speechActive.value || window.speechSynthesis?.speaking) stopSpeechReading()
+  if (speechActive.value || speechLoading.value || window.speechSynthesis?.speaking) stopSpeechReading()
   else speakSegments(currentSpeechSegments())
 }
 
@@ -1287,10 +1372,11 @@ const onVisibilityChange = () => {
   if (
     document.visibilityState === 'hidden' &&
     aloudPreferences.value.pauseOnInterruption &&
-    window.speechSynthesis?.speaking &&
-    !window.speechSynthesis.paused
+    ((window.speechSynthesis?.speaking && !window.speechSynthesis.paused) ||
+      Boolean(httpTtsAudio && !httpTtsAudio.paused))
   ) {
     window.speechSynthesis.pause()
+    httpTtsAudio?.pause()
     speechPausedByVisibility = true
     speechActive.value = false
     setMediaPlaybackState('paused')
@@ -1298,10 +1384,11 @@ const onVisibilityChange = () => {
   } else if (
     document.visibilityState === 'visible' &&
     speechPausedByVisibility &&
-    window.speechSynthesis?.paused
+    (window.speechSynthesis?.paused || httpTtsAudio?.paused)
   ) {
     speechPausedByVisibility = false
     window.speechSynthesis.resume()
+    void httpTtsAudio?.play()
     speechActive.value = true
     setMediaPlaybackState('playing')
     void acquireSpeechWakeLock()
@@ -1405,7 +1492,12 @@ function configureMediaSession() {
   if (!('mediaSession' in navigator)) return
   document.documentElement.dataset.legadoMediaSession = 'active'
   setMediaSessionHandler('play', () => {
-    if (window.speechSynthesis?.paused) {
+    if (httpTtsAudio?.paused) {
+      void httpTtsAudio.play()
+      speechActive.value = true
+      setMediaPlaybackState('playing')
+      void acquireSpeechWakeLock()
+    } else if (window.speechSynthesis?.paused) {
       window.speechSynthesis.resume()
       speechActive.value = true
       setMediaPlaybackState('playing')
@@ -1416,6 +1508,7 @@ function configureMediaSession() {
   })
   setMediaSessionHandler('pause', () => {
     window.speechSynthesis?.pause()
+    httpTtsAudio?.pause()
     speechActive.value = false
     setMediaPlaybackState('paused')
     void releaseSpeechWakeLock()
