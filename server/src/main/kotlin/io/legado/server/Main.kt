@@ -544,12 +544,13 @@ class LegadoStore(
     @Volatile private var sourceCheckClientMode = false
     @Volatile private var sourceCheckClient = buildNetworkClient(false)
     private val authSessions = ConcurrentHashMap<String, Long>()
+    private val sourceCookieLock = Any()
     private val appDataKinds = listOf(
         AppDataKind("bookGroups", "书籍分组", "书架分组、排序、刷新策略", "groupId", "Web 可用"),
         AppDataKind("bookmarks", "书签摘录", "阅读器书签、划线、摘录内容", "time", "Web 可用"),
         AppDataKind("readRecords", "阅读记录", "最近阅读、阅读时长和入口历史", "id", "配置保留"),
         AppDataKind("httpTTS", "HTTP TTS", "在线朗读引擎、请求头和登录脚本", "id", "Linux 需实现"),
-        AppDataKind("cookies", "Cookie 管理", "书源/RSS/HTTP TTS 登录 Cookie", "url", "Linux 需实现"),
+        AppDataKind("cookies", "Cookie 管理", "启用 Cookie Jar 的书源登录 Cookie", "url", "Web 可用"),
         AppDataKind("dictRules", "字典规则", "划词字典查询规则", "name", "Linux 需实现"),
         AppDataKind("rssArticles", "RSS 文章缓存", "订阅文章列表、分组、阅读状态", "link", "配置保留"),
         AppDataKind("rssReadRecords", "RSS 阅读记录", "订阅阅读进度和已读记录", "record", "配置保留"),
@@ -1592,6 +1593,7 @@ class LegadoStore(
         val requestSpec = sourceSearchRequest(source, searchUrl, key) ?: return emptyList()
         return try {
             val response = networkClient().send(requestSpec.request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
+            captureSourceCookies(response, source)
             if (response.statusCode() !in 200..299) return emptyList()
             val latency = ((System.nanoTime() - startedAt) / 1_000_000).coerceAtLeast(0)
             val responseBody = response.body()
@@ -1648,6 +1650,7 @@ class LegadoStore(
             .timeout(Duration.ofSeconds(15))
             .header("User-Agent", networkUserAgent())
         applySourceHeaders(builder, source)
+        applySourceCookies(builder, source)
         options?.get("headers")?.asObjectOrNull()?.entrySet()?.forEach { (name, value) ->
             if (name.isNotBlank()) builder.header(name, value.asString)
         }
@@ -1664,6 +1667,57 @@ class LegadoStore(
             ?.entrySet()
             ?.forEach { (name, value) -> if (name.isNotBlank()) builder.header(name, value.asString) }
     }
+
+    private fun applySourceCookies(builder: HttpRequest.Builder, source: JsonObject) {
+        if (!sourceCookieJarEnabled(source) || sourceHasCookieHeader(source)) return
+        val sourceUrl = source.string("bookSourceUrl").orEmpty()
+        if (sourceUrl.isBlank()) return
+        val cookies = synchronized(sourceCookieLock) {
+            readList("cookies").firstOrNull { it.string("url") == sourceUrl }
+                ?.string("cookie")
+                ?.trim()
+                .orEmpty()
+        }
+        if (cookies.isNotBlank()) builder.header("Cookie", cookies.take(8192))
+    }
+
+    private fun captureSourceCookies(response: HttpResponse<*>, source: JsonObject) {
+        if (!sourceCookieJarEnabled(source)) return
+        val sourceUrl = source.string("bookSourceUrl").orEmpty()
+        if (sourceUrl.isBlank()) return
+        val updates = response.headers().allValues("set-cookie")
+            .map { it.substringBefore(';').trim() }
+            .filter { '=' in it }
+        if (updates.isEmpty()) return
+        synchronized(sourceCookieLock) {
+            val values = linkedMapOf<String, String>()
+            val list = readList("cookies")
+            val existing = list.firstOrNull { it.string("url") == sourceUrl }
+            existing?.string("cookie")?.split(';')?.forEach { item ->
+                val pair = item.trim()
+                val split = pair.indexOf('=')
+                if (split > 0) values[pair.substring(0, split).trim()] = pair.substring(split + 1).trim()
+            }
+            updates.forEach { item ->
+                val split = item.indexOf('=')
+                values[item.substring(0, split).trim()] = item.substring(split + 1).trim()
+            }
+            val cookie = values.entries.joinToString("; ") { "${it.key}=${it.value}" }.take(8192)
+            val record = existing ?: JsonObject().also { list.add(it) }
+            record.addProperty("url", sourceUrl)
+            record.addProperty("cookie", cookie)
+            record.addProperty("updatedAt", System.currentTimeMillis())
+            writeList("cookies", list)
+        }
+    }
+
+    private fun sourceCookieJarEnabled(source: JsonObject): Boolean = source["enabledCookieJar"]?.safeBoolean() == true
+
+    private fun sourceHasCookieHeader(source: JsonObject): Boolean = source.string("header")
+        ?.let { runCatching { JsonParser.parseString(it).asObjectOrNull() }.getOrNull() }
+        ?.entrySet()
+        ?.any { (name, _) -> name.equals("cookie", ignoreCase = true) }
+        ?: false
 
     private fun extractRuleValues(input: String, rule: String): List<String> {
         if (rule.isBlank() || rule.contains("@js:", true)) return emptyList()
@@ -2371,6 +2425,7 @@ class LegadoStore(
                 .timeout(Duration.ofSeconds(20))
                 .header("User-Agent", networkUserAgent())
             applySourceHeaders(builder, source)
+            applySourceCookies(builder, source)
             requestUrl.options?.get("headers")?.asObjectOrNull()?.entrySet()?.forEach { (name, value) ->
                 if (name.isNotBlank()) builder.header(name, value.asString)
             }
@@ -2384,6 +2439,7 @@ class LegadoStore(
                 else -> builder.GET()
             }
             val response = networkClient().send(builder.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
+            captureSourceCookies(response, source)
             response.body().takeIf { response.statusCode() in 200..299 }
         } catch (_: Exception) {
             null
