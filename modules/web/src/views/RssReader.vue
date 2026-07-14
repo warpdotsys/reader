@@ -83,6 +83,7 @@ type RssArticle = AppDataItem & {
   image?: string
   isRead?: boolean
   starred?: boolean
+  starTime?: number
   refreshedAt?: number
 }
 
@@ -160,7 +161,10 @@ async function toggleRead(article: RssArticle) {
 }
 async function toggleStar(article: RssArticle) {
   try {
-    await updateArticle(article, { starred: !article.starred })
+    await updateArticle(article, {
+      starred: !article.starred,
+      starTime: !article.starred ? Date.now() : undefined,
+    })
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '保存文章状态失败')
   }

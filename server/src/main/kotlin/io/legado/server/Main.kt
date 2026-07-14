@@ -573,8 +573,8 @@ class LegadoStore(
         AppDataKind("cookies", "Cookie 管理", "启用 Cookie Jar 的书源登录 Cookie", "url", "Web 可用"),
         AppDataKind("dictRules", "字典规则", "划词字典查询规则", "name", "Web 可用"),
         AppDataKind("rssArticles", "RSS 文章缓存", "订阅源规则解析后的文章列表、分组和阅读状态", "link", "Web 可用"),
-        AppDataKind("rssReadRecords", "RSS 阅读记录", "订阅阅读进度和已读记录", "record", "配置保留"),
-        AppDataKind("rssStars", "RSS 收藏", "订阅文章收藏和星标", "link", "配置保留"),
+        AppDataKind("rssReadRecords", "RSS 阅读记录", "订阅阅读进度和已读记录", "record", "Web 可用"),
+        AppDataKind("rssStars", "RSS 收藏", "订阅文章收藏和星标", "link", "Web 可用"),
         AppDataKind("cacheRecords", "缓存记录", "通用缓存、源变量和临时数据", "key", "配置保留"),
         AppDataKind("downloadTasks", "下载任务", "离线下载、缓存书籍、媒体下载队列", "id", "Web 可用"),
         AppDataKind("themeConfigs", "主题方案", "Android 主题方案列表", "themeName", "配置保留"),
@@ -1327,6 +1327,7 @@ class LegadoStore(
                 upsert(kind.kind, kind.primaryKey, item)
             }
         }
+        if (kind.kind == "rssArticles") syncRssArticleMetadata(readList("rssArticles"))
         return ReturnData.ok(readList(kind.kind))
     }
 
@@ -1342,6 +1343,7 @@ class LegadoStore(
         if (keys.isEmpty()) return ReturnData.error("No ${kind.primaryKey} values found")
         val kept = readList(kind.kind).filterNot { it.string(kind.primaryKey) in keys }
         writeList(kind.kind, kept)
+        if (kind.kind == "rssArticles") syncRssArticleMetadata(kept)
         return ReturnData.ok(readList(kind.kind))
     }
 
@@ -1852,7 +1854,7 @@ class LegadoStore(
                 val link = article.string("link").orEmpty()
                 val old = cached.firstOrNull { it.string("link") == link }
                 if (old != null) {
-                    for (key in listOf("isRead", "starred", "group", "readAt")) {
+                    for (key in listOf("isRead", "starred", "group", "readAt", "starTime")) {
                         old[key]?.let { article.add(key, it.deepCopy()) }
                     }
                     val index = cached.indexOf(old)
@@ -1862,8 +1864,35 @@ class LegadoStore(
                 }
             }
             writeList("rssArticles", cached)
+            syncRssArticleMetadata(cached)
         }
         return articles
+    }
+
+    private fun syncRssArticleMetadata(articles: List<JsonObject>) {
+        val readRecords = articles.filter { it["isRead"]?.safeBoolean() == true }.map { article ->
+            JsonObject().apply {
+                val link = article.string("link").orEmpty()
+                addProperty("record", link)
+                addProperty("link", link)
+                addProperty("title", article.string("title") ?: "")
+                addProperty("sourceName", article.string("sourceName") ?: "")
+                addProperty("progress", "read")
+                addProperty("readTime", article["readAt"].safeLong().takeIf { it > 0 } ?: System.currentTimeMillis())
+            }
+        }
+        val stars = articles.filter { it["starred"]?.safeBoolean() == true }.map { article ->
+            JsonObject().apply {
+                val link = article.string("link").orEmpty()
+                addProperty("link", link)
+                addProperty("title", article.string("title") ?: "")
+                addProperty("sourceName", article.string("sourceName") ?: "")
+                addProperty("summary", article.string("description") ?: article.string("content") ?: "")
+                addProperty("starTime", article["starTime"].safeLong().takeIf { it > 0 } ?: System.currentTimeMillis())
+            }
+        }
+        writeList("rssReadRecords", readRecords)
+        writeList("rssStars", stars)
     }
 
     private fun parseRssArticles(source: JsonObject, body: String): List<JsonObject> {
