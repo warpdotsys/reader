@@ -47,6 +47,7 @@ import java.util.zip.ZipOutputStream
 import javax.xml.parsers.DocumentBuilderFactory
 import org.xml.sax.InputSource
 import org.jsoup.Jsoup
+import org.jsoup.parser.Parser
 import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isRegularFile
@@ -553,7 +554,7 @@ class LegadoStore(
         AppDataKind("httpTTS", "HTTP TTS", "在线朗读引擎、请求头和登录脚本", "id", "Linux 需实现"),
         AppDataKind("cookies", "Cookie 管理", "启用 Cookie Jar 的书源登录 Cookie", "url", "Web 可用"),
         AppDataKind("dictRules", "字典规则", "划词字典查询规则", "name", "Linux 需实现"),
-        AppDataKind("rssArticles", "RSS 文章缓存", "订阅文章列表、分组、阅读状态", "link", "配置保留"),
+        AppDataKind("rssArticles", "RSS 文章缓存", "订阅源规则解析后的文章列表、分组和阅读状态", "link", "Web 可用"),
         AppDataKind("rssReadRecords", "RSS 阅读记录", "订阅阅读进度和已读记录", "record", "配置保留"),
         AppDataKind("rssStars", "RSS 收藏", "订阅文章收藏和星标", "link", "配置保留"),
         AppDataKind("cacheRecords", "缓存记录", "通用缓存、源变量和临时数据", "key", "配置保留"),
@@ -1367,23 +1368,14 @@ class LegadoStore(
             val source = readList("rssSources").firstOrNull { it.string("sourceUrl") == sourceUrl }
                 ?: return ReturnData.error("RSS source not found")
             val started = System.nanoTime()
-            val response = try {
-                val request = HttpRequest.newBuilder(URI.create(sourceUrl))
-                    .timeout(Duration.ofSeconds(15))
-                    .header("User-Agent", networkUserAgent())
-                    .GET()
-                    .build()
-                networkClient().send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
-            } catch (error: Exception) {
-                return ReturnData.error(error.message ?: error.javaClass.simpleName)
-            }
+            val articles = refreshRssSource(source)
             ReturnData.ok(mapOf(
                 "kind" to "rss",
                 "sourceName" to (source.string("sourceName") ?: ""),
-                "statusCode" to response.statusCode(),
                 "latencyMs" to ((System.nanoTime() - started) / 1_000_000).coerceAtLeast(0),
-                "bodyPreview" to response.body().take(8192),
-                "message" to "RSS connection response; RSS article rule execution is not available yet.",
+                "resultCount" to articles.size,
+                "results" to articles,
+                "message" to "RSS articles were parsed and cached in the RSS article collection.",
             ))
         } else {
             val source = readList("bookSources").firstOrNull { it.string("bookSourceUrl") == sourceUrl }
@@ -1422,6 +1414,80 @@ class LegadoStore(
         } finally {
             executor.shutdown()
         }
+    }
+
+    private fun refreshRssSource(source: JsonObject): List<JsonObject> {
+        val sourceUrl = source.string("sourceUrl").orEmpty()
+        val body = fetchSourceText(source, sourceUrl) ?: return emptyList()
+        val articles = parseRssArticles(source, body)
+        if (articles.isEmpty()) return emptyList()
+        synchronized(this) {
+            val cached = readList("rssArticles")
+            for (article in articles) {
+                val link = article.string("link").orEmpty()
+                val old = cached.firstOrNull { it.string("link") == link }
+                if (old != null) {
+                    for (key in listOf("isRead", "starred", "group", "readAt")) {
+                        old[key]?.let { article.add(key, it.deepCopy()) }
+                    }
+                    val index = cached.indexOf(old)
+                    cached[index] = article
+                } else {
+                    cached.add(article)
+                }
+            }
+            writeList("rssArticles", cached)
+        }
+        return articles
+    }
+
+    private fun parseRssArticles(source: JsonObject, body: String): List<JsonObject> {
+        val sourceUrl = source.string("sourceUrl").orEmpty()
+        val articleRule = source.string("ruleArticles").orEmpty()
+        val entries = if (articleRule.isBlank()) {
+            runCatching { Jsoup.parse(body, "", Parser.xmlParser()).select("item, entry").map { it.outerHtml() } }
+                .getOrDefault(emptyList())
+        } else {
+            extractRuleValues(body, articleRule)
+        }
+        return entries.mapNotNull { entry ->
+            val title = rssRuleValue(entry, source.string("ruleTitle"), "title@text").trim()
+            val rawLink = rssRuleValue(entry, source.string("ruleLink"), "link@href")
+                .ifBlank { rssRuleValue(entry, source.string("ruleLink"), "link@text") }
+                .trim()
+            val link = resolveSearchUrl(sourceUrl, rawLink)
+            if (title.isBlank() || link.isBlank()) return@mapNotNull null
+            JsonObject().apply {
+                addProperty("link", link)
+                addProperty("title", title)
+                addProperty("sourceUrl", sourceUrl)
+                addProperty("sourceName", source.string("sourceName") ?: "")
+                rssRuleValue(entry, source.string("rulePubDate"), "pubDate@text").trim()
+                    .takeIf(String::isNotBlank)?.let { addProperty("pubDate", it) }
+                rssRuleValue(entry, source.string("ruleDescription"), "description@text").trim()
+                    .takeIf(String::isNotBlank)?.let { addProperty("description", it) }
+                rssRuleValue(entry, source.string("ruleImage"), "enclosure@url").trim()
+                    .takeIf(String::isNotBlank)?.let { addProperty("image", resolveSearchUrl(sourceUrl, it)) }
+                rssRuleValue(entry, source.string("ruleContent"), "content@text").trim()
+                    .takeIf(String::isNotBlank)?.let { addProperty("content", it) }
+                addProperty("isRead", false)
+                addProperty("starred", false)
+                addProperty("refreshedAt", System.currentTimeMillis())
+            }
+        }
+    }
+
+    private fun rssRuleValue(entry: String, configured: String?, fallback: String): String {
+        if (!configured.isNullOrBlank()) return extractRuleValue(entry, configured)
+        val (selector, attribute) = cssRuleParts(fallback)
+        return runCatching {
+            val element = Jsoup.parse(entry, "", Parser.xmlParser()).selectFirst(selector) ?: return ""
+            when (attribute?.lowercase()) {
+                null, "text" -> element.text()
+                "html" -> element.html()
+                else -> element.attr(attribute)
+            }
+        }.getOrDefault("")
     }
 
     @Synchronized
