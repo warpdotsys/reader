@@ -568,7 +568,7 @@ class LegadoStore(
     private val appDataKinds = listOf(
         AppDataKind("bookGroups", "书籍分组", "书架分组、排序、刷新策略", "groupId", "Web 可用"),
         AppDataKind("bookmarks", "书签摘录", "阅读器书签、划线、摘录内容", "time", "Web 可用"),
-        AppDataKind("readRecords", "阅读记录", "最近阅读、阅读时长和入口历史", "id", "配置保留"),
+        AppDataKind("readRecords", "阅读记录", "最近阅读、阅读时长和入口历史", "id", "Web 可用"),
         AppDataKind("httpTTS", "HTTP TTS", "在线朗读引擎、请求头和登录脚本", "id", "Web 可用"),
         AppDataKind("cookies", "Cookie 管理", "启用 Cookie Jar 的书源登录 Cookie", "url", "Web 可用"),
         AppDataKind("dictRules", "字典规则", "划词字典查询规则", "name", "Web 可用"),
@@ -2909,6 +2909,19 @@ class LegadoStore(
             progress[key]?.let { book.add(key, it.deepCopy()) }
         }
         writeList("books", books)
+        val records = readList("readRecords")
+        val bookUrl = book.string("bookUrl").orEmpty()
+        val record = records.firstOrNull { it.string("id") == bookUrl }
+            ?: JsonObject().also(records::add)
+        record.addProperty("id", bookUrl)
+        record.addProperty("bookUrl", bookUrl)
+        record.addProperty("bookName", book.string("name") ?: "")
+        record.addProperty("bookAuthor", book.string("author") ?: "")
+        record.addProperty("chapterTitle", book.string("durChapterTitle") ?: "")
+        record.addProperty("chapterIndex", book["durChapterIndex"].safeIntOrNull() ?: 0)
+        record.addProperty("chapterPos", book["durChapterPos"].safeIntOrNull() ?: 0)
+        record.addProperty("readTime", System.currentTimeMillis())
+        writeList("readRecords", records)
         return ReturnData.ok("")
     }
 
