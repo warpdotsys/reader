@@ -1707,7 +1707,11 @@ class LegadoStore(
 
     private fun resolveSearchUrl(baseUrl: String, candidate: String): String {
         if (candidate.isBlank()) return ""
-        return runCatching { URI.create(baseUrl).resolve(candidate).toString() }.getOrDefault(candidate)
+        val separator = candidate.indexOf(",{")
+        val candidateUrl = if (separator >= 0) candidate.substring(0, separator) else candidate
+        val options = if (separator >= 0) candidate.substring(separator) else ""
+        val cleanBase = baseUrl.substringBefore(",{")
+        return runCatching { URI.create(cleanBase).resolve(candidateUrl).toString() + options }.getOrDefault(candidate)
     }
 
     @Synchronized
@@ -2229,7 +2233,7 @@ class LegadoStore(
 
     private fun loadRemoteChapters(book: JsonObject, source: JsonObject): List<JsonObject> {
         val rule = source["ruleToc"].asObjectOrNull() ?: return emptyList()
-        val tocUrl = book.string("tocUrl")?.ifBlank { book.string("bookUrl") }.orEmpty()
+        val tocUrl = resolveRemoteTocUrl(book, source)
         val response = fetchSourceText(source, tocUrl) ?: return emptyList()
         val entries = extractRuleValues(response, rule.string("chapterList").orEmpty())
         val bookUrl = book.string("bookUrl").orEmpty()
@@ -2259,18 +2263,52 @@ class LegadoStore(
         return extractRuleValue(response, rule).takeIf(String::isNotBlank)
     }
 
-    private fun fetchSourceText(source: JsonObject, url: String): String? {
-        if (!url.startsWith("http://", true) && !url.startsWith("https://", true)) return null
+    private fun resolveRemoteTocUrl(book: JsonObject, source: JsonObject): String {
+        val fallback = book.string("tocUrl")?.ifBlank { book.string("bookUrl") }.orEmpty()
+        val tocRule = source["ruleBookInfo"].asObjectOrNull()?.string("tocUrl")
+        if (tocRule.isNullOrBlank()) return fallback
+        val detailUrl = book.string("bookUrl").orEmpty()
+        val detail = fetchSourceText(source, detailUrl) ?: return fallback
+        val extracted = extractRuleValue(detail, tocRule).trim()
+        return resolveSearchUrl(detailUrl, extracted).ifBlank { fallback }
+    }
+
+    private fun fetchSourceText(source: JsonObject, rawUrl: String): String? {
+        val requestUrl = parseSourceRequestUrl(rawUrl) ?: return null
         return try {
-            val builder = HttpRequest.newBuilder(URI.create(url))
+            val builder = HttpRequest.newBuilder(URI.create(requestUrl.url))
                 .timeout(Duration.ofSeconds(20))
                 .header("User-Agent", networkUserAgent())
             applySourceHeaders(builder, source)
-            val response = networkClient().send(builder.GET().build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
+            requestUrl.options?.get("headers")?.asObjectOrNull()?.entrySet()?.forEach { (name, value) ->
+                if (name.isNotBlank()) builder.header(name, value.asString)
+            }
+            when (requestUrl.options?.string("method")?.uppercase()) {
+                "POST" -> builder.POST(
+                    HttpRequest.BodyPublishers.ofString(
+                        requestUrl.options["body"]?.let { gson.toJson(it) } ?: "",
+                        StandardCharsets.UTF_8,
+                    )
+                )
+                else -> builder.GET()
+            }
+            val response = networkClient().send(builder.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
             response.body().takeIf { response.statusCode() in 200..299 }
         } catch (_: Exception) {
             null
         }
+    }
+
+    private data class SourceRequestUrl(val url: String, val options: JsonObject?)
+
+    private fun parseSourceRequestUrl(rawUrl: String): SourceRequestUrl? {
+        val separator = rawUrl.indexOf(",{")
+        val url = (if (separator >= 0) rawUrl.substring(0, separator) else rawUrl).trim()
+        if (!url.startsWith("http://", true) && !url.startsWith("https://", true)) return null
+        val options = if (separator >= 0) {
+            runCatching { JsonParser.parseString(rawUrl.substring(separator + 1)).asObjectOrNull() }.getOrNull()
+        } else null
+        return SourceRequestUrl(url, options)
     }
 
     @Synchronized
