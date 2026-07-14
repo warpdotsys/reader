@@ -46,6 +46,7 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import javax.xml.parsers.DocumentBuilderFactory
 import org.xml.sax.InputSource
+import org.jsoup.Jsoup
 import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isRegularFile
@@ -1670,6 +1671,12 @@ class LegadoStore(
             val root = runCatching { JsonParser.parseString(input) }.getOrNull() ?: return emptyList()
             return jsonPath(root, rule).map { gson.toJson(it) }
         }
+        if (isCssRule(rule)) {
+            val selector = cssSelector(rule)
+            if (selector.isBlank()) return emptyList()
+            return runCatching { Jsoup.parseBodyFragment(input).select(selector).map { it.outerHtml() } }
+                .getOrDefault(emptyList())
+        }
         return runCatching {
             Regex(rule, setOf(RegexOption.DOT_MATCHES_ALL)).findAll(input)
                 .map { match -> match.groups.drop(1).firstOrNull { it != null }?.value ?: match.value }
@@ -1684,10 +1691,45 @@ class LegadoStore(
             val value = jsonPath(root, rule).firstOrNull() ?: return ""
             return if (value.isJsonPrimitive) value.asString else gson.toJson(value)
         }
+        if (isCssRule(rule)) {
+            return runCatching {
+                val (selector, attribute) = cssRuleParts(rule)
+                val element = if (selector.isBlank()) Jsoup.parseBodyFragment(input).body()
+                    else Jsoup.parseBodyFragment(input).selectFirst(selector)
+                    ?: return ""
+                when (attribute?.lowercase()) {
+                    null, "text" -> element.text()
+                    "owntext" -> element.ownText()
+                    "html" -> element.html()
+                    "outerhtml" -> element.outerHtml()
+                    else -> element.attr(attribute)
+                }
+            }.getOrDefault("")
+        }
         return runCatching {
             val match = Regex(rule, setOf(RegexOption.DOT_MATCHES_ALL)).find(input) ?: return ""
             match.groups.drop(1).firstOrNull { it != null }?.value ?: match.value
         }.getOrDefault("")
+    }
+
+    private fun isCssRule(rawRule: String): Boolean {
+        val rule = rawRule.trim().removePrefix("@css:").trim()
+        if (rawRule.trim().startsWith("@css:", true)) return true
+        if (rule.isBlank() || rule.startsWith("@xpath:", true) || rule.startsWith("@regex:", true)) return false
+        if (Regex("""[\\(){}|]""").containsMatchIn(rule)) return false
+        if (rule.contains('@')) return true
+        return Regex("""^[A-Za-z][A-Za-z0-9_-]*(?:[ .#:\[>+~][^\n]*)?$|^[.#][A-Za-z0-9_-].*$""").matches(rule)
+    }
+
+    private fun cssSelector(rawRule: String): String = cssRuleParts(rawRule).first
+
+    private fun cssRuleParts(rawRule: String): Pair<String, String?> {
+        val rule = rawRule.trim().removePrefix("@css:").trim()
+        val marker = rule.lastIndexOf('@')
+        if (marker <= 0) return rule to null
+        val selector = rule.substring(0, marker).trim()
+        val attribute = rule.substring(marker + 1).trim().takeIf(String::isNotBlank)
+        return selector to attribute
     }
 
     /** Minimal JSONPath: $.field.nested, [index], [*], and dot traversal. */
