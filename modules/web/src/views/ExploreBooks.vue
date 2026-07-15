@@ -12,12 +12,13 @@
         <el-select v-model="selectedEntryUrl" :disabled="!selectedSource" placeholder="选择分类" @change="reload">
           <el-option v-for="entry in selectedSource?.entries || []" :key="entry.url" :label="entry.title" :value="entry.url" />
         </el-select>
+        <el-input v-model="searchText" clearable placeholder="筛选书名或作者" />
         <el-button :icon="Refresh" :loading="loadingBooks" @click="reload">刷新</el-button>
       </div>
     </header>
 
     <section v-loading="loadingBooks" class="book-grid" aria-live="polite">
-      <article v-for="book in books" :key="`${book.origin}:${book.bookUrl}`" class="book-card">
+      <article v-for="book in visibleBooks" :key="`${book.origin}:${book.bookUrl}`" class="book-card">
         <img :src="coverUrl(book.coverUrl)" :alt="book.name" @error="hideBrokenCover" />
         <div class="book-copy">
           <span>{{ book.originName }}</span>
@@ -30,7 +31,7 @@
           </div>
         </div>
       </article>
-      <el-empty v-if="!loadingBooks && books.length === 0" :description="emptyLabel" />
+      <el-empty v-if="!loadingBooks && visibleBooks.length === 0" :description="emptyLabel" />
     </section>
 
     <footer class="pagination-bar">
@@ -52,13 +53,21 @@ const sources = ref<ExploreSource[]>([])
 const books = ref<SeachBook[]>([])
 const selectedSourceUrl = ref('')
 const selectedEntryUrl = ref('')
+const searchText = ref('')
 const page = ref(1)
 const loadingSources = ref(false)
 const loadingBooks = ref(false)
 
 const selectedSource = computed(() => sources.value.find(source => source.sourceUrl === selectedSourceUrl.value))
-const resultLabel = computed(() => books.value.length ? `${books.value.length} 本` : '发现书籍')
-const emptyLabel = computed(() => selectedSource.value ? '当前分类没有可用书籍' : '没有可用的发现书源')
+const visibleBooks = computed(() => {
+  const query = searchText.value.trim().toLocaleLowerCase()
+  if (!query) return books.value
+  return books.value.filter(book => [book.name, book.author, book.kind].some(value =>
+    String(value || '').toLocaleLowerCase().includes(query),
+  ))
+})
+const resultLabel = computed(() => books.value.length ? `${visibleBooks.value.length} / ${books.value.length} 本` : '发现书籍')
+const emptyLabel = computed(() => selectedSource.value ? '当前分类没有匹配书籍' : '没有可用的发现书源')
 
 function coverUrl(url?: string) {
   return API.getProxyCoverUrl(url || '')
@@ -161,7 +170,7 @@ onMounted(loadSources)
 @media (max-width: 760px) {
   .explore-page { padding: max(60px, calc(env(safe-area-inset-top) + 52px)) 14px 24px; }
   .explore-header { align-items: stretch; flex-direction: column; }
-  .explore-actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; }
+  .explore-actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .explore-actions .el-select { width: auto; }
   .book-grid { grid-template-columns: 1fr; gap: 10px; }
   .book-card, .book-card img { min-height: 152px; }
