@@ -3628,6 +3628,7 @@ class LegadoStore(
     private fun loadRemoteChapterContent(chapter: JsonObject, source: JsonObject): String? {
         val rules = source["ruleContent"].asObjectOrNull() ?: return fetchSourceText(source, chapter.string("url").orEmpty())
         val contentRule = rules.string("content")
+        val subContentRule = rules.string("subContent")
         val titleRule = rules.string("title")
         val nextRule = rules.string("nextContentUrl")
         var pageUrl = chapter.string("url").orEmpty()
@@ -3636,7 +3637,9 @@ class LegadoStore(
         for (attempt in 0 until 5) {
             if (pageUrl.isBlank() || !visited.add(pageUrl)) break
             val response = fetchSourceText(source, pageUrl) ?: break
-            val content = if (contentRule.isNullOrBlank()) response else extractRuleValue(response, contentRule)
+            val mainContent = if (contentRule.isNullOrBlank()) response else extractRuleValue(response, contentRule)
+            val subContent = subContentRule?.let { extractRuleValue(response, it) }.orEmpty()
+            val content = listOf(mainContent, subContent).filter(String::isNotBlank).joinToString("\n\n")
             content.trim().takeIf(String::isNotBlank)?.let(pages::add)
             if (titleRule != null) {
                 extractRuleValue(response, titleRule).trim().takeIf(String::isNotBlank)
