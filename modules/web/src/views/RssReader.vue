@@ -7,6 +7,8 @@
       </div>
       <div class="rss-actions">
         <el-button :icon="Setting" @click="router.push('/rssSource')">管理订阅源</el-button>
+        <el-button :icon="CircleCheck" :disabled="filteredArticles.length === 0" :loading="batching" @click="markFilteredRead">当前筛选已读</el-button>
+        <el-button :icon="Collection" :disabled="filteredArticles.length === 0" :loading="batching" @click="setFilteredGroup">设置分组</el-button>
         <el-button type="primary" :icon="Refresh" :loading="refreshing" @click="refreshFeeds">刷新订阅</el-button>
       </div>
     </header>
@@ -16,6 +18,9 @@
         <div class="rss-filters">
           <el-select v-model="sourceFilter" clearable placeholder="全部订阅源">
             <el-option v-for="source in sourceOptions" :key="source.value" :label="source.label" :value="source.value" />
+          </el-select>
+          <el-select v-model="groupFilter" clearable placeholder="全部分组">
+            <el-option v-for="group in groupOptions" :key="group" :label="group" :value="group" />
           </el-select>
           <el-input v-model="searchText" :prefix-icon="Search" clearable placeholder="搜索文章" />
           <el-checkbox v-model="unreadOnly">仅未读</el-checkbox>
@@ -69,7 +74,8 @@
 
 <script setup lang="ts">
 import API, { type AppDataItem } from '@/api/api'
-import { CircleCheck, Link, Reading, Refresh, Search, Setting, Star } from '@element-plus/icons-vue'
+import { CircleCheck, Collection, Link, Reading, Refresh, Search, Setting, Star } from '@element-plus/icons-vue'
+import { ElMessageBox } from 'element-plus'
 
 type RssArticle = AppDataItem & {
   link: string
@@ -83,6 +89,7 @@ type RssArticle = AppDataItem & {
   image?: string
   isRead?: boolean
   starred?: boolean
+  group?: string
   starTime?: number
   refreshedAt?: number
 }
@@ -93,9 +100,11 @@ const refreshing = ref(false)
 const articles = ref<RssArticle[]>([])
 const selectedLink = ref('')
 const sourceFilter = ref('')
+const groupFilter = ref('')
 const searchText = ref('')
 const unreadOnly = ref(false)
 const starredOnly = ref(false)
+const batching = ref(false)
 const contentLoading = ref(false)
 const contentError = ref('')
 const articleText = computed(() => selectedArticle.value?.articleContent || selectedArticle.value?.content || selectedArticle.value?.description || '')
@@ -107,10 +116,14 @@ const sourceOptions = computed(() => {
   })
   return [...sources.entries()].map(([value, label]) => ({ value, label }))
 })
+const groupOptions = computed(() => [...new Set(
+  articles.value.map(article => String(article.group || '').trim()).filter(Boolean),
+)].sort((left, right) => left.localeCompare(right, 'zh-Hans-CN')))
 const filteredArticles = computed(() => {
   const query = searchText.value.trim().toLocaleLowerCase()
   return articles.value.filter(article => {
     if (sourceFilter.value && article.sourceUrl !== sourceFilter.value) return false
+    if (groupFilter.value && article.group !== groupFilter.value) return false
     if (unreadOnly.value && article.isRead) return false
     if (starredOnly.value && !article.starred) return false
     return !query || [article.title, article.description, article.sourceName].some(value =>
@@ -167,6 +180,45 @@ async function toggleStar(article: RssArticle) {
     })
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '保存文章状态失败')
+  }
+}
+async function updateFiltered(patch: Record<string, unknown>, successMessage: string) {
+  const links = filteredArticles.value.map(article => article.link)
+  if (links.length === 0) return
+  batching.value = true
+  try {
+    const response = await API.updateRssArticles(links, patch)
+    if (!response.data.isSuccess) throw new Error(response.data.errorMsg || '批量更新失败')
+    await loadArticles()
+    ElMessage.success(`${successMessage} ${response.data.data.changed} 篇文章`)
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '批量更新失败')
+  } finally {
+    batching.value = false
+  }
+}
+async function markFilteredRead() {
+  try {
+    await ElMessageBox.confirm(`将当前筛选的 ${filteredArticles.value.length} 篇文章标记为已读？`, '批量标记', {
+      type: 'warning',
+      confirmButtonText: '标记已读',
+      cancelButtonText: '取消',
+    })
+    await updateFiltered({ isRead: true }, '已标记')
+  } catch (error) {
+    if (error !== 'cancel') ElMessage.error(error instanceof Error ? error.message : '批量更新失败')
+  }
+}
+async function setFilteredGroup() {
+  try {
+    const result = await ElMessageBox.prompt('留空可清除当前筛选文章的分组。', '设置文章分组', {
+      inputValue: groupFilter.value,
+      confirmButtonText: '保存',
+      cancelButtonText: '取消',
+    })
+    await updateFiltered({ group: result.value.trim() }, '已更新')
+  } catch (error) {
+    if (error !== 'cancel') ElMessage.error(error instanceof Error ? error.message : '批量更新失败')
   }
 }
 async function loadArticleContent(article: RssArticle) {

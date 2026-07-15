@@ -362,6 +362,9 @@ const batchChangeBookSources = (bookUrls?: string[]) =>
 const refreshRssSources = (sourceUrls?: string[]) =>
   ajax.post<LeagdoApiResponse<RssRefreshResult>>('refreshRssSources', { sourceUrls })
 
+const updateRssArticles = (links: string[], patch: Record<string, unknown>) =>
+  ajax.post<LeagdoApiResponse<{ changed: number }>>('updateRssArticles', { links, ...patch })
+
 const getRssArticleContent = (link: string) =>
   ajax.post<LeagdoApiResponse<RssArticleContent>>('getRssArticleContent', { link })
 
@@ -622,6 +625,7 @@ export default {
   autoChangeBookSource,
   batchChangeBookSources,
   refreshRssSources,
+  updateRssArticles,
   getRssArticleContent,
   requestHttpTts,
   startBookDownload,

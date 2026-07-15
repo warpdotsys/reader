@@ -310,6 +310,7 @@ class LegadoHttpServer(
             "/exploreBooks" -> store.exploreBooks(post.postData)
             "/debugSource" -> store.debugSource(post.postData)
             "/refreshRssSources" -> store.refreshRssSources(post.postData)
+            "/updateRssArticles" -> store.updateRssArticles(post.postData)
             "/getRssArticleContent" -> store.getRssArticleContent(post.postData)
             "/requestHttpTts" -> throw AudioResponse(store.requestHttpTts(post.postData))
             "/lookupDictionary" -> store.lookupDictionary(post.postData)
@@ -1737,6 +1738,41 @@ class LegadoStore(
             "articleCount" to results.sumOf { it["articleCount"] as Int },
             "results" to results,
         ))
+    }
+
+    @Synchronized
+    fun updateRssArticles(postData: String?): ReturnData {
+        val payload = parseJson(postData)?.asObjectOrNull() ?: return ReturnData.error("Expected JSON object")
+        val links = payload["links"].asArrayOrNull()
+            ?.mapNotNull { runCatching { it.asString.trim() }.getOrNull()?.takeIf(String::isNotBlank) }
+            ?.take(2_000)
+            ?.toSet()
+            .orEmpty()
+        if (links.isEmpty()) return ReturnData.error("links is required")
+        val articles = readList("rssArticles")
+        val hasGroup = payload.has("group")
+        val hasRead = payload.has("isRead")
+        val hasStarred = payload.has("starred")
+        val group = payload.string("group")?.trim().orEmpty()
+        val isRead = payload["isRead"]?.safeBoolean() == true
+        val starred = payload["starred"]?.safeBoolean() == true
+        val now = System.currentTimeMillis()
+        var changed = 0
+        articles.filter { it.string("link") in links }.forEach { article ->
+            if (hasGroup) article.addProperty("group", group)
+            if (hasRead) {
+                article.addProperty("isRead", isRead)
+                if (isRead) article.addProperty("readAt", now) else article.remove("readAt")
+            }
+            if (hasStarred) {
+                article.addProperty("starred", starred)
+                if (starred) article.addProperty("starTime", now) else article.remove("starTime")
+            }
+            changed++
+        }
+        writeList("rssArticles", articles)
+        syncRssArticleMetadata(articles)
+        return ReturnData.ok(mapOf("changed" to changed, "articles" to articles))
     }
 
     @Synchronized
