@@ -3222,6 +3222,7 @@ class LegadoStore(
             addProperty("type", 0)
             addProperty("localFile", target.toAbsolutePath().normalize().toString())
             addProperty("managedLocalFile", true)
+            epub?.coverUrl?.takeIf(String::isNotBlank)?.let { addProperty("coverUrl", it) }
             withBookDefaults()
             addProperty("totalChapterNum", chapters.size)
             addProperty("latestChapterTitle", chapters.lastOrNull()?.string("title") ?: "")
@@ -3234,6 +3235,7 @@ class LegadoStore(
         val title: String,
         val author: String,
         val chapters: List<JsonObject>,
+        val coverUrl: String,
     )
 
     private fun parseEpubBook(file: Path, bookUrl: String): EpubBook? = runCatching {
@@ -3266,6 +3268,18 @@ class LegadoStore(
                     if (id.isEmpty() || href.isEmpty()) null else id to href
                 }
                 .toMap(LinkedHashMap())
+            val coverReference = packageDocument.getAllElements()
+                .firstOrNull {
+                    epubLocalName(it.tagName()) == "meta" &&
+                        it.attr("name").equals("cover", ignoreCase = true)
+                }
+                ?.attr("content")
+                ?.trim()
+                ?.let(manifest::get)
+                ?: manifest["cover"]
+            val coverUrl = coverReference
+                ?.let { resolveArchivePath(packagePath, it) }
+                ?.let { inlineEpubImage(zip, it) }
             val readingOrder = packageDocument.getAllElements()
                 .filter { epubLocalName(it.tagName()) == "itemref" }
                 .mapNotNull { item -> manifest[item.attr("idref").trim()] }
@@ -3298,7 +3312,7 @@ class LegadoStore(
                 chapter(bookUrl, index, chapterTitle, content)
             }
             if (chapters.isEmpty()) return@use null
-            EpubBook(title, author, chapters)
+            EpubBook(title, author, chapters, coverUrl.orEmpty())
         }
     }.getOrNull()
 
@@ -3358,6 +3372,15 @@ class LegadoStore(
             totalBytes += bytes.size
             image.attr("src", "data:$mime;base64,${Base64.getEncoder().encodeToString(bytes)}")
         }
+    }
+
+    private fun inlineEpubImage(zip: ZipFile, path: String): String? {
+        val mime = epubImageMime(path) ?: return null
+        val entry = zipEntry(zip, path) ?: return null
+        if (entry.isDirectory || entry.size !in 1..MAX_EPUB_IMAGE_BYTES.toLong()) return null
+        val bytes = zip.getInputStream(entry).use { it.readNBytes(MAX_EPUB_IMAGE_BYTES + 1) }
+        if (bytes.isEmpty() || bytes.size > MAX_EPUB_IMAGE_BYTES) return null
+        return "data:$mime;base64,${Base64.getEncoder().encodeToString(bytes)}"
     }
 
     private fun epubImageMime(path: String): String? = when (path.substringAfterLast('.', "").lowercase()) {
