@@ -3595,23 +3595,44 @@ class LegadoStore(
             JsonObject().apply {
                 addProperty("url", chapterUrl)
                 addProperty("title", title)
-                addProperty("isVolume", false)
+                val volumeRule = rule.string("isVolume")
+                val isVolume = volumeRule?.let { value ->
+                    extractRuleValue(entry, value).trim().equals("true", ignoreCase = true)
+                } ?: false
+                addProperty("isVolume", isVolume)
                 addProperty("baseUrl", tocUrl)
                 addProperty("bookUrl", bookUrl)
                 addProperty("index", index)
                 addProperty("isVip", false)
                 addProperty("isPay", false)
-                extractRuleValue(entry, rule.string("chapterTag")).trim().takeIf(String::isNotBlank)
+                extractRuleValue(entry, rule.string("chapterTag") ?: rule.string("updateTime")).trim().takeIf(String::isNotBlank)
                     ?.let { addProperty("tag", it) }
             }
         }
     }
 
     private fun loadRemoteChapterContent(chapter: JsonObject, source: JsonObject): String? {
-        val response = fetchSourceText(source, chapter.string("url").orEmpty()) ?: return null
-        val rule = source["ruleContent"].asObjectOrNull()?.string("content")
-        if (rule.isNullOrBlank()) return response
-        return extractRuleValue(response, rule).takeIf(String::isNotBlank)
+        val rules = source["ruleContent"].asObjectOrNull() ?: return fetchSourceText(source, chapter.string("url").orEmpty())
+        val contentRule = rules.string("content")
+        val titleRule = rules.string("title")
+        val nextRule = rules.string("nextContentUrl")
+        var pageUrl = chapter.string("url").orEmpty()
+        val visited = linkedSetOf<String>()
+        val pages = mutableListOf<String>()
+        for (attempt in 0 until 5) {
+            if (pageUrl.isBlank() || !visited.add(pageUrl)) break
+            val response = fetchSourceText(source, pageUrl) ?: break
+            val content = if (contentRule.isNullOrBlank()) response else extractRuleValue(response, contentRule)
+            content.trim().takeIf(String::isNotBlank)?.let(pages::add)
+            if (titleRule != null) {
+                extractRuleValue(response, titleRule).trim().takeIf(String::isNotBlank)
+                    ?.let { chapter.addProperty("title", it) }
+            }
+            val next = nextRule?.let { extractRuleValue(response, it).trim() }.orEmpty()
+            pageUrl = resolveSearchUrl(pageUrl, next)
+            if (next.isBlank()) break
+        }
+        return pages.joinToString("\n\n").takeIf(String::isNotBlank)
     }
 
     private fun resolveRemoteTocUrl(book: JsonObject, source: JsonObject): String {
