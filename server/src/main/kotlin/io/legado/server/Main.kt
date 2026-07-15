@@ -3604,12 +3604,12 @@ class LegadoStore(
                 chapters += JsonObject().apply {
                     addProperty("url", chapterUrl)
                     addProperty("title", title)
-                    addProperty("isVolume", rule.string("isVolume")?.let { extractRuleValue(entry, it).trim().equals("true", true) } ?: false)
+                    addProperty("isVolume", sourceRuleBoolean(rule.string("isVolume")?.let { extractRuleValue(entry, it) }))
                     addProperty("baseUrl", pageUrl)
                     addProperty("bookUrl", bookUrl)
                     addProperty("index", chapters.size)
-                    addProperty("isVip", false)
-                    addProperty("isPay", false)
+                    addProperty("isVip", sourceRuleBoolean(rule.string("isVip")?.let { extractRuleValue(entry, it) }))
+                    addProperty("isPay", sourceRuleBoolean(rule.string("isPay")?.let { extractRuleValue(entry, it) }))
                     extractRuleValue(entry, rule.string("chapterTag") ?: rule.string("updateTime")).trim().takeIf(String::isNotBlank)?.let { addProperty("tag", it) }
                 }
             }
@@ -3664,11 +3664,23 @@ class LegadoStore(
             parsed?.isJsonArray == true -> parsed.asJsonArray.mapNotNull { it.asObjectOrNull() }
             else -> emptyList()
         }
-        return rules.take(20).fold(content) { value, rule ->
+        if (rules.isNotEmpty()) return rules.take(20).fold(content) { value, rule ->
             val pattern = rule.string("pattern") ?: rule.string("regex") ?: return@fold value
             val replacement = rule.string("replacement") ?: rule.string("replace") ?: ""
-            runCatching { Regex(pattern, RegexOption.DOT_MATCHES_ALL).replace(value, replacement) }.getOrDefault(value)
+            runCatching { Regex(pattern).replace(value, replacement) }.getOrDefault(value)
         }
+        val parts = rawRules.split("##")
+        if (parts.size < 3 || parts[0].isNotBlank()) return content
+        val pattern = parts[1]
+        val replacement = parts[2]
+        if (pattern.isBlank()) return content
+        return runCatching { Regex(pattern).replace(content, replacement) }.getOrDefault(content)
+    }
+
+    private fun sourceRuleBoolean(value: String?): Boolean {
+        val normalized = value?.trim().orEmpty()
+        return normalized.isNotEmpty() && !normalized.equals("null", true) &&
+            !normalized.matches(Regex("^(false|no|not|0)$", RegexOption.IGNORE_CASE))
     }
 
     private fun resolveRemoteTocUrl(book: JsonObject, source: JsonObject): String {
