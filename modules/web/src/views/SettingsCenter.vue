@@ -95,25 +95,6 @@
         </div>
       </section>
 
-      <section class="settings-stats">
-        <div class="stat-item">
-          <span>设置项</span>
-          <strong>{{ totalFields }}</strong>
-        </div>
-        <div class="stat-item">
-          <span>Web 可用</span>
-          <strong>{{ liveFields }}</strong>
-        </div>
-        <div class="stat-item">
-          <span>配置保留</span>
-          <strong>{{ storedFields }}</strong>
-        </div>
-        <div class="stat-item">
-          <span>Linux 需实现</span>
-          <strong>{{ plannedFields }}</strong>
-        </div>
-      </section>
-
       <section class="settings-layout">
         <article class="settings-panel">
           <div class="panel-heading">
@@ -736,13 +717,6 @@ const currentSection = computed(
   () => sections.find(section => section.id === activeSection.value) || sections[0],
 )
 
-const totalFields = computed(() =>
-  sections.reduce((sum, section) => sum + section.fields.length, 0),
-)
-const liveFields = computed(() => countStatus('live'))
-const storedFields = computed(() => countStatus('stored'))
-const plannedFields = computed(() => countStatus('planned'))
-
 function f(
   path: string,
   label: string,
@@ -779,14 +753,6 @@ function resolveSettingSection(value: unknown) {
 function openAppEntry(entry: AppEntry) {
   void router.push({ path: entry.path, query: entry.query })
 }
-function countStatus(status: FieldStatus) {
-  return sections.reduce(
-    (sum, section) =>
-      sum + section.fields.filter(field => field.status === status).length,
-    0,
-  )
-}
-
 function getField(path: string): unknown {
   const [group, key] = path.split('.')
   return settings.value[group]?.[key]
@@ -1105,7 +1071,6 @@ onMounted(() => {
 }
 
 .settings-header,
-.settings-stats,
 .settings-panel,
 .parity-panel {
   border: 1px solid #e3e8ef;
@@ -1140,35 +1105,6 @@ onMounted(() => {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 10px;
-}
-
-.settings-stats {
-  margin-top: 18px;
-  padding: 14px;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.stat-item {
-  min-height: 76px;
-  padding: 14px 16px;
-  border-radius: 8px;
-  background: #f8fafc;
-  display: grid;
-  align-content: center;
-  gap: 6px;
-
-  span {
-    font-size: 13px;
-    color: #64748b;
-  }
-
-  strong {
-    font-size: 24px;
-    line-height: 1;
-    color: #111827;
-  }
 }
 
 .settings-layout {
@@ -1466,7 +1402,6 @@ onMounted(() => {
     overflow: auto;
   }
 
-  .settings-stats,
   .setting-row {
     grid-template-columns: 1fr;
   }
