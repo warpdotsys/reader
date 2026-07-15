@@ -3589,32 +3589,35 @@ class LegadoStore(
 
     private fun loadRemoteChapters(book: JsonObject, source: JsonObject): List<JsonObject> {
         val rule = source["ruleToc"].asObjectOrNull() ?: return emptyList()
-        val tocUrl = resolveRemoteTocUrl(book, source)
-        val response = fetchSourceText(source, tocUrl) ?: return emptyList()
-        val entries = extractRuleValues(response, rule.string("chapterList").orEmpty())
         val bookUrl = book.string("bookUrl").orEmpty()
-        return entries.mapIndexedNotNull { index, entry ->
-            val rawTitle = extractRuleValue(entry, rule.string("chapterName")).trim()
-            val title = formatChapterTitle(rawTitle, rule.string("formatJs"), index + 1)
-            val chapterUrl = resolveSearchUrl(tocUrl, extractRuleValue(entry, rule.string("chapterUrl")).trim())
-            if (title.isBlank() || chapterUrl.isBlank()) return@mapIndexedNotNull null
-            JsonObject().apply {
-                addProperty("url", chapterUrl)
-                addProperty("title", title)
-                val volumeRule = rule.string("isVolume")
-                val isVolume = volumeRule?.let { value ->
-                    extractRuleValue(entry, value).trim().equals("true", ignoreCase = true)
-                } ?: false
-                addProperty("isVolume", isVolume)
-                addProperty("baseUrl", tocUrl)
-                addProperty("bookUrl", bookUrl)
-                addProperty("index", index)
-                addProperty("isVip", false)
-                addProperty("isPay", false)
-                extractRuleValue(entry, rule.string("chapterTag") ?: rule.string("updateTime")).trim().takeIf(String::isNotBlank)
-                    ?.let { addProperty("tag", it) }
+        var pageUrl = resolveRemoteTocUrl(book, source)
+        val visited = linkedSetOf<String>()
+        val chapters = mutableListOf<JsonObject>()
+        for (page in 0 until 5) {
+            if (pageUrl.isBlank() || !visited.add(pageUrl)) break
+            val response = fetchSourceText(source, pageUrl) ?: break
+            extractRuleValues(response, rule.string("chapterList").orEmpty()).forEach { entry ->
+                val rawTitle = extractRuleValue(entry, rule.string("chapterName")).trim()
+                val title = formatChapterTitle(rawTitle, rule.string("formatJs"), chapters.size + 1)
+                val chapterUrl = resolveSearchUrl(pageUrl, extractRuleValue(entry, rule.string("chapterUrl")).trim())
+                if (title.isBlank() || chapterUrl.isBlank() || chapters.any { it.string("url") == chapterUrl }) return@forEach
+                chapters += JsonObject().apply {
+                    addProperty("url", chapterUrl)
+                    addProperty("title", title)
+                    addProperty("isVolume", rule.string("isVolume")?.let { extractRuleValue(entry, it).trim().equals("true", true) } ?: false)
+                    addProperty("baseUrl", pageUrl)
+                    addProperty("bookUrl", bookUrl)
+                    addProperty("index", chapters.size)
+                    addProperty("isVip", false)
+                    addProperty("isPay", false)
+                    extractRuleValue(entry, rule.string("chapterTag") ?: rule.string("updateTime")).trim().takeIf(String::isNotBlank)?.let { addProperty("tag", it) }
+                }
             }
+            val next = rule.string("nextTocUrl")?.let { extractRuleValue(response, it).trim() }.orEmpty()
+            if (next.isBlank()) break
+            pageUrl = resolveSearchUrl(pageUrl, next)
         }
+        return chapters
     }
 
     private fun formatChapterTitle(title: String, formatJs: String?, index: Int): String {
