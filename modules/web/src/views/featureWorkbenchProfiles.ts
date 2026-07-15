@@ -107,6 +107,7 @@ export const appDataProfiles: Record<string, AppDataProfile> = {
       { key: 'time', label: '时间戳', type: 'number' },
       { key: 'bookName', label: '书名', type: 'text' },
       { key: 'bookAuthor', label: '作者', type: 'text' },
+      { key: 'bookUrl', label: '书籍 URL', type: 'text', wide: true },
       { key: 'chapterName', label: '章节名', type: 'text' },
       { key: 'chapterIndex', label: '章节序号', type: 'number' },
       { key: 'chapterPos', label: '章节位置', type: 'number' },

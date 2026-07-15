@@ -203,7 +203,7 @@
               <el-button :icon="EditPen" text @click="openEditEditor(row)" />
               <el-button :icon="Files" text @click="openJsonEditor(row)" />
               <el-button
-                v-if="activeKind?.kind === 'readRecords'"
+                v-if="['readRecords', 'bookmarks'].includes(activeKind?.kind || '')"
                 :icon="Reading"
                 text
                 type="success"
@@ -667,8 +667,10 @@ function openTextDraftFromRoute() {
     bookText: text,
     bookName: typeof route.query.bookName === 'string' ? route.query.bookName : '',
     bookAuthor: typeof route.query.bookAuthor === 'string' ? route.query.bookAuthor : '',
+    bookUrl: typeof route.query.bookUrl === 'string' ? route.query.bookUrl : '',
     chapterName: typeof route.query.chapterName === 'string' ? route.query.chapterName : '',
     chapterIndex: Number(route.query.chapterIndex || 0),
+    chapterPos: Number(route.query.chapterPos || 0),
   }
   editorText.value = JSON.stringify(formDraft.value, null, 2)
   editorOpen.value = true

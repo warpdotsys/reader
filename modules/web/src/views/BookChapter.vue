@@ -886,8 +886,10 @@ function processSelectedText() {
       draftText: text,
       bookName: store.readingBook.name || '',
       bookAuthor: store.readingBook.author || '',
+      bookUrl: store.readingBook.bookUrl || '',
       chapterName: catalog.value[store.readingBook.chapterIndex]?.title || '',
       chapterIndex: String(store.readingBook.chapterIndex || 0),
+      chapterPos: String(store.readingBook.chapterPos || 0),
     },
   })
 }
