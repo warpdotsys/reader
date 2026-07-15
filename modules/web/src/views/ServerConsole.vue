@@ -1068,10 +1068,15 @@ async function importBackup(event: Event) {
   try {
     const content = await file.text()
     const data = JSON.parse(content) as Partial<ServerExportData>
-    await ElMessageBox.confirm('导入会覆盖同名数据集合。', '导入备份', {
+    const preview = previewImportData(data)
+    if (preview.length === 0) throw new Error('备份中没有可导入的 Legado 数据集合')
+    await ElMessageBox.confirm(
+      `${file.name}\n\n${preview.join('\n')}\n\n导入会覆盖以上同名数据集合。`,
+      '导入备份', {
       type: 'warning',
       confirmButtonText: '导入',
       cancelButtonText: '取消',
+      dangerouslyUseHTMLString: false,
     })
     const result = unwrap(await API.importData(data))
     ElMessage.success(
@@ -1137,6 +1142,29 @@ async function restoreWebDavBackup(backup: WebDavBackup) {
   } finally {
     restoringBackup.value = ''
   }
+}
+
+function previewImportData(data: Partial<ServerExportData>) {
+  const labels: Array<[keyof ServerExportData, string]> = [
+    ['books', '书籍'],
+    ['bookSources', '书源'],
+    ['rssSources', '订阅源'],
+    ['replaceRules', '替换规则'],
+    ['txtTocRules', 'TXT 目录规则'],
+  ]
+  const summary = labels.flatMap(([key, label]) => {
+    const value = data[key]
+    return Array.isArray(value) ? [`${label}: ${value.length}`] : []
+  })
+  if (data.appSettings && typeof data.appSettings === 'object') {
+    summary.push(`应用设置: ${Object.keys(data.appSettings).length} 个分组`)
+  }
+  if (data.appData && typeof data.appData === 'object') {
+    Object.entries(data.appData).forEach(([kind, items]) => {
+      if (Array.isArray(items)) summary.push(`App 数据 ${kind}: ${items.length}`)
+    })
+  }
+  return summary
 }
 
 async function removeWebDavBackup(backup: WebDavBackup) {
