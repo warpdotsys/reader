@@ -2965,11 +2965,21 @@ class LegadoStore(
     fun deleteBook(postData: String?): ReturnData {
         val book = parseJson(postData)?.asObjectOrNull() ?: return ReturnData.error("Expected JSON object")
         val bookUrl = book.string("bookUrl") ?: return ReturnData.error("bookUrl is required")
+        val existing = readList("books").firstOrNull { it.string("bookUrl") == bookUrl }
         val kept = readList("books").filterNot { it.string("bookUrl") == bookUrl }
         writeList("books", kept)
         val chaptersFile = chaptersFile(bookUrl)
         if (chaptersFile.exists()) Files.delete(chaptersFile)
+        if (existing?.get("managedLocalFile")?.safeBoolean() == true) {
+            existing.string("localFile")?.let(::deleteLocalBookFile)
+        }
         return ReturnData.ok("")
+    }
+
+    private fun deleteLocalBookFile(rawPath: String) {
+        val file = runCatching { Paths.get(rawPath).toAbsolutePath().normalize() }.getOrNull() ?: return
+        if (!file.isRegularFile()) return
+        runCatching { Files.deleteIfExists(file) }
     }
 
     @Synchronized
@@ -3209,6 +3219,7 @@ class LegadoStore(
             addProperty("author", author)
             addProperty("type", 0)
             addProperty("localFile", target.toAbsolutePath().normalize().toString())
+            addProperty("managedLocalFile", true)
             withBookDefaults()
             addProperty("totalChapterNum", chapters.size)
             addProperty("latestChapterTitle", chapters.lastOrNull()?.string("title") ?: "")
