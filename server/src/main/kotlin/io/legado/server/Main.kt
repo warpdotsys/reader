@@ -339,6 +339,7 @@ class LegadoHttpServer(
             "/createBackup" -> store.createBackup()
             "/restoreBackup" -> store.restoreBackup(post.postData)
             "/restoreWebDavBackup" -> store.restoreWebDavBackup(post.postData)
+            "/deleteWebDavBackup" -> store.deleteWebDavBackup(post.postData)
             "/deleteBackup" -> store.deleteBackup(post.postData)
             "/checkSources" -> store.checkSources(post.postData)
             "/deleteSourceChecks" -> store.deleteSourceChecks()
@@ -885,6 +886,25 @@ class LegadoStore(
             if (response.statusCode() !in 200..299) return ReturnData.error("WebDAV returned HTTP ${response.statusCode()}")
             if (response.body().size > 64 * 1024 * 1024) return ReturnData.error("Remote backup exceeds 64 MiB")
             importData(response.body().toString(StandardCharsets.UTF_8))
+        } catch (error: Exception) { ReturnData.error(error.message ?: error.javaClass.simpleName) }
+    }
+
+    @Synchronized
+    fun deleteWebDavBackup(postData: String?): ReturnData {
+        val payload = parseJson(postData)?.asObjectOrNull() ?: return ReturnData.error("Expected JSON object")
+        val fileName = payload.string("fileName")?.takeIf { it.matches(Regex("[A-Za-z0-9._-]+\\.json")) }
+            ?: return ReturnData.error("A valid backup fileName is required")
+        val backup = readAppSettings()["backup"]?.asObjectOrNull() ?: JsonObject()
+        val directory = webDavBackupDirectory(backup) ?: return ReturnData.error("WebDAV is not configured")
+        return try {
+            val target = directory.resolve("./${encodePathSegment(fileName)}")
+            if (target.host != directory.host || !target.path.startsWith(directory.path.trimEnd('/') + "/")) return ReturnData.error("Invalid WebDAV backup path")
+            val builder = HttpRequest.newBuilder(target).timeout(Duration.ofSeconds(30))
+                .method("DELETE", HttpRequest.BodyPublishers.noBody()).header("User-Agent", networkUserAgent())
+            webDavAuthorization(backup)?.let { builder.header("Authorization", it) }
+            val response = networkClient().send(builder.build(), HttpResponse.BodyHandlers.discarding())
+            if (response.statusCode() !in 200..299 && response.statusCode() != 404) return ReturnData.error("WebDAV returned HTTP ${response.statusCode()}")
+            getWebDavBackups()
         } catch (error: Exception) { ReturnData.error(error.message ?: error.javaClass.simpleName) }
     }
 

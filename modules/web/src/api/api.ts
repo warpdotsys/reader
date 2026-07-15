@@ -499,6 +499,9 @@ const restoreBackup = (fileName: string) =>
 const restoreWebDavBackup = (fileName: string) =>
   ajax.post<LeagdoApiResponse<Record<string, number>>>('restoreWebDavBackup', { fileName })
 
+const deleteWebDavBackup = (fileName: string) =>
+  ajax.post<LeagdoApiResponse<WebDavBackup[]>>('deleteWebDavBackup', { fileName })
+
 const deleteBackup = (fileName: string) =>
   ajax.post<LeagdoApiResponse<ServerBackup[]>>('deleteBackup', { fileName })
 
@@ -639,6 +642,7 @@ export default {
   checkNewBackup,
   restoreBackup,
   restoreWebDavBackup,
+  deleteWebDavBackup,
   deleteBackup,
   getSourceChecks,
   checkSources,

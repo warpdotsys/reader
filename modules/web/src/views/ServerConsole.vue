@@ -203,6 +203,7 @@
               </div>
               <div class="backup-row-actions">
                 <el-button :icon="Upload" text :loading="restoringBackup === `remote:${backup.fileName}`" @click="restoreWebDavBackup(backup)" />
+                <el-button :icon="Delete" text type="danger" @click="removeWebDavBackup(backup)" />
               </div>
             </div>
           </div>
@@ -1135,6 +1136,18 @@ async function restoreWebDavBackup(backup: WebDavBackup) {
     if (error !== 'cancel') ElMessage.error(error instanceof Error ? error.message : '远端恢复失败')
   } finally {
     restoringBackup.value = ''
+  }
+}
+
+async function removeWebDavBackup(backup: WebDavBackup) {
+  try {
+    await ElMessageBox.confirm(`删除远端快照 ${backup.fileName}？`, '删除 WebDAV 快照', {
+      type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消',
+    })
+    webDavBackups.value = unwrap(await API.deleteWebDavBackup(backup.fileName))
+    ElMessage.success('已删除远端快照')
+  } catch (error) {
+    if (error !== 'cancel') ElMessage.error(error instanceof Error ? error.message : '远端删除失败')
   }
 }
 
