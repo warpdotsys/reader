@@ -3248,7 +3248,7 @@ class LegadoStore(
             var totalBytes = 0
             val pages = zip.entries().asSequence()
                 .filter { !it.isDirectory && epubImageMime(it.name) != null }
-                .sortedBy { it.name.lowercase() }
+                .sortedWith { left, right -> naturalArchivePathCompare(left.name, right.name) }
                 .take(500)
                 .mapIndexedNotNull { index, entry ->
                     if (entry.size !in 1..MAX_EPUB_IMAGE_BYTES.toLong()) return@mapIndexedNotNull null
@@ -3256,12 +3256,30 @@ class LegadoStore(
                     if (bytes.isEmpty() || bytes.size > MAX_EPUB_IMAGE_BYTES || totalBytes + bytes.size > 32 * 1024 * 1024) return@mapIndexedNotNull null
                     totalBytes += bytes.size
                     val image = "data:${epubImageMime(entry.name)};base64,${Base64.getEncoder().encodeToString(bytes)}"
-                    chapter(bookUrl, index, entry.name.substringAfterLast('/').substringBeforeLast('.'), "<img src=\"$image\"/>")
+                    chapter(bookUrl, index, "Page ${index + 1}", "<img src=\"$image\"/>")
                 }
                 .toList()
             pages.takeIf { it.isNotEmpty() }?.let { CbzBook(it, it.first().string("content").orEmpty().substringAfter("src=\"").substringBefore('"')) }
         }
     }.getOrNull()
+
+    private fun naturalArchivePathCompare(left: String, right: String): Int {
+        val leftParts = Regex("\\d+|\\D+").findAll(left.lowercase()).map { it.value }.toList()
+        val rightParts = Regex("\\d+|\\D+").findAll(right.lowercase()).map { it.value }.toList()
+        for (index in 0 until minOf(leftParts.size, rightParts.size)) {
+            val a = leftParts[index]
+            val b = rightParts[index]
+            if (a == b) continue
+            val comparison = if (a.all(Char::isDigit) && b.all(Char::isDigit)) {
+                val normalizedA = a.trimStart('0').ifEmpty { "0" }
+                val normalizedB = b.trimStart('0').ifEmpty { "0" }
+                normalizedA.length.compareTo(normalizedB.length).takeIf { it != 0 }
+                    ?: normalizedA.compareTo(normalizedB)
+            } else a.compareTo(b)
+            if (comparison != 0) return comparison
+        }
+        return leftParts.size.compareTo(rightParts.size).takeIf { it != 0 } ?: left.compareTo(right)
+    }
 
     private fun parseEpubBook(file: Path, bookUrl: String): EpubBook? = runCatching {
         ZipFile(file.toFile(), StandardCharsets.UTF_8).use { zip ->

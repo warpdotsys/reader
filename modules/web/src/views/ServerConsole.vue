@@ -89,7 +89,7 @@
           <div class="panel-heading">
             <div>
               <h3>本地书籍</h3>
-              <p>TXT / EPUB 入库</p>
+              <p>TXT / EPUB / CBZ 入库</p>
             </div>
             <el-button
               :icon="FolderAdd"
@@ -114,7 +114,7 @@
             </div>
             <div class="local-book-meta">
               <strong>{{ lastLocalBook?.name || '等待文件' }}</strong>
-              <span>{{ lastLocalBook?.originName || 'TXT 按目录规则拆章，EPUB 保留书内目录' }}</span>
+              <span>{{ lastLocalBook?.originName || 'TXT 按目录规则拆章，EPUB 保留目录，CBZ 按图片页阅读' }}</span>
             </div>
           </div>
         </article>
