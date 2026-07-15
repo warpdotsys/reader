@@ -69,7 +69,7 @@ fun main(args: Array<String>) {
     val wsPort = if (options.wsPortExplicit) options.wsPort else httpPort + 1
     val assets = StaticAssets(options.webRoot)
     val httpServer = LegadoHttpServer(options.host, httpPort, store, assets, gson)
-    val wsServer = if (options.noWebSocket) null else LegadoWebSocketServer(options.host, wsPort)
+    val wsServer = if (options.noWebSocket) null else LegadoWebSocketServer(options.host, wsPort, store, gson)
 
     httpServer.start(NanoHTTPD.SOCKET_READ_TIMEOUT, false)
     wsServer?.start(NanoHTTPD.SOCKET_READ_TIMEOUT, false)
@@ -4389,11 +4389,25 @@ class StaticAssets(private val configuredRoot: Path?) {
     }
 }
 
-class LegadoWebSocketServer(host: String, port: Int) : NanoWSD(host, port) {
+class LegadoWebSocketServer(
+    host: String,
+    port: Int,
+    private val store: LegadoStore,
+    private val gson: Gson,
+) : NanoWSD(host, port) {
     override fun openWebSocket(handshake: IHTTPSession): WebSocket {
         val endpoint = handshake.uri.trim('/')
+        val queryToken = handshake.parameters["token"]?.firstOrNull()?.trim().orEmpty()
+        val authorization = handshake.headers["authorization"]
+            ?: queryToken.takeIf(String::isNotBlank)?.let { "Bearer $it" }
+        val authorized = !store.requiresLocalAuthentication() || store.isAuthenticated(authorization)
         return object : WebSocket(handshake) {
-            override fun onOpen() = Unit
+            override fun onOpen() {
+                if (!authorized) {
+                    sendResult(ReturnData.error("Unauthorized"))
+                    close(WebSocketFrame.CloseCode.PolicyViolation, "Unauthorized", false)
+                }
+            }
 
             override fun onClose(
                 code: WebSocketFrame.CloseCode?,
@@ -4402,16 +4416,13 @@ class LegadoWebSocketServer(host: String, port: Int) : NanoWSD(host, port) {
             ) = Unit
 
             override fun onMessage(message: WebSocketFrame) {
+                if (!authorized) return
                 when (endpoint) {
-                    "searchBook" -> {
-                        send("[]")
-                        close(WebSocketFrame.CloseCode.NormalClosure, "search is not implemented in JVM server yet", false)
-                    }
+                    "searchBook" -> handleSearch(message.textPayload)
 
-                    "bookSourceDebug", "rssSourceDebug" -> {
-                        send("Rule debugging is not implemented in the JVM server yet.")
-                        close(WebSocketFrame.CloseCode.NormalClosure, "debug is not implemented", false)
-                    }
+                    "bookSourceDebug" -> handleDebug(message.textPayload, "book")
+
+                    "rssSourceDebug" -> handleDebug(message.textPayload, "rss")
 
                     else -> close(WebSocketFrame.CloseCode.UnsupportedData, "unknown endpoint", false)
                 }
@@ -4422,6 +4433,28 @@ class LegadoWebSocketServer(host: String, port: Int) : NanoWSD(host, port) {
             override fun onException(exception: IOException) {
                 exception.printStackTrace()
             }
+
+            private fun handleSearch(payload: String) {
+                val request = parseWebSocketObject(payload) ?: JsonObject().apply {
+                    addProperty("key", payload.trim())
+                }
+                sendResult(store.searchBooks(gson.toJson(request)))
+            }
+
+            private fun handleDebug(payload: String, kind: String) {
+                val request = parseWebSocketObject(payload)
+                    ?: JsonObject().also { it.addProperty("sourceUrl", payload.trim()) }
+                request.addProperty("kind", kind)
+                sendResult(store.debugSource(gson.toJson(request)))
+            }
+
+            private fun sendResult(result: ReturnData) {
+                runCatching { send(gson.toJson(result)) }
+            }
+
+            private fun parseWebSocketObject(payload: String): JsonObject? = runCatching {
+                JsonParser.parseString(payload).asObjectOrNull()
+            }.getOrNull()
         }
     }
 }

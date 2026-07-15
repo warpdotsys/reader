@@ -8,19 +8,18 @@ It runs a JVM HTTP/WebSocket service, stores data as portable JSON files, and se
 
 Implemented today:
 
-- Bookshelf, reading view, local TXT upload and chapter splitting.
+- Bookshelf, reading view, local TXT/EPUB/CBZ import and chapter splitting.
 - Book-source and RSS-source CRUD, import/export, replace rules, TXT TOC rules, and source availability checks.
-- Browser reading preferences, theme/cover preferences, bookmarks, reading records, reader export, local backups, and WebDAV backup upload/check.
-- Server console for backup management, source checks, local book upload, maintenance, update checks, and App-data JSON collections.
+- Browser reading preferences, theme/cover preferences, bookmarks, reading records, reader export, local backups, and WebDAV snapshot management.
+- Server console for backup management, source checks, local book import, maintenance, update checks, and App-data JSON collections.
 - JSON data directory suitable for bind mounts, backups, and migration between Linux hosts.
 
 Not implemented yet:
 
-- Android JavaScript/Rhino book-source rules and Android-only login flows. Portable HTTP, JSONPath, regex, CSS, and XPath rules are supported.
 - Android-only integrations such as phone-call state, notifications, content providers, Room migrations, and Android media services.
-- A full Android-compatible EPUB/local-file library importer. The browser UI currently supports TXT upload, reading, and server-side exports.
+- Android JavaScript/Rhino book-source rules and Android-only login flows. Portable HTTP, JSONPath, regex, CSS, and XPath rules are supported.
 
-Remote search, remote TOC/content crawling, RSS refresh/full-text reading, automatic source switching, HTTP TTS, dictionary lookup, download tasks, and LAN password/session authentication are implemented. Do not expose the service to an untrusted network without a firewall, reverse proxy, or VPN.
+Remote search, remote TOC/content crawling, RSS refresh/full-text reading, automatic source switching, HTTP TTS, dictionary lookup, download tasks, TXT/EPUB/CBZ local import, WebDAV snapshot management, and LAN password/session authentication are implemented. The optional WebSocket compatibility listener supports search and source debugging through the same JVM engine as the HTTP API. Do not expose the service to an untrusted network without a firewall, reverse proxy, or VPN.
 
 The upstream project remains the reference for Legado data formats and user-facing semantics. This repository documents only behavior that exists in this Linux server.
 
