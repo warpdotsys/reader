@@ -56,6 +56,8 @@ import kotlin.io.path.name
 
 private const val MAX_LOCAL_BOOK_BYTES = 64L * 1024 * 1024
 private const val MAX_EPUB_ENTRY_BYTES = 4 * 1024 * 1024
+private const val MAX_EPUB_IMAGE_BYTES = 1024 * 1024
+private const val MAX_EPUB_CHAPTER_IMAGE_BYTES = 4 * 1024 * 1024
 
 fun main(args: Array<String>) {
     val options = ServerOptions.parse(args) ?: return
@@ -3283,6 +3285,7 @@ class LegadoStore(
                 val body = chapterDocument.getAllElements()
                     .firstOrNull { epubLocalName(it.tagName()) == "body" }
                     ?: return@mapIndexedNotNull null
+                inlineEpubImages(body, zip, entryPath)
                 sanitizeEpubBody(body)
                 val content = body.html().trim()
                 if (content.isEmpty()) return@mapIndexedNotNull null
@@ -3301,16 +3304,18 @@ class LegadoStore(
 
     private fun readZipText(zip: ZipFile, rawPath: String): String? {
         val path = normalizeArchivePath(rawPath) ?: return null
-        val entry = zip.getEntry(path)
-            ?: zip.entries().asSequence().firstOrNull { candidate ->
-                candidate.name.replace('\\', '/') == path
-            }
+        val entry = zipEntry(zip, path)
             ?: return null
         if (entry.isDirectory || entry.size > MAX_EPUB_ENTRY_BYTES.toLong()) return null
         val bytes = zip.getInputStream(entry).use { input -> input.readNBytes(MAX_EPUB_ENTRY_BYTES + 1) }
         if (bytes.size > MAX_EPUB_ENTRY_BYTES) return null
         return bytes.toString(StandardCharsets.UTF_8)
     }
+
+    private fun zipEntry(zip: ZipFile, path: String): ZipEntry? = zip.getEntry(path)
+            ?: zip.entries().asSequence().firstOrNull { candidate ->
+                candidate.name.replace('\\', '/') == path
+            }
 
     private fun normalizeArchivePath(rawPath: String): String? {
         val value = rawPath.substringBefore('#').substringBefore('?').replace('\\', '/').trim()
@@ -3334,13 +3339,47 @@ class LegadoStore(
         ?.trim()
         .orEmpty()
 
+    private fun inlineEpubImages(body: org.jsoup.nodes.Element, zip: ZipFile, chapterPath: String) {
+        var totalBytes = 0
+        body.select("img").forEach { image ->
+            val source = image.attr("src").trim()
+            val imagePath = resolveArchivePath(chapterPath, source)
+            val mime = imagePath?.let(::epubImageMime)
+            val entry = imagePath?.let { zipEntry(zip, it) }
+            if (mime == null || entry == null || entry.isDirectory || entry.size !in 1..MAX_EPUB_IMAGE_BYTES.toLong()) {
+                image.remove()
+                return@forEach
+            }
+            val bytes = zip.getInputStream(entry).use { it.readNBytes(MAX_EPUB_IMAGE_BYTES + 1) }
+            if (bytes.isEmpty() || bytes.size > MAX_EPUB_IMAGE_BYTES || totalBytes + bytes.size > MAX_EPUB_CHAPTER_IMAGE_BYTES) {
+                image.remove()
+                return@forEach
+            }
+            totalBytes += bytes.size
+            image.attr("src", "data:$mime;base64,${Base64.getEncoder().encodeToString(bytes)}")
+        }
+    }
+
+    private fun epubImageMime(path: String): String? = when (path.substringAfterLast('.', "").lowercase()) {
+        "jpg", "jpeg" -> "image/jpeg"
+        "png" -> "image/png"
+        "gif" -> "image/gif"
+        "webp" -> "image/webp"
+        "avif" -> "image/avif"
+        else -> null
+    }
+
     private fun sanitizeEpubBody(body: org.jsoup.nodes.Element) {
-        body.select("script, style, iframe, frame, object, embed, form, svg, link, meta, img").remove()
+        body.select("script, style, iframe, frame, object, embed, form, svg, link, meta").remove()
         body.getAllElements().forEach { element ->
             element.attributes().asList()
                 .filter { attribute ->
                     val key = attribute.key.lowercase()
-                    key.startsWith("on") || key == "style" || key == "href" || key == "src"
+                    key.startsWith("on") || key == "style" || key == "href" ||
+                        (key == "src" && !(
+                            epubLocalName(element.tagName()) == "img" &&
+                                attribute.value.startsWith("data:image/", ignoreCase = true)
+                            ))
                 }
                 .forEach { attribute -> element.removeAttr(attribute.key) }
         }
