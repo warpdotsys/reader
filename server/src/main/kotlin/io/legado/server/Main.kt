@@ -3179,8 +3179,8 @@ class LegadoStore(
         val displayName = fileName.replace('\\', '/').substringAfterLast('/').take(180)
         if (displayName.isBlank()) return ReturnData.error("fileName is required")
         val extension = displayName.substringAfterLast('.', "").lowercase()
-        if (extension !in setOf("txt", "epub")) {
-            return ReturnData.error("Only TXT and EPUB files are supported")
+        if (extension !in setOf("txt", "epub", "cbz")) {
+            return ReturnData.error("Only TXT, EPUB, and CBZ files are supported")
         }
         val baseName = displayName.substringBeforeLast('.', displayName)
         val backup = readAppSettings()["backup"].asObjectOrNull() ?: JsonObject()
@@ -3191,9 +3191,11 @@ class LegadoStore(
         val hash = sha256(bytes).take(16)
         val bookUrl = "local://$hash/$displayName"
         val epub = if (extension == "epub") parseEpubBook(source, bookUrl) else null
+        val comic = if (extension == "cbz") parseCbzBook(source, bookUrl) else null
         if (extension == "epub" && epub == null) {
             return ReturnData.error("Unable to read this EPUB file")
         }
+        if (extension == "cbz" && comic == null) return ReturnData.error("Unable to read this CBZ file")
         val name = parsed?.groups?.get("name")?.value?.trim().orEmpty()
             .ifEmpty { epub?.title.orEmpty() }
             .ifEmpty { baseName }
@@ -3209,7 +3211,7 @@ class LegadoStore(
         val target = targetDir.resolve("$hash-$safeFileName")
         Files.write(target, bytes)
 
-        val chapters = epub?.chapters ?: splitTextBook(bookUrl, bytes.toString(StandardCharsets.UTF_8))
+        val chapters = epub?.chapters ?: comic?.chapters ?: splitTextBook(bookUrl, bytes.toString(StandardCharsets.UTF_8))
         writeChapterList(bookUrl, chapters)
 
         val book = JsonObject().apply {
@@ -3223,6 +3225,7 @@ class LegadoStore(
             addProperty("localFile", target.toAbsolutePath().normalize().toString())
             addProperty("managedLocalFile", true)
             epub?.coverUrl?.takeIf(String::isNotBlank)?.let { addProperty("coverUrl", it) }
+            comic?.coverUrl?.takeIf(String::isNotBlank)?.let { addProperty("coverUrl", it) }
             withBookDefaults()
             addProperty("totalChapterNum", chapters.size)
             addProperty("latestChapterTitle", chapters.lastOrNull()?.string("title") ?: "")
@@ -3237,6 +3240,28 @@ class LegadoStore(
         val chapters: List<JsonObject>,
         val coverUrl: String,
     )
+
+    private data class CbzBook(val chapters: List<JsonObject>, val coverUrl: String)
+
+    private fun parseCbzBook(file: Path, bookUrl: String): CbzBook? = runCatching {
+        ZipFile(file.toFile(), StandardCharsets.UTF_8).use { zip ->
+            var totalBytes = 0
+            val pages = zip.entries().asSequence()
+                .filter { !it.isDirectory && epubImageMime(it.name) != null }
+                .sortedBy { it.name.lowercase() }
+                .take(500)
+                .mapIndexedNotNull { index, entry ->
+                    if (entry.size !in 1..MAX_EPUB_IMAGE_BYTES.toLong()) return@mapIndexedNotNull null
+                    val bytes = zip.getInputStream(entry).use { it.readNBytes(MAX_EPUB_IMAGE_BYTES + 1) }
+                    if (bytes.isEmpty() || bytes.size > MAX_EPUB_IMAGE_BYTES || totalBytes + bytes.size > 32 * 1024 * 1024) return@mapIndexedNotNull null
+                    totalBytes += bytes.size
+                    val image = "data:${epubImageMime(entry.name)};base64,${Base64.getEncoder().encodeToString(bytes)}"
+                    chapter(bookUrl, index, entry.name.substringAfterLast('/').substringBeforeLast('.'), "<img src=\"$image\"/>")
+                }
+                .toList()
+            pages.takeIf { it.isNotEmpty() }?.let { CbzBook(it, it.first().string("content").orEmpty().substringAfter("src=\"").substringBefore('"')) }
+        }
+    }.getOrNull()
 
     private fun parseEpubBook(file: Path, bookUrl: String): EpubBook? = runCatching {
         ZipFile(file.toFile(), StandardCharsets.UTF_8).use { zip ->

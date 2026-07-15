@@ -103,7 +103,7 @@
               ref="txtInput"
               class="visually-hidden"
               type="file"
-              accept=".txt,.epub,text/plain,application/epub+zip"
+              accept=".txt,.epub,.cbz,text/plain,application/epub+zip,application/vnd.comicbook+zip"
               multiple
               @change="uploadLocalBook"
             />
