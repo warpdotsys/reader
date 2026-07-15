@@ -580,6 +580,7 @@ class LegadoStore(
     @Volatile private var sourceCheckClient = buildNetworkClient(false)
     private val authSessions = ConcurrentHashMap<String, Long>()
     private val sourceCookieLock = Any()
+    private val javaScriptRuleContext = ThreadLocal<JavaScriptRuleContext?>()
     private val javaScriptRuleExecutor = Executors.newFixedThreadPool(2) { runnable ->
         Thread(runnable, "legado-js-rule").apply { isDaemon = true }
     }
@@ -1642,11 +1643,14 @@ class LegadoStore(
             captureSourceCookies(response, source)
             val body = response.body()
             val latency = ((System.nanoTime() - startedAt) / 1_000_000).coerceAtLeast(0)
-            val entries = if (response.statusCode() in 200..299) {
+            val accepted = response.statusCode() in 200..299 && matchesSearchCheckWord(body, rule.string("checkKeyWord"))
+            val entries = if (accepted) {
                 extractRuleValues(body, rule.string("bookList").orEmpty())
             } else emptyList()
-            val results = if (response.statusCode() in 200..299) {
-                extractSourceBooks(source, rule, body, requestSpec.baseUrl, latency)
+            val results = if (accepted) {
+                withJavaScriptRuleContext(key, requestSpec.baseUrl) {
+                    extractSourceBooks(source, rule, body, requestSpec.baseUrl, latency)
+                }
             } else emptyList()
             mapOf(
                 "request" to mapOf("url" to requestSpec.baseUrl, "method" to requestSpec.request.method()),
@@ -1656,6 +1660,7 @@ class LegadoStore(
                     "preview" to body.take(8_000),
                 ),
                 "listRule" to rule.string("bookList").orEmpty(),
+                "checkKeyWordMatched" to accepted,
                 "entryCount" to entries.size,
                 "firstEntry" to entries.firstOrNull()?.take(8_000).orEmpty(),
                 "fieldPreview" to entries.firstOrNull()?.let { previewRuleFields(it, rule) }.orEmpty(),
@@ -2602,10 +2607,37 @@ class LegadoStore(
             val response = networkClient().send(requestSpec.request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
             captureSourceCookies(response, source)
             if (response.statusCode() !in 200..299) return emptyList()
+            if (!matchesSearchCheckWord(response.body(), rule.string("checkKeyWord"))) return emptyList()
             val latency = ((System.nanoTime() - startedAt) / 1_000_000).coerceAtLeast(0)
-            extractSourceBooks(source, rule, response.body(), requestSpec.baseUrl, latency)
+            withJavaScriptRuleContext(key, requestSpec.baseUrl) {
+                extractSourceBooks(source, rule, response.body(), requestSpec.baseUrl, latency)
+            }
         } catch (_: Exception) {
             emptyList()
+        }
+    }
+
+    private fun matchesSearchCheckWord(body: String, rule: String?): Boolean {
+        val checks = rule.orEmpty().split("&&", "||", "\n")
+            .map(String::trim)
+            .filter(String::isNotBlank)
+        if (checks.isEmpty()) return true
+        return checks.any { check ->
+            if (check.startsWith("@regex:", true)) {
+                runCatching { Regex(check.substringAfter(':')).containsMatchIn(body) }.getOrDefault(false)
+            } else body.contains(check)
+        }
+    }
+
+    private data class JavaScriptRuleContext(val key: String = "", val baseUrl: String = "")
+
+    private fun <T> withJavaScriptRuleContext(key: String, baseUrl: String, block: () -> T): T {
+        val previous = javaScriptRuleContext.get()
+        javaScriptRuleContext.set(JavaScriptRuleContext(key, baseUrl))
+        return try {
+            block()
+        } finally {
+            javaScriptRuleContext.set(previous)
         }
     }
 
@@ -2877,9 +2909,15 @@ class LegadoStore(
             try {
                 val bindings = context.getBindings("js")
                 bindings.putMember("input", input)
+                val ruleContext = javaScriptRuleContext.get() ?: JavaScriptRuleContext()
+                bindings.putMember("inputKey", ruleContext.key)
+                bindings.putMember("inputBaseUrl", ruleContext.baseUrl)
                 val expression = """
                     (function () {
                       const result = String(input);
+                      const key = String(inputKey);
+                      const searchKey = key;
+                      const baseUrl = String(inputBaseUrl);
                       let resultJson = null;
                       try { resultJson = JSON.parse(result); } catch (_) {}
                       const __value = ($script);
@@ -2889,6 +2927,9 @@ class LegadoStore(
                 val statement = """
                     (function () {
                       let result = String(input);
+                      const key = String(inputKey);
+                      const searchKey = key;
+                      const baseUrl = String(inputBaseUrl);
                       let resultJson = null;
                       try { resultJson = JSON.parse(result); } catch (_) {}
                       const __value = (function () {
