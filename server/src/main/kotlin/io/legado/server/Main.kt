@@ -3634,6 +3634,7 @@ class LegadoStore(
         val subContentRule = rules.string("subContent")
         val titleRule = rules.string("title")
         val nextRule = rules.string("nextContentUrl")
+        val replaceRule = rules.string("replaceRegex")
         var pageUrl = chapter.string("url").orEmpty()
         val visited = linkedSetOf<String>()
         val pages = mutableListOf<String>()
@@ -3652,7 +3653,22 @@ class LegadoStore(
             pageUrl = resolveSearchUrl(pageUrl, next)
             if (next.isBlank()) break
         }
-        return pages.joinToString("\n\n").takeIf(String::isNotBlank)
+        return applyContentReplaceRules(pages.joinToString("\n\n"), replaceRule).takeIf(String::isNotBlank)
+    }
+
+    private fun applyContentReplaceRules(content: String, rawRules: String?): String {
+        if (content.isBlank() || rawRules.isNullOrBlank()) return content
+        val parsed = runCatching { JsonParser.parseString(rawRules) }.getOrNull()
+        val rules = when {
+            parsed?.isJsonObject == true -> listOf(parsed.asJsonObject)
+            parsed?.isJsonArray == true -> parsed.asJsonArray.mapNotNull { it.asObjectOrNull() }
+            else -> emptyList()
+        }
+        return rules.take(20).fold(content) { value, rule ->
+            val pattern = rule.string("pattern") ?: rule.string("regex") ?: return@fold value
+            val replacement = rule.string("replacement") ?: rule.string("replace") ?: ""
+            runCatching { Regex(pattern, RegexOption.DOT_MATCHES_ALL).replace(value, replacement) }.getOrDefault(value)
+        }
     }
 
     private fun resolveRemoteTocUrl(book: JsonObject, source: JsonObject): String {
