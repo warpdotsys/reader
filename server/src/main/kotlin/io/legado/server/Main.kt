@@ -3290,6 +3290,31 @@ class LegadoStore(
             val coverUrl = coverReference
                 ?.let { resolveArchivePath(packagePath, it) }
                 ?.let { inlineEpubImage(zip, it) }
+            val navigationReference = packageDocument.getAllElements()
+                .firstOrNull {
+                    epubLocalName(it.tagName()) == "item" &&
+                        it.attr("properties").split(Regex("\\s+")).any { property ->
+                            property.equals("nav", ignoreCase = true)
+                        }
+                }
+                ?.attr("href")
+                ?.trim()
+                ?.takeIf(String::isNotBlank)
+                ?: manifest["nav"]
+            val navigationTitles = navigationReference
+                ?.let { resolveArchivePath(packagePath, it) }
+                ?.let { navigationPath ->
+                    readZipText(zip, navigationPath)?.let { navigation ->
+                        Jsoup.parse(navigation, "", Parser.xmlParser()).select("a[href]")
+                            .mapNotNull { link ->
+                                resolveArchivePath(navigationPath, link.attr("href"))
+                                    ?.let { path -> path to link.text().trim().takeIf(String::isNotBlank) }
+                            }
+                            .filter { it.second != null }
+                            .associate { it.first to it.second.orEmpty() }
+                    }
+                }
+                .orEmpty()
             val readingOrder = packageDocument.getAllElements()
                 .filter { epubLocalName(it.tagName()) == "itemref" }
                 .mapNotNull { item -> manifest[item.attr("idref").trim()] }
@@ -3313,11 +3338,13 @@ class LegadoStore(
                 sanitizeEpubBody(body)
                 val content = body.html().trim()
                 if (content.isEmpty()) return@mapIndexedNotNull null
-                val chapterTitle = body.getAllElements()
+                val heading = body.getAllElements()
                     .firstOrNull { epubLocalName(it.tagName()) in setOf("h1", "h2", "h3") }
                     ?.text()
                     ?.trim()
                     .orEmpty()
+                val chapterTitle = navigationTitles[entryPath].orEmpty()
+                    .ifEmpty { heading }
                     .ifEmpty { href.substringAfterLast('/').substringBeforeLast('.') }
                 chapter(bookUrl, index, chapterTitle, content)
             }
