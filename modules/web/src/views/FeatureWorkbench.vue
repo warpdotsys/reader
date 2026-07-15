@@ -203,6 +203,14 @@
               <el-button :icon="EditPen" text @click="openEditEditor(row)" />
               <el-button :icon="Files" text @click="openJsonEditor(row)" />
               <el-button
+                v-if="activeKind?.kind === 'readRecords'"
+                :icon="Reading"
+                text
+                type="success"
+                title="继续阅读"
+                @click="resumeReading(row)"
+              />
+              <el-button
                 v-if="activeKind?.kind === 'themeConfigs'"
                 :icon="Check"
                 text
@@ -904,6 +912,29 @@ async function applyThemeConfig(config: AppDataItem) {
     ElMessage.success(`已应用主题：${themeName}`)
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '应用主题失败')
+  }
+}
+
+async function resumeReading(record: AppDataItem) {
+  const bookUrl = String(record.bookUrl || '').trim()
+  if (!bookUrl) {
+    ElMessage.warning('阅读记录缺少书籍地址')
+    return
+  }
+  try {
+    const response = await API.getBookShelf()
+    const book = response.data.isSuccess
+      ? response.data.data.find(item => String(item.bookUrl || '') === bookUrl)
+      : undefined
+    if (!book) throw new Error('书籍已不在书架中')
+    sessionStorage.setItem('bookUrl', String(book.bookUrl))
+    sessionStorage.setItem('name', String(book.name || record.bookName || ''))
+    sessionStorage.setItem('author', String(book.author || record.bookAuthor || ''))
+    sessionStorage.setItem('chapterIndex', String(Math.max(0, Number(record.chapterIndex || 0))))
+    sessionStorage.setItem('chapterPos', String(Math.max(0, Number(record.chapterPos || 0))))
+    await router.push('/chapter')
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '无法恢复阅读记录')
   }
 }
 
