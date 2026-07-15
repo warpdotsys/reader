@@ -89,6 +89,12 @@
         >
           {{ batchChanging ? '换源中' : '批量换源' }}
         </button>
+        <button class="batch-source-button" type="button" title="新建书籍分组" @click="createBookGroup">
+          新建分组
+        </button>
+        <button class="batch-source-button" type="button" title="管理书籍分组" @click="router.push({ path: '/features', query: { kind: 'bookGroups' } })">
+          管理分组
+        </button>
       </div>
       <div
         v-if="bookGroups.length > 0 && groupStyle !== '2'"
@@ -370,6 +376,33 @@ async function loadAppPreferences() {
     }
   } catch {
     // Keep the original bookshelf behavior when preferences are unavailable.
+  }
+}
+
+async function createBookGroup() {
+  try {
+    const result = await ElMessageBox.prompt('输入分组名称', '新建书籍分组', {
+      confirmButtonText: '创建', cancelButtonText: '取消', inputPattern: /\S+/, inputErrorMessage: '分组名称不能为空',
+    })
+    const groups = await API.getAppData('bookGroups')
+    if (!groups.data.isSuccess) throw new Error(groups.data.errorMsg || '无法读取分组')
+    const used = new Set(groups.data.data.map(group => Number(group.groupId)))
+    let groupId = 1
+    while (used.has(groupId) && groupId < 1_073_741_824) groupId *= 2
+    if (used.has(groupId)) throw new Error('分组数量已达到上限')
+    await API.saveAppData('bookGroups', {
+      groupId,
+      groupName: result.value.trim(),
+      order: groups.data.data.length,
+      show: true,
+      enableRefresh: true,
+      bookSort: -1,
+    })
+    await loadAppPreferences()
+    selectedGroupId.value = groupId
+    ElMessage.success('分组已创建')
+  } catch (error) {
+    if (error !== 'cancel') ElMessage.error(error instanceof Error ? error.message : '创建分组失败')
   }
 }
 function updateScrollProgress() {
