@@ -2461,16 +2461,27 @@ class LegadoStore(
         val rule = source["ruleBookInfo"].asObjectOrNull() ?: return
         val detailUrl = candidate.string("bookUrl").orEmpty()
         val detail = fetchSourceText(source, detailUrl) ?: return
+        val detailScope = extractBookInfoScope(detail, rule.string("init"))
         for (field in listOf("name", "author", "kind", "wordCount", "intro")) {
-            val value = extractRuleValue(detail, rule.string(field)).trim()
+            val value = extractRuleValue(detailScope, rule.string(field)).trim()
             if (value.isNotBlank()) candidate.addProperty(field, value)
         }
-        val cover = extractRuleValue(detail, rule.string("coverUrl")).trim()
+        val cover = extractRuleValue(detailScope, rule.string("coverUrl")).trim()
         if (cover.isNotBlank()) candidate.addProperty("coverUrl", resolveSearchUrl(detailUrl, cover))
-        val toc = extractRuleValue(detail, rule.string("tocUrl")).trim()
+        val toc = extractRuleValue(detailScope, rule.string("tocUrl")).trim()
         if (toc.isNotBlank()) candidate.addProperty("tocUrl", resolveSearchUrl(detailUrl, toc))
-        val latest = extractRuleValue(detail, rule.string("lastChapter")).trim()
+        val latest = extractRuleValue(detailScope, rule.string("lastChapter")).trim()
         if (latest.isNotBlank()) candidate.addProperty("latestChapterTitle", latest)
+        val updateTime = extractRuleValue(detailScope, rule.string("updateTime")).trim()
+        if (updateTime.isNotBlank()) candidate.addProperty("latestChapterTime", updateTime)
+    }
+
+    private fun extractBookInfoScope(response: String, initRule: String?): String {
+        if (initRule.isNullOrBlank()) return response
+        return extractRuleValues(response, initRule).firstOrNull()
+            ?.takeIf(String::isNotBlank)
+            ?: extractRuleValue(response, initRule).takeIf(String::isNotBlank)
+            ?: response
     }
 
     @Synchronized
@@ -2790,15 +2801,21 @@ class LegadoStore(
             return jsonPath(root, rule).map { gson.toJson(it) }
         }
         if (isXpathRule(rule)) {
-            val expression = xpathRuleParts(rule).first
+            val (expression, attribute) = xpathRuleParts(rule)
             if (expression.isBlank()) return emptyList()
-            return runCatching { Jsoup.parseBodyFragment(input).body().selectXpath(expression).map { it.outerHtml() } }
+            return runCatching {
+                Jsoup.parseBodyFragment(input).body().selectXpath(expression)
+                    .map { elementRuleValue(it, attribute, outerHtmlWhenUnspecified = true) }
+            }
                 .getOrDefault(emptyList())
         }
         if (isCssRule(rule)) {
-            val selector = cssSelector(rule)
+            val (selector, attribute) = cssRuleParts(rule)
             if (selector.isBlank()) return emptyList()
-            return runCatching { Jsoup.parseBodyFragment(input).select(selector).map { it.outerHtml() } }
+            return runCatching {
+                Jsoup.parseBodyFragment(input).select(selector)
+                    .map { elementRuleValue(it, attribute, outerHtmlWhenUnspecified = true) }
+            }
                 .getOrDefault(emptyList())
         }
         return runCatching {
@@ -2823,13 +2840,7 @@ class LegadoStore(
             return runCatching {
                 val (expression, attribute) = xpathRuleParts(rule)
                 val element = Jsoup.parseBodyFragment(input).body().selectXpath(expression).firstOrNull() ?: return ""
-                when (attribute?.lowercase()) {
-                    null, "text" -> element.text()
-                    "owntext" -> element.ownText()
-                    "html" -> element.html()
-                    "outerhtml" -> element.outerHtml()
-                    else -> element.attr(attribute)
-                }
+                elementRuleValue(element, attribute)
             }.getOrDefault("")
         }
         if (isCssRule(rule)) {
@@ -2838,13 +2849,7 @@ class LegadoStore(
                 val element = if (selector.isBlank()) Jsoup.parseBodyFragment(input).body()
                     else Jsoup.parseBodyFragment(input).selectFirst(selector)
                     ?: return ""
-                when (attribute?.lowercase()) {
-                    null, "text" -> element.text()
-                    "owntext" -> element.ownText()
-                    "html" -> element.html()
-                    "outerhtml" -> element.outerHtml()
-                    else -> element.attr(attribute)
-                }
+                elementRuleValue(element, attribute)
             }.getOrDefault("")
         }
         return runCatching {
@@ -2852,6 +2857,16 @@ class LegadoStore(
             match.groups.drop(1).firstOrNull { it != null }?.value ?: match.value
         }.getOrDefault("")
     }
+
+    private fun elementRuleValue(element: org.jsoup.nodes.Element, attribute: String?, outerHtmlWhenUnspecified: Boolean = false): String =
+        when (attribute?.lowercase()) {
+            null -> if (outerHtmlWhenUnspecified) element.outerHtml() else element.text()
+            "text" -> element.text()
+            "owntext" -> element.ownText()
+            "html" -> element.html()
+            "outerhtml" -> element.outerHtml()
+            else -> element.attr(attribute)
+        }
 
     private data class JavaScriptRuleResult(
         val json: String? = null,
@@ -3685,12 +3700,13 @@ class LegadoStore(
 
     private fun resolveRemoteTocUrl(book: JsonObject, source: JsonObject): String {
         val fallback = book.string("tocUrl")?.ifBlank { book.string("bookUrl") }.orEmpty()
-        val tocRule = source["ruleBookInfo"].asObjectOrNull()?.string("tocUrl")
+        val infoRule = source["ruleBookInfo"].asObjectOrNull()
+        val tocRule = infoRule?.string("tocUrl")
         if (tocRule.isNullOrBlank()) return fallback
         val detailUrl = book.string("bookUrl").orEmpty()
         if (fallback.isNotBlank() && fallback != detailUrl) return fallback
         val detail = fetchSourceText(source, detailUrl) ?: return fallback
-        val extracted = extractRuleValue(detail, tocRule).trim()
+        val extracted = extractRuleValue(extractBookInfoScope(detail, infoRule?.string("init")), tocRule).trim()
         return resolveSearchUrl(detailUrl, extracted).ifBlank { fallback }
     }
 
