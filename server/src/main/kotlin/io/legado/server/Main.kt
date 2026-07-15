@@ -3315,6 +3315,40 @@ class LegadoStore(
                     }
                 }
                 .orEmpty()
+            val ncxReference = packageDocument.getAllElements()
+                .firstOrNull { epubLocalName(it.tagName()) == "spine" }
+                ?.attr("toc")
+                ?.trim()
+                ?.let(manifest::get)
+                ?: packageDocument.getAllElements()
+                    .firstOrNull {
+                        epubLocalName(it.tagName()) == "item" &&
+                            it.attr("media-type").equals("application/x-dtbncx+xml", ignoreCase = true)
+                    }
+                    ?.attr("href")
+                    ?.trim()
+                    ?.takeIf(String::isNotBlank)
+            val ncxTitles = if (navigationTitles.isNotEmpty()) emptyMap() else ncxReference
+                ?.let { resolveArchivePath(packagePath, it) }
+                ?.let { ncxPath ->
+                    readZipText(zip, ncxPath)?.let { ncx ->
+                        Jsoup.parse(ncx, "", Parser.xmlParser()).getAllElements()
+                            .filter { epubLocalName(it.tagName()) == "navpoint" }
+                            .mapNotNull { point ->
+                                val target = point.getAllElements()
+                                    .firstOrNull { epubLocalName(it.tagName()) == "content" }
+                                    ?.attr("src")
+                                    ?.let { resolveArchivePath(ncxPath, it) }
+                                val label = point.getAllElements()
+                                    .firstOrNull { epubLocalName(it.tagName()) == "text" }
+                                    ?.text()
+                                    ?.trim()
+                                if (target == null || label.isNullOrBlank()) null else target to label
+                            }
+                            .associate { it }
+                    }
+                }
+                .orEmpty()
             val readingOrder = packageDocument.getAllElements()
                 .filter { epubLocalName(it.tagName()) == "itemref" }
                 .mapNotNull { item -> manifest[item.attr("idref").trim()] }
@@ -3344,6 +3378,7 @@ class LegadoStore(
                     ?.trim()
                     .orEmpty()
                 val chapterTitle = navigationTitles[entryPath].orEmpty()
+                    .ifEmpty { ncxTitles[entryPath].orEmpty() }
                     .ifEmpty { heading }
                     .ifEmpty { href.substringAfterLast('/').substringBeforeLast('.') }
                 chapter(bookUrl, index, chapterTitle, content)
