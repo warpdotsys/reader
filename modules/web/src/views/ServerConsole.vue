@@ -165,6 +165,9 @@
             <el-button :icon="Refresh" :loading="loading" @click="loadBackups">
               刷新
             </el-button>
+            <el-button :icon="Connection" :loading="loadingWebDavBackups" @click="loadWebDavBackups">
+              远端快照
+            </el-button>
           </div>
           <div v-if="backups.length" class="backup-list">
             <div v-for="backup in backups" :key="backup.fileName" class="backup-row">
@@ -191,6 +194,17 @@
           <div v-else class="backup-empty">
             <el-icon><Files /></el-icon>
             <span>暂无本地备份快照</span>
+          </div>
+          <div v-if="webDavBackups.length" class="backup-list remote-backup-list">
+            <div v-for="backup in webDavBackups" :key="backup.href" class="backup-row">
+              <div>
+                <strong>{{ backup.fileName }}</strong>
+                <span>WebDAV · {{ formatTime(backup.modifiedTime) }} · {{ formatBytes(backup.size) }}</span>
+              </div>
+              <div class="backup-row-actions">
+                <el-button :icon="Upload" text :loading="restoringBackup === `remote:${backup.fileName}`" @click="restoreWebDavBackup(backup)" />
+              </div>
+            </div>
           </div>
         </article>
       </section>
@@ -529,6 +543,7 @@ import type {
   LeagdoApiResponse,
   ReplaceRule,
   ServerBackup,
+  WebDavBackup,
   ServerExportData,
   ServerInfo,
   SourceCheckReport,
@@ -574,6 +589,7 @@ const savingReplace = ref(false)
 const creatingBackup = ref(false)
 const exportingBooks = ref(false)
 const restoringBackup = ref('')
+const loadingWebDavBackups = ref(false)
 const checkingSources = ref(false)
 const checkingUpdates = ref(false)
 const serverInfo = ref<ServerInfo>()
@@ -582,6 +598,7 @@ const backupInput = ref<HTMLInputElement>()
 const lastLocalBook = ref<Book>()
 const appSettings = ref<AppSettings>({})
 const backups = ref<ServerBackup[]>([])
+const webDavBackups = ref<WebDavBackup[]>([])
 const sourceChecks = ref<SourceCheckReport[]>([])
 const updateCheck = ref<UpdateCheckResult>()
 
@@ -860,6 +877,17 @@ async function loadBackups() {
   backups.value = unwrap(await API.getBackups())
 }
 
+async function loadWebDavBackups() {
+  loadingWebDavBackups.value = true
+  try {
+    webDavBackups.value = unwrap(await API.getWebDavBackups())
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '无法读取 WebDAV 快照')
+  } finally {
+    loadingWebDavBackups.value = false
+  }
+}
+
 async function loadSourceChecks() {
   sourceChecks.value = unwrap(await API.getSourceChecks())
 }
@@ -1092,6 +1120,22 @@ function downloadJson(data: unknown, fileName: string) {
   anchor.download = fileName.replace(/[:.]/g, '-')
   anchor.click()
   URL.revokeObjectURL(url)
+}
+
+async function restoreWebDavBackup(backup: WebDavBackup) {
+  try {
+    await ElMessageBox.confirm(`恢复远端快照 ${backup.fileName} 会覆盖同名数据集合。`, '恢复 WebDAV 快照', {
+      type: 'warning', confirmButtonText: '恢复', cancelButtonText: '取消',
+    })
+    restoringBackup.value = `remote:${backup.fileName}`
+    const result = unwrap(await API.restoreWebDavBackup(backup.fileName))
+    ElMessage.success(Object.entries(result).map(([key, value]) => `${key}: ${value}`).join(' / '))
+    await refreshAll()
+  } catch (error) {
+    if (error !== 'cancel') ElMessage.error(error instanceof Error ? error.message : '远端恢复失败')
+  } finally {
+    restoringBackup.value = ''
+  }
 }
 
 function downloadBookExport(result: import('@/api/api').BookExportResult) {

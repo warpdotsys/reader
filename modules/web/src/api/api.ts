@@ -110,6 +110,13 @@ export type ServerBackup = {
   remotePath?: string
 }
 
+export type WebDavBackup = {
+  fileName: string
+  modifiedTime: number
+  size: number
+  href: string
+}
+
 export type BookExportResult = {
   fileName: string
   mime: string
@@ -475,6 +482,9 @@ const importData = (data: Partial<ServerExportData>) =>
 const getBackups = () =>
   ajax.get<LeagdoApiResponse<ServerBackup[]>>('getBackups')
 
+const getWebDavBackups = () =>
+  ajax.get<LeagdoApiResponse<WebDavBackup[]>>('getWebDavBackups')
+
 const createBackup = () =>
   ajax.post<LeagdoApiResponse<ServerBackup>>('createBackup')
 
@@ -485,6 +495,9 @@ const restoreBackup = (fileName: string) =>
   ajax.post<LeagdoApiResponse<Record<string, number>>>('restoreBackup', {
     fileName,
   })
+
+const restoreWebDavBackup = (fileName: string) =>
+  ajax.post<LeagdoApiResponse<Record<string, number>>>('restoreWebDavBackup', { fileName })
 
 const deleteBackup = (fileName: string) =>
   ajax.post<LeagdoApiResponse<ServerBackup[]>>('deleteBackup', { fileName })
@@ -621,9 +634,11 @@ export default {
   exportData,
   importData,
   getBackups,
+  getWebDavBackups,
   createBackup,
   checkNewBackup,
   restoreBackup,
+  restoreWebDavBackup,
   deleteBackup,
   getSourceChecks,
   checkSources,
