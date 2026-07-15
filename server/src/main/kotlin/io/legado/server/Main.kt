@@ -1613,7 +1613,8 @@ class LegadoStore(
             val key = payload.string("key")?.trim().orEmpty()
             if (key.isBlank()) return ReturnData.error("key is required for book source debugging")
             val started = System.nanoTime()
-            val results = searchSource(source, key)
+            val trace = debugBookSource(source, key)
+            val results = trace["results"] as? List<*> ?: emptyList<Any>()
             ReturnData.ok(mapOf(
                 "kind" to "book",
                 "sourceName" to (source.string("bookSourceName") ?: ""),
@@ -1621,10 +1622,58 @@ class LegadoStore(
                 "latencyMs" to ((System.nanoTime() - started) / 1_000_000).coerceAtLeast(0),
                 "resultCount" to results.size,
                 "results" to results,
+                "trace" to trace.filterKeys { it != "results" },
                 "ruleDiagnostics" to sourceRuleDiagnostics(source),
             ))
         }
     }
+
+    private fun debugBookSource(source: JsonObject, key: String): Map<String, Any> {
+        val rule = source["ruleSearch"].asObjectOrNull()
+            ?: return mapOf("error" to "ruleSearch is required", "results" to emptyList<JsonObject>())
+        val requestSpec = sourceSearchRequest(source, source.string("searchUrl").orEmpty(), key)
+            ?: return mapOf("error" to "searchUrl is not a portable HTTP request", "results" to emptyList<JsonObject>())
+        val startedAt = System.nanoTime()
+        return try {
+            val response = networkClient().send(requestSpec.request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
+            captureSourceCookies(response, source)
+            val body = response.body()
+            val latency = ((System.nanoTime() - startedAt) / 1_000_000).coerceAtLeast(0)
+            val entries = if (response.statusCode() in 200..299) {
+                extractRuleValues(body, rule.string("bookList").orEmpty())
+            } else emptyList()
+            val results = if (response.statusCode() in 200..299) {
+                extractSourceBooks(source, rule, body, requestSpec.baseUrl, latency)
+            } else emptyList()
+            mapOf(
+                "request" to mapOf("url" to requestSpec.baseUrl, "method" to requestSpec.request.method()),
+                "response" to mapOf(
+                    "statusCode" to response.statusCode(),
+                    "bytes" to body.toByteArray(StandardCharsets.UTF_8).size,
+                    "preview" to body.take(8_000),
+                ),
+                "listRule" to rule.string("bookList").orEmpty(),
+                "entryCount" to entries.size,
+                "firstEntry" to entries.firstOrNull()?.take(8_000).orEmpty(),
+                "fieldPreview" to entries.firstOrNull()?.let { previewRuleFields(it, rule) }.orEmpty(),
+                "latencyMs" to latency,
+                "results" to results,
+            )
+        } catch (error: Exception) {
+            mapOf(
+                "request" to mapOf("url" to requestSpec.baseUrl, "method" to requestSpec.request.method()),
+                "error" to (error.message ?: error.javaClass.simpleName),
+                "results" to emptyList<JsonObject>(),
+            )
+        }
+    }
+
+    private fun previewRuleFields(entry: String, rule: JsonObject): Map<String, Map<String, String>> =
+        listOf("name", "author", "bookUrl", "kind", "wordCount", "coverUrl", "intro", "lastChapter")
+            .associateWith { field ->
+                val configured = rule.string(field).orEmpty()
+                mapOf("rule" to configured, "value" to extractRuleValue(entry, configured).take(2_000))
+            }
 
     private fun sourceRuleDiagnostics(source: JsonObject): Map<String, Any> {
         val javaScriptFields = mutableListOf<String>()
@@ -2476,37 +2525,42 @@ class LegadoStore(
             captureSourceCookies(response, source)
             if (response.statusCode() !in 200..299) return emptyList()
             val latency = ((System.nanoTime() - startedAt) / 1_000_000).coerceAtLeast(0)
-            val responseBody = response.body()
-            val listRule = rule.string("bookList").orEmpty()
-            val entries = extractRuleValues(responseBody, listRule)
-            entries.mapNotNull { entry ->
-                val name = extractRuleValue(entry, rule.string("name")).trim()
-                val bookUrl = resolveSearchUrl(requestSpec.baseUrl, extractRuleValue(entry, rule.string("bookUrl")).trim())
-                if (name.isBlank() || bookUrl.isBlank()) return@mapNotNull null
-                JsonObject().apply {
-                    addProperty("name", name)
-                    addProperty("author", extractRuleValue(entry, rule.string("author")).trim())
-                    addProperty("bookUrl", bookUrl)
-                    addProperty("kind", extractRuleValue(entry, rule.string("kind")).trim())
-                    addProperty("wordCount", extractRuleValue(entry, rule.string("wordCount")).trim())
-                    addProperty("origin", source.string("bookSourceUrl") ?: "")
-                    addProperty("originName", source.string("bookSourceName") ?: "")
-                    addProperty("type", source["bookSourceType"].safeInt())
-                    val cover = resolveSearchUrl(requestSpec.baseUrl, extractRuleValue(entry, rule.string("coverUrl")).trim())
-                    if (cover.isNotBlank()) addProperty("coverUrl", cover)
-                    val intro = extractRuleValue(entry, rule.string("intro")).trim()
-                    if (intro.isNotBlank()) addProperty("intro", intro)
-                    val latest = extractRuleValue(entry, rule.string("lastChapter")).trim()
-                    if (latest.isNotBlank()) addProperty("latestChapterTitle", latest)
-                    addProperty("tocUrl", bookUrl)
-                    addProperty("time", System.currentTimeMillis())
-                    addProperty("originOrder", source["customOrder"].safeInt())
-                    addProperty("chapterWordCount", 0)
-                    addProperty("respondTime", latency)
-                }
-            }
+            extractSourceBooks(source, rule, response.body(), requestSpec.baseUrl, latency)
         } catch (_: Exception) {
             emptyList()
+        }
+    }
+
+    private fun extractSourceBooks(
+        source: JsonObject,
+        rule: JsonObject,
+        responseBody: String,
+        baseUrl: String,
+        latency: Long,
+    ): List<JsonObject> = extractRuleValues(responseBody, rule.string("bookList").orEmpty()).mapNotNull { entry ->
+        val name = extractRuleValue(entry, rule.string("name")).trim()
+        val bookUrl = resolveSearchUrl(baseUrl, extractRuleValue(entry, rule.string("bookUrl")).trim())
+        if (name.isBlank() || bookUrl.isBlank()) return@mapNotNull null
+        JsonObject().apply {
+            addProperty("name", name)
+            addProperty("author", extractRuleValue(entry, rule.string("author")).trim())
+            addProperty("bookUrl", bookUrl)
+            addProperty("kind", extractRuleValue(entry, rule.string("kind")).trim())
+            addProperty("wordCount", extractRuleValue(entry, rule.string("wordCount")).trim())
+            addProperty("origin", source.string("bookSourceUrl") ?: "")
+            addProperty("originName", source.string("bookSourceName") ?: "")
+            addProperty("type", source["bookSourceType"].safeInt())
+            resolveSearchUrl(baseUrl, extractRuleValue(entry, rule.string("coverUrl")).trim())
+                .takeIf(String::isNotBlank)?.let { addProperty("coverUrl", it) }
+            extractRuleValue(entry, rule.string("intro")).trim().takeIf(String::isNotBlank)
+                ?.let { addProperty("intro", it) }
+            extractRuleValue(entry, rule.string("lastChapter")).trim().takeIf(String::isNotBlank)
+                ?.let { addProperty("latestChapterTitle", it) }
+            addProperty("tocUrl", bookUrl)
+            addProperty("time", System.currentTimeMillis())
+            addProperty("originOrder", source["customOrder"].safeInt())
+            addProperty("chapterWordCount", 0)
+            addProperty("respondTime", latency)
         }
     }
 
