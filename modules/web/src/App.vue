@@ -153,8 +153,12 @@ const showRouteDock = computed(() =>
 }
 
 @media (max-width: 760px) {
+  :global(:root) {
+    --legado-route-dock-height: calc(48px + env(safe-area-inset-top));
+  }
+
   .route-content:not(.chapter-route-content) {
-    padding-top: 48px;
+    padding-top: var(--legado-route-dock-height);
   }
 }
 </style>

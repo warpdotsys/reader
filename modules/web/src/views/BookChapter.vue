@@ -1171,8 +1171,8 @@ const bodyTheme = computed(() => {
 const readerPageTheme = computed(() => ({
   ...bodyTheme.value,
   '--reader-safe-top': readingPreferences.value.paddingDisplayCutouts
-    ? 'max(48px, env(safe-area-inset-top))'
-    : '48px',
+    ? 'max(58px, calc(48px + env(safe-area-inset-top)))'
+    : '58px',
   '--reader-safe-inline': readingPreferences.value.paddingDisplayCutouts
     ? 'env(safe-area-inset-left)'
     : '0px',
@@ -2380,7 +2380,7 @@ onBeforeRouteLeave(async (to, from, next) => {
     padding: var(--reader-safe-top) var(--reader-safe-inline) 0;
 
     .tool-bar {
-      top: 48px;
+      top: var(--reader-safe-top);
       left: 0;
       width: 100vw;
       margin-left: 0 !important;
@@ -2396,7 +2396,7 @@ onBeforeRouteLeave(async (to, from, next) => {
     }
 
     .chapter-progress {
-      top: 48px;
+      top: var(--reader-safe-top);
     }
 
     .brightness-control {
