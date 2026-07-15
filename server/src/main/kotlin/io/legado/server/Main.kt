@@ -1598,13 +1598,15 @@ class LegadoStore(
             val source = readList("rssSources").firstOrNull { it.string("sourceUrl") == sourceUrl }
                 ?: return ReturnData.error("RSS source not found")
             val started = System.nanoTime()
-            val articles = refreshRssSource(source)
+            val trace = debugRssSource(source)
+            val articles = trace["articles"] as? List<*> ?: emptyList<Any>()
             ReturnData.ok(mapOf(
                 "kind" to "rss",
                 "sourceName" to (source.string("sourceName") ?: ""),
                 "latencyMs" to ((System.nanoTime() - started) / 1_000_000).coerceAtLeast(0),
                 "resultCount" to articles.size,
                 "results" to articles,
+                "trace" to trace.filterKeys { it != "articles" },
                 "ruleDiagnostics" to sourceRuleDiagnostics(source),
                 "message" to "RSS articles were parsed and cached in the RSS article collection.",
             ))
@@ -1666,6 +1668,42 @@ class LegadoStore(
                 "error" to (error.message ?: error.javaClass.simpleName),
                 "results" to emptyList<JsonObject>(),
             )
+        }
+    }
+
+    private fun debugRssSource(source: JsonObject): Map<String, Any> {
+        val rawUrl = source.string("sourceUrl").orEmpty()
+        val requestUrl = parseSourceRequestUrl(expandSourceVariables(source, rawUrl))
+            ?: return mapOf("error" to "sourceUrl is not a portable HTTP request", "articles" to emptyList<JsonObject>())
+        val startedAt = System.nanoTime()
+        return try {
+            val builder = HttpRequest.newBuilder(URI.create(requestUrl.url))
+                .timeout(Duration.ofSeconds(20))
+                .header("User-Agent", networkUserAgent())
+            applySourceHeaders(builder, source)
+            applySourceCookies(builder, source)
+            requestUrl.options?.get("headers")?.asObjectOrNull()?.entrySet()?.forEach { (name, value) ->
+                if (name.isNotBlank()) builder.header(name, value.asString)
+            }
+            when (requestUrl.options?.string("method")?.uppercase()) {
+                "POST" -> builder.POST(HttpRequest.BodyPublishers.ofString(requestUrl.options["body"]?.let(gson::toJson) ?: ""))
+                else -> builder.GET()
+            }
+            val response = networkClient().send(builder.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
+            captureSourceCookies(response, source)
+            val body = response.body()
+            val articles = if (response.statusCode() in 200..299) parseRssArticles(source, body) else emptyList()
+            if (articles.isNotEmpty()) cacheRssArticles(articles)
+            mapOf(
+                "request" to mapOf("url" to requestUrl.url, "method" to (requestUrl.options?.string("method")?.uppercase() ?: "GET")),
+                "response" to mapOf("statusCode" to response.statusCode(), "bytes" to body.toByteArray(StandardCharsets.UTF_8).size, "preview" to body.take(8_000)),
+                "articleRule" to source.string("ruleArticles").orEmpty(),
+                "latencyMs" to ((System.nanoTime() - startedAt) / 1_000_000).coerceAtLeast(0),
+                "firstArticle" to articles.firstOrNull()?.let(gson::toJson).orEmpty(),
+                "articles" to articles,
+            )
+        } catch (error: Exception) {
+            mapOf("request" to mapOf("url" to requestUrl.url), "error" to (error.message ?: error.javaClass.simpleName), "articles" to emptyList<JsonObject>())
         }
     }
 
@@ -2176,6 +2214,11 @@ class LegadoStore(
         val body = fetchSourceText(source, sourceUrl) ?: return emptyList()
         val articles = parseRssArticles(source, body)
         if (articles.isEmpty()) return emptyList()
+        cacheRssArticles(articles)
+        return articles
+    }
+
+    private fun cacheRssArticles(articles: List<JsonObject>) {
         synchronized(this) {
             val cached = readList("rssArticles")
             for (article in articles) {
@@ -2194,7 +2237,6 @@ class LegadoStore(
             writeList("rssArticles", cached)
             syncRssArticleMetadata(cached)
         }
-        return articles
     }
 
     private fun syncRssArticleMetadata(articles: List<JsonObject>) {
