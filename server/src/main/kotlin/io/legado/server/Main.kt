@@ -2111,13 +2111,18 @@ class LegadoStore(
         }
         try {
             if (downloadTaskCancelled(taskId)) return
+            val book = synchronized(this) { readList("books").firstOrNull { it.string("bookUrl") == bookUrl } }
+                ?: throw IllegalStateException("Book not found")
+            val source = sourceForBook(book)
+            if (source != null && source["bookSourceType"].safeInt() == 3) {
+                downloadRemoteFileBook(taskId, book, source)
+                return
+            }
             val toc = getChapterList(bookUrl)
             if (!toc.isSuccess) throw IllegalStateException(toc.errorMsg)
             val chapters = synchronized(this) { readChapterList(bookUrl).sortedBy { it["index"].safeInt() } }
             if (chapters.isEmpty()) throw IllegalStateException("No chapters available for download")
             if (chapters.size > 3_000) throw IllegalStateException("Book exceeds the 3000 chapter offline download limit")
-            val book = synchronized(this) { readList("books").firstOrNull { it.string("bookUrl") == bookUrl } }
-                ?: throw IllegalStateException("Book not found")
             val content = buildString {
                 append(book.string("name") ?: "Book").append('\n')
                 book.string("author")?.takeIf(String::isNotBlank)?.let { append(it).append('\n') }
@@ -2154,6 +2159,94 @@ class LegadoStore(
                 task.addProperty("error", error.message ?: error.javaClass.simpleName)
             }
         }
+    }
+
+    private fun downloadRemoteFileBook(taskId: String, book: JsonObject, source: JsonObject) {
+        val urls = loadRemoteFileUrls(book, source)
+        if (urls.isEmpty()) throw IllegalStateException("downloadUrls did not produce an HTTP download link")
+        if (downloadTaskCancelled(taskId)) return
+        val response = fetchSourceBytes(source, urls.first())
+            ?: throw IllegalStateException("Unable to download file from source")
+        if (response.bytes.isEmpty()) throw IllegalStateException("Downloaded file is empty")
+        val baseName = (book.string("name") ?: "book")
+            .replace(Regex("[\\\\/:*?\"<>|]"), "_").trim().ifEmpty { "book" }
+        val extension = response.fileName.substringAfterLast('.', "").takeIf { it.matches(Regex("[A-Za-z0-9]{1,12}")) }
+            ?.let { ".$it" }
+            ?: extensionFromContentType(response.contentType)
+        val target = downloadsDir.resolve("$baseName-${System.currentTimeMillis()}$extension").normalize()
+        if (!target.startsWith(downloadsDir) || response.bytes.size > MAX_LOCAL_BOOK_BYTES) {
+            throw IllegalStateException("Downloaded file is too large or has an invalid target")
+        }
+        Files.write(target, response.bytes, StandardOpenOption.CREATE_NEW)
+        updateDownloadTask(taskId) { task ->
+            task.addProperty("status", "done")
+            task.addProperty("progress", 100)
+            task.addProperty("path", target.toAbsolutePath().normalize().toString())
+            task.addProperty("size", response.bytes.size)
+            task.addProperty("fileName", target.fileName.toString())
+            task.addProperty("sourceUrl", urls.first())
+        }
+    }
+
+    private fun loadRemoteFileUrls(book: JsonObject, source: JsonObject): List<String> {
+        val rule = source["ruleBookInfo"].asObjectOrNull() ?: return emptyList()
+        val downloadRule = rule.string("downloadUrls") ?: return emptyList()
+        val detailUrl = book.string("bookUrl").orEmpty()
+        val detail = fetchSourceText(source, detailUrl) ?: return emptyList()
+        val scope = extractBookInfoScope(detail, rule.string("init"))
+        return extractRuleValues(scope, downloadRule)
+            .map { resolveSearchUrl(detailUrl, it.trim()) }
+            .filter { it.startsWith("http://", true) || it.startsWith("https://", true) }
+            .distinct()
+            .take(8)
+    }
+
+    private data class SourceBytesResponse(
+        val bytes: ByteArray,
+        val contentType: String,
+        val fileName: String,
+    )
+
+    private fun fetchSourceBytes(source: JsonObject, rawUrl: String): SourceBytesResponse? {
+        val requestUrl = parseSourceRequestUrl(expandSourceVariables(source, rawUrl)) ?: return null
+        return try {
+            val builder = HttpRequest.newBuilder(URI.create(requestUrl.url))
+                .timeout(Duration.ofSeconds(60))
+                .header("User-Agent", networkUserAgent())
+            applySourceHeaders(builder, source)
+            applySourceCookies(builder, source)
+            requestUrl.options?.get("headers")?.asObjectOrNull()?.entrySet()?.forEach { (name, value) ->
+                if (name.isNotBlank()) builder.header(name, value.asString)
+            }
+            when (requestUrl.options?.string("method")?.uppercase()) {
+                "POST" -> builder.POST(HttpRequest.BodyPublishers.ofString(
+                    requestUrl.options["body"]?.let { gson.toJson(it) } ?: "", StandardCharsets.UTF_8,
+                ))
+                else -> builder.GET()
+            }
+            val response = networkClient().send(builder.build(), HttpResponse.BodyHandlers.ofByteArray())
+            captureSourceCookies(response, source)
+            if (response.statusCode() !in 200..299 || response.body().size > MAX_LOCAL_BOOK_BYTES) return null
+            val disposition = response.headers().firstValue("content-disposition").orElse("")
+            val fileName = Regex("""filename\\*?=(?:UTF-8''|[\"])?([^;\"]+)""", RegexOption.IGNORE_CASE)
+                .find(disposition)?.groupValues?.getOrNull(1)?.let { URLDecoder.decode(it.trim(), StandardCharsets.UTF_8) }
+                ?: URI.create(requestUrl.url).path.substringAfterLast('/').ifBlank { "book" }
+            SourceBytesResponse(
+                response.body(),
+                response.headers().firstValue("content-type").orElse("").substringBefore(';'),
+                fileName,
+            )
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun extensionFromContentType(contentType: String): String = when (contentType.lowercase()) {
+        "application/epub+zip" -> ".epub"
+        "application/pdf" -> ".pdf"
+        "application/zip", "application/x-zip-compressed" -> ".zip"
+        "text/plain" -> ".txt"
+        else -> ""
     }
 
     private fun updateDownloadTask(taskId: String, update: (JsonObject) -> Unit) {
@@ -3706,7 +3799,7 @@ class LegadoStore(
         val detailUrl = book.string("bookUrl").orEmpty()
         if (fallback.isNotBlank() && fallback != detailUrl) return fallback
         val detail = fetchSourceText(source, detailUrl) ?: return fallback
-        val extracted = extractRuleValue(extractBookInfoScope(detail, infoRule?.string("init")), tocRule).trim()
+        val extracted = extractRuleValue(extractBookInfoScope(detail, infoRule.string("init")), tocRule).trim()
         return resolveSearchUrl(detailUrl, extracted).ifBlank { fallback }
     }
 
