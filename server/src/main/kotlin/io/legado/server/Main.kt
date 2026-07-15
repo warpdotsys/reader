@@ -49,6 +49,10 @@ import javax.xml.parsers.DocumentBuilderFactory
 import org.xml.sax.InputSource
 import org.jsoup.Jsoup
 import org.jsoup.parser.Parser
+import org.graalvm.polyglot.Context
+import org.graalvm.polyglot.HostAccess
+import org.graalvm.polyglot.Value
+import org.graalvm.polyglot.io.IOAccess
 import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isRegularFile
@@ -58,6 +62,7 @@ private const val MAX_LOCAL_BOOK_BYTES = 64L * 1024 * 1024
 private const val MAX_EPUB_ENTRY_BYTES = 4 * 1024 * 1024
 private const val MAX_EPUB_IMAGE_BYTES = 1024 * 1024
 private const val MAX_EPUB_CHAPTER_IMAGE_BYTES = 4 * 1024 * 1024
+private const val JAVA_SCRIPT_RULE_TIMEOUT_MILLIS = 1_500L
 
 fun main(args: Array<String>) {
     val options = ServerOptions.parse(args) ?: return
@@ -572,6 +577,9 @@ class LegadoStore(
     @Volatile private var sourceCheckClient = buildNetworkClient(false)
     private val authSessions = ConcurrentHashMap<String, Long>()
     private val sourceCookieLock = Any()
+    private val javaScriptRuleExecutor = Executors.newFixedThreadPool(2) { runnable ->
+        Thread(runnable, "legado-js-rule").apply { isDaemon = true }
+    }
     private val downloadExecutor = Executors.newFixedThreadPool(2) { runnable ->
         Thread(runnable, "legado-download").apply { isDaemon = true }
     }
@@ -1491,6 +1499,7 @@ class LegadoStore(
                 "latencyMs" to ((System.nanoTime() - started) / 1_000_000).coerceAtLeast(0),
                 "resultCount" to articles.size,
                 "results" to articles,
+                "ruleDiagnostics" to sourceRuleDiagnostics(source),
                 "message" to "RSS articles were parsed and cached in the RSS article collection.",
             ))
         } else {
@@ -1507,8 +1516,45 @@ class LegadoStore(
                 "latencyMs" to ((System.nanoTime() - started) / 1_000_000).coerceAtLeast(0),
                 "resultCount" to results.size,
                 "results" to results,
+                "ruleDiagnostics" to sourceRuleDiagnostics(source),
             ))
         }
+    }
+
+    private fun sourceRuleDiagnostics(source: JsonObject): Map<String, Any> {
+        val javaScriptFields = mutableListOf<String>()
+        val bridgeFields = mutableListOf<String>()
+        fun visit(path: String, value: JsonElement?) {
+            when {
+                value == null || value.isJsonNull -> Unit
+                value.isJsonObject -> value.asJsonObject.entrySet().forEach { (key, nested) ->
+                    visit(if (path.isBlank()) key else "$path.$key", nested)
+                }
+                value.isJsonArray -> value.asJsonArray.forEachIndexed { index, nested ->
+                    visit("$path[$index]", nested)
+                }
+                value.isJsonPrimitive -> {
+                    val text = runCatching { value.asString }.getOrDefault("")
+                    if (text.contains("@js:", true)) javaScriptFields += path
+                    if (Regex("""\b(?:java|source|book|chapter|webView|document)\.""", RegexOption.IGNORE_CASE)
+                            .containsMatchIn(text)
+                    ) {
+                        bridgeFields += path
+                    }
+                }
+            }
+        }
+        source.entrySet().forEach { (key, value) -> visit(key, value) }
+        return mapOf(
+            "javaScriptRuntime" to "restricted-graaljs",
+            "javaScriptFields" to javaScriptFields.distinct(),
+            "androidBridgeFields" to bridgeFields.distinct(),
+            "message" to if (bridgeFields.isEmpty()) {
+                "JavaScript transformation rules run in the restricted Linux server runtime."
+            } else {
+                "Rules using Android bridge objects are reported but cannot run in the Linux server."
+            },
+        )
     }
 
     @Synchronized
@@ -1767,9 +1813,6 @@ class LegadoStore(
 
     private fun extractDictionaryContent(body: String, rule: String?): Pair<String, String?> {
         if (rule.isNullOrBlank()) return readableDictionaryText(body) to null
-        if (rule.contains("@js:", true)) {
-            return readableDictionaryText(body) to "Android JavaScript display rule was not executed; showing readable page text."
-        }
         val legacyTagRule = rule.trim().takeIf { it.startsWith("tag.", true) }
         val extracted = if (legacyTagRule != null) {
             val selector = legacyTagRule.substringAfter("tag.").substringBefore('@').trim()
@@ -2040,7 +2083,12 @@ class LegadoStore(
     }
 
     private fun extractRssRuleValues(input: String, rule: String): List<String> {
-        if (rule.isBlank() || rule.contains("@js:", true)) return emptyList()
+        if (rule.isBlank()) return emptyList()
+        if (isJavaScriptRule(rule)) return evaluateJavaScriptRule(input, rule).asValues()
+        splitJavaScriptTransform(rule)?.let { (baseRule, transform) ->
+            return extractRssRuleValues(input, baseRule)
+                .flatMap { value -> evaluateJavaScriptRule(value, transform).asValues() }
+        }
         if (rule.trimStart().startsWith("$") || !isCssRule(rule) && !isXpathRule(rule)) return extractRuleValues(input, rule)
         return runCatching {
             if (isXpathRule(rule)) {
@@ -2052,7 +2100,11 @@ class LegadoStore(
     }
 
     private fun extractRssRuleValue(input: String, rule: String): String {
-        if (rule.isBlank() || rule.contains("@js:", true)) return ""
+        if (rule.isBlank()) return ""
+        if (isJavaScriptRule(rule)) return evaluateJavaScriptRule(input, rule).asValue()
+        splitJavaScriptTransform(rule)?.let { (baseRule, transform) ->
+            return evaluateJavaScriptRule(extractRssRuleValue(input, baseRule), transform).asValue()
+        }
         if (rule.trimStart().startsWith("$") || !isCssRule(rule) && !isXpathRule(rule)) return extractRuleValue(input, rule)
         return runCatching {
             val (selector, attribute) = if (isXpathRule(rule)) xpathRuleParts(rule) else cssRuleParts(rule)
@@ -2458,7 +2510,12 @@ class LegadoStore(
         ?: false
 
     private fun extractRuleValues(input: String, rule: String): List<String> {
-        if (rule.isBlank() || rule.contains("@js:", true)) return emptyList()
+        if (rule.isBlank()) return emptyList()
+        if (isJavaScriptRule(rule)) return evaluateJavaScriptRule(input, rule).asValues()
+        splitJavaScriptTransform(rule)?.let { (baseRule, transform) ->
+            return extractRuleValues(input, baseRule)
+                .flatMap { value -> evaluateJavaScriptRule(value, transform).asValues() }
+        }
         if (rule.trimStart().startsWith("$")) {
             val root = runCatching { JsonParser.parseString(input) }.getOrNull() ?: return emptyList()
             return jsonPath(root, rule).map { gson.toJson(it) }
@@ -2483,7 +2540,11 @@ class LegadoStore(
     }
 
     private fun extractRuleValue(input: String, rule: String?): String {
-        if (rule.isNullOrBlank() || rule.contains("@js:", true)) return ""
+        if (rule.isNullOrBlank()) return ""
+        if (isJavaScriptRule(rule)) return evaluateJavaScriptRule(input, rule).asValue()
+        splitJavaScriptTransform(rule)?.let { (baseRule, transform) ->
+            return evaluateJavaScriptRule(extractRuleValue(input, baseRule), transform).asValue()
+        }
         if (rule.trimStart().startsWith("$")) {
             val root = runCatching { JsonParser.parseString(input) }.getOrNull() ?: return ""
             val value = jsonPath(root, rule).firstOrNull() ?: return ""
@@ -2522,6 +2583,113 @@ class LegadoStore(
             match.groups.drop(1).firstOrNull { it != null }?.value ?: match.value
         }.getOrDefault("")
     }
+
+    private data class JavaScriptRuleResult(
+        val json: String? = null,
+        val error: String? = null,
+    ) {
+        fun asValue(): String {
+            val value = json?.let { runCatching { JsonParser.parseString(it) }.getOrNull() } ?: return ""
+            return if (value.isJsonPrimitive) runCatching { value.asString }.getOrDefault("") else value.toString()
+        }
+
+        fun asValues(): List<String> {
+            val value = json?.let { runCatching { JsonParser.parseString(it) }.getOrNull() } ?: return emptyList()
+            return when {
+                value.isJsonArray -> value.asJsonArray.map { item ->
+                    if (item.isJsonPrimitive) runCatching { item.asString }.getOrDefault("") else item.toString()
+                }
+                value.isJsonNull -> emptyList()
+                value.isJsonPrimitive -> listOf(runCatching { value.asString }.getOrDefault(""))
+                else -> listOf(value.toString())
+            }
+        }
+    }
+
+    private fun isJavaScriptRule(rule: String): Boolean = rule.trimStart().startsWith("@js:", true)
+
+    private fun splitJavaScriptTransform(rule: String): Pair<String, String>? {
+        val marker = rule.indexOf("@js:", ignoreCase = true)
+        if (marker <= 0) return null
+        val baseRule = rule.substring(0, marker).trim()
+        val script = rule.substring(marker).trim()
+        return baseRule.takeIf(String::isNotBlank)?.let { it to script }
+    }
+
+    /**
+     * Executes only transformation rules. JavaScript receives plain strings and
+     * no Java, file, network, process, or thread access. Each invocation gets a
+     * fresh context so state cannot leak across sources or requests.
+     */
+    private fun evaluateJavaScriptRule(input: String, rule: String): JavaScriptRuleResult {
+        val script = rule.trimStart().substringAfter("@js:", "").trim()
+        if (script.isBlank()) return JavaScriptRuleResult(error = "JavaScript rule is empty")
+
+        val contextRef = java.util.concurrent.atomic.AtomicReference<Context?>()
+        val task = javaScriptRuleExecutor.submit<JavaScriptRuleResult> {
+            val context = Context.newBuilder("js")
+                .allowAllAccess(false)
+                .allowHostAccess(HostAccess.NONE)
+                .allowHostClassLookup { false }
+                .allowCreateThread(false)
+                .allowNativeAccess(false)
+                .allowIO(IOAccess.NONE)
+                .option("engine.WarnInterpreterOnly", "false")
+                .build()
+            contextRef.set(context)
+            try {
+                val bindings = context.getBindings("js")
+                bindings.putMember("input", input)
+                val expression = """
+                    (function () {
+                      const result = String(input);
+                      let resultJson = null;
+                      try { resultJson = JSON.parse(result); } catch (_) {}
+                      const __value = ($script);
+                      return JSON.stringify(__value === undefined ? "" : __value);
+                    })()
+                """.trimIndent()
+                val statement = """
+                    (function () {
+                      let result = String(input);
+                      let resultJson = null;
+                      try { resultJson = JSON.parse(result); } catch (_) {}
+                      const __value = (function () {
+                        $script
+                        return result;
+                      })();
+                      return JSON.stringify(__value === undefined ? "" : __value);
+                    })()
+                """.trimIndent()
+                val value = runCatching { context.eval("js", expression) }
+                    .recoverCatching { context.eval("js", statement) }
+                    .getOrElse { error -> return@submit JavaScriptRuleResult(error = ruleError(error)) }
+                JavaScriptRuleResult(json = polyglotString(value))
+            } finally {
+                runCatching { context.close(true) }
+                contextRef.compareAndSet(context, null)
+            }
+        }
+        return try {
+            task.get(JAVA_SCRIPT_RULE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)
+        } catch (_: java.util.concurrent.TimeoutException) {
+            contextRef.getAndSet(null)?.let { context -> runCatching { context.close(true) } }
+            task.cancel(true)
+            JavaScriptRuleResult(error = "JavaScript rule timed out after ${JAVA_SCRIPT_RULE_TIMEOUT_MILLIS}ms")
+        } catch (error: Exception) {
+            JavaScriptRuleResult(error = ruleError(error))
+        }
+    }
+
+    private fun polyglotString(value: Value): String? = runCatching {
+        if (value.isNull) "null" else value.asString()
+    }.getOrNull()
+
+    private fun ruleError(error: Throwable): String = (error.message ?: error.javaClass.simpleName)
+        .lineSequence()
+        .firstOrNull()
+        ?.take(300)
+        .orEmpty()
 
     private fun isXpathRule(rawRule: String): Boolean {
         val rule = rawRule.trim()

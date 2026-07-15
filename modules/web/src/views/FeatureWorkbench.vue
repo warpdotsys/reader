@@ -424,7 +424,7 @@ const featureGroups: FeatureGroup[] = [
   {
     name: '书源与订阅源',
     description: '书源/RSS 源编辑、导入导出、调试入口、源变量和 Cookie。',
-    coverage: '管理、调试及 HTTP、JSONPath、正则、CSS、XPath 规则执行均可用',
+    coverage: '管理、调试及 HTTP、JSONPath、正则、CSS、XPath 与受限 JS 转换规则均可用',
     status: 'Web 可用',
     tone: 'tone-blue',
     icon: Collection,

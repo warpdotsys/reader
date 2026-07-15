@@ -17,4 +17,6 @@ dependencies {
     implementation 'org.jsoup:jsoup:1.21.2'
     implementation 'org.nanohttpd:nanohttpd:2.3.1'
     implementation 'org.nanohttpd:nanohttpd-websocket:2.3.1'
+    implementation 'org.graalvm.polyglot:polyglot:24.2.2'
+    runtimeOnly 'org.graalvm.polyglot:js:24.2.2'
 }

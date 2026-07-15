@@ -17,7 +17,7 @@ Implemented today:
 Not implemented yet:
 
 - Android-only integrations such as phone-call state, notifications, content providers, Room migrations, and Android media services.
-- Android JavaScript/Rhino book-source rules and Android-only login flows. Portable HTTP, JSONPath, regex, CSS, and XPath rules are supported.
+- Android Java/Rhino bridge APIs (`java.*`, `source.*`, `book.*`, WebView DOM) and Android-only login flows. Portable HTTP, JSONPath, regex, CSS, XPath, and restricted `@js:` transformation rules are supported.
 
 Remote search, remote TOC/content crawling, RSS refresh/full-text reading, automatic source switching, HTTP TTS, dictionary lookup, download tasks, TXT/EPUB/CBZ local import, WebDAV snapshot management, and LAN password/session authentication are implemented. The optional WebSocket compatibility listener supports search and source debugging through the same JVM engine as the HTTP API. Do not expose the service to an untrusted network without a firewall, reverse proxy, or VPN.
 
