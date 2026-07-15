@@ -7,6 +7,7 @@
       </div>
       <div class="rss-actions">
         <el-button :icon="Setting" @click="router.push('/rssSource')">管理订阅源</el-button>
+        <el-button :icon="Download" :disabled="filteredArticles.length === 0" @click="exportFilteredArticles">导出当前筛选</el-button>
         <el-button :icon="CircleCheck" :disabled="filteredArticles.length === 0" :loading="batching" @click="markFilteredRead">当前筛选已读</el-button>
         <el-button :icon="Collection" :disabled="filteredArticles.length === 0" :loading="batching" @click="setFilteredGroup">设置分组</el-button>
         <el-button type="primary" :icon="Refresh" :loading="refreshing" @click="refreshFeeds">刷新订阅</el-button>
@@ -74,7 +75,7 @@
 
 <script setup lang="ts">
 import API, { type AppDataItem } from '@/api/api'
-import { CircleCheck, Collection, Link, Reading, Refresh, Search, Setting, Star } from '@element-plus/icons-vue'
+import { CircleCheck, Collection, Download, Link, Reading, Refresh, Search, Setting, Star } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
 
 type RssArticle = AppDataItem & {
@@ -220,6 +221,18 @@ async function setFilteredGroup() {
   } catch (error) {
     if (error !== 'cancel') ElMessage.error(error instanceof Error ? error.message : '批量更新失败')
   }
+}
+function exportFilteredArticles() {
+  const payload = JSON.stringify(filteredArticles.value, null, 2)
+  const blob = new Blob([payload], { type: 'application/json;charset=utf-8' })
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(blob)
+  link.download = `legado-rss-${new Date().toISOString().replace(/[:.]/g, '-')}.json`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(link.href)
+  ElMessage.success(`已导出 ${filteredArticles.value.length} 篇文章`)
 }
 async function loadArticleContent(article: RssArticle) {
   if (article.articleContent) return
