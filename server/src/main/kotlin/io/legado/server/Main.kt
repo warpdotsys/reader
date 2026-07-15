@@ -3277,6 +3277,16 @@ class LegadoStore(
                 ?.trim()
                 ?.let(manifest::get)
                 ?: manifest["cover"]
+                ?: packageDocument.getAllElements()
+                    .firstOrNull {
+                        epubLocalName(it.tagName()) == "item" &&
+                            it.attr("properties").split(Regex("\\s+")).any { property ->
+                                property.equals("cover-image", ignoreCase = true)
+                            }
+                    }
+                    ?.attr("href")
+                    ?.trim()
+                    ?.takeIf(String::isNotBlank)
             val coverUrl = coverReference
                 ?.let { resolveArchivePath(packagePath, it) }
                 ?.let { inlineEpubImage(zip, it) }
