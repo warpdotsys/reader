@@ -16,9 +16,11 @@ Implemented today:
 
 Not implemented yet:
 
-- Upstream rule execution, online book search, remote content crawling, and automatic source switching.
+- Android JavaScript/Rhino book-source rules and Android-only login flows. Portable HTTP, JSONPath, regex, CSS, and XPath rules are supported.
 - Android-only integrations such as phone-call state, notifications, content providers, Room migrations, and Android media services.
-- LAN password enforcement. Do not expose this service to an untrusted network.
+- A full Android-compatible EPUB/local-file library importer. The browser UI currently supports TXT upload, reading, and server-side exports.
+
+Remote search, remote TOC/content crawling, RSS refresh/full-text reading, automatic source switching, HTTP TTS, dictionary lookup, download tasks, and LAN password/session authentication are implemented. Do not expose the service to an untrusted network without a firewall, reverse proxy, or VPN.
 
 The upstream project remains the reference for Legado data formats and user-facing semantics. This repository documents only behavior that exists in this Linux server.
 
@@ -75,6 +77,22 @@ The data directory contains JSON collections such as `books.json`, `bookSources.
 Use the server console or `GET /exportData` for a portable snapshot. `POST /importData` restores compatible data. The backup UI can also create local snapshots and, when configured, upload them to WebDAV.
 
 ## Operations
+
+### PM2 deployment
+
+The repository includes a deployment helper for the maintained Linux test host. It builds the Vue bundle and JVM distribution, uploads a versioned release, preserves the server data directory, starts the service through root PM2, enables the `pm2-root` systemd unit, and checks `/health`.
+
+```powershell
+.\scripts\deploy-remote.ps1
+```
+
+The default target is `transwarp@192.168.1.148:1132`. It never stores credentials. On hosts without passwordless sudo, run it from an interactive terminal with `-InteractiveSudo` so `sudo` can prompt locally:
+
+```powershell
+.\scripts\deploy-remote.ps1 -InteractiveSudo
+```
+
+The deployed release is under `/opt/legado-server/current`; persistent books, settings, and backups remain under `/var/lib/legado-server`.
 
 Smoke test an installed distribution:
 
