@@ -89,7 +89,7 @@
           <div class="panel-heading">
             <div>
               <h3>本地书籍</h3>
-              <p>TXT 入库</p>
+              <p>TXT / EPUB 入库</p>
             </div>
             <el-button
               :icon="FolderAdd"
@@ -97,13 +97,13 @@
               type="primary"
               @click="txtInput?.click()"
             >
-              上传 TXT
+              上传电子书
             </el-button>
             <input
               ref="txtInput"
               class="visually-hidden"
               type="file"
-              accept=".txt,text/plain"
+              accept=".txt,.epub,text/plain,application/epub+zip"
               multiple
               @change="uploadLocalBook"
             />
@@ -114,7 +114,7 @@
             </div>
             <div class="local-book-meta">
               <strong>{{ lastLocalBook?.name || '等待文件' }}</strong>
-              <span>{{ lastLocalBook?.originName || 'UTF-8 TXT 文件会按目录规则拆章' }}</span>
+              <span>{{ lastLocalBook?.originName || 'TXT 按目录规则拆章，EPUB 保留书内目录' }}</span>
             </div>
           </div>
         </article>

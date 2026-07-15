@@ -43,6 +43,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.zip.CRC32
 import java.util.zip.ZipEntry
+import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
 import javax.xml.parsers.DocumentBuilderFactory
 import org.xml.sax.InputSource
@@ -52,6 +53,9 @@ import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.name
+
+private const val MAX_LOCAL_BOOK_BYTES = 64L * 1024 * 1024
+private const val MAX_EPUB_ENTRY_BYTES = 4 * 1024 * 1024
 
 fun main(args: Array<String>) {
     val options = ServerOptions.parse(args) ?: return
@@ -3156,29 +3160,44 @@ class LegadoStore(
         val source = Paths.get(fileData)
         if (!source.isRegularFile()) return ReturnData.error("Uploaded file not found")
 
+        if (Files.size(source) > MAX_LOCAL_BOOK_BYTES) {
+            return ReturnData.error("Local books must be 64 MiB or smaller")
+        }
         val bytes = Files.readAllBytes(source)
-        val displayName = fileName.replace('\\', '/').substringAfterLast('/')
+        val displayName = fileName.replace('\\', '/').substringAfterLast('/').take(180)
+        if (displayName.isBlank()) return ReturnData.error("fileName is required")
+        val extension = displayName.substringAfterLast('.', "").lowercase()
+        if (extension !in setOf("txt", "epub")) {
+            return ReturnData.error("Only TXT and EPUB files are supported")
+        }
         val baseName = displayName.substringBeforeLast('.', displayName)
         val backup = readAppSettings()["backup"].asObjectOrNull() ?: JsonObject()
         val importPattern = backup.string("bookImportFileName")?.trim().orEmpty()
         val parsed = if (importPattern.isNotEmpty()) {
             try { importPattern.toRegex().matchEntire(baseName) } catch (_: Exception) { null }
         } else null
-        val name = parsed?.groups?.get("name")?.value?.trim().orEmpty().ifEmpty { baseName }
-        val author = parsed?.groups?.get("author")?.value?.trim().orEmpty()
         val hash = sha256(bytes).take(16)
+        val bookUrl = "local://$hash/$displayName"
+        val epub = if (extension == "epub") parseEpubBook(source, bookUrl) else null
+        if (extension == "epub" && epub == null) {
+            return ReturnData.error("Unable to read this EPUB file")
+        }
+        val name = parsed?.groups?.get("name")?.value?.trim().orEmpty()
+            .ifEmpty { epub?.title.orEmpty() }
+            .ifEmpty { baseName }
+        val author = parsed?.groups?.get("author")?.value?.trim().orEmpty()
+            .ifEmpty { epub?.author.orEmpty() }
         val configuredDir = backup.string("defaultBookTreeUri")?.trim().orEmpty()
         val targetDir = if (configuredDir.isEmpty()) booksDir else {
             val path = Paths.get(configuredDir)
             if (path.isAbsolute) path else dataDir.resolve(path)
         }.toAbsolutePath().normalize()
         Files.createDirectories(targetDir)
-        val target = targetDir.resolve("$hash-$displayName")
+        val safeFileName = displayName.replace(Regex("[^\\p{L}\\p{N}._ -]"), "_")
+        val target = targetDir.resolve("$hash-$safeFileName")
         Files.write(target, bytes)
 
-        val text = bytes.toString(StandardCharsets.UTF_8)
-        val bookUrl = "local://$hash/$displayName"
-        val chapters = splitTextBook(bookUrl, text)
+        val chapters = epub?.chapters ?: splitTextBook(bookUrl, bytes.toString(StandardCharsets.UTF_8))
         writeChapterList(bookUrl, chapters)
 
         val book = JsonObject().apply {
@@ -3196,6 +3215,124 @@ class LegadoStore(
         }
         upsert("books", "bookUrl", book)
         return ReturnData.ok(book)
+    }
+
+    private data class EpubBook(
+        val title: String,
+        val author: String,
+        val chapters: List<JsonObject>,
+    )
+
+    private fun parseEpubBook(file: Path, bookUrl: String): EpubBook? = runCatching {
+        ZipFile(file.toFile(), StandardCharsets.UTF_8).use { zip ->
+            val container = readZipText(zip, "META-INF/container.xml") ?: return@use null
+            val containerDocument = Jsoup.parse(container, "", Parser.xmlParser())
+            val packagePath = containerDocument.getAllElements()
+                .firstOrNull { epubLocalName(it.tagName()) == "rootfile" }
+                ?.attr("full-path")
+                ?.let(::normalizeArchivePath)
+                ?: zip.entries().asSequence()
+                    .firstOrNull { entry ->
+                        !entry.isDirectory && entry.name.endsWith(".opf", ignoreCase = true)
+                    }
+                    ?.name
+                    ?.let(::normalizeArchivePath)
+                ?: return@use null
+            val packageDocument = Jsoup.parse(
+                readZipText(zip, packagePath) ?: return@use null,
+                "",
+                Parser.xmlParser(),
+            )
+            val title = epubText(packageDocument, "title")
+            val author = epubText(packageDocument, "creator")
+            val manifest = packageDocument.getAllElements()
+                .filter { epubLocalName(it.tagName()) == "item" }
+                .mapNotNull { item ->
+                    val id = item.attr("id").trim()
+                    val href = item.attr("href").trim()
+                    if (id.isEmpty() || href.isEmpty()) null else id to href
+                }
+                .toMap(LinkedHashMap())
+            val readingOrder = packageDocument.getAllElements()
+                .filter { epubLocalName(it.tagName()) == "itemref" }
+                .mapNotNull { item -> manifest[item.attr("idref").trim()] }
+                .ifEmpty {
+                    manifest.values.filter { href ->
+                        href.substringBefore('#').lowercase().let { it.endsWith(".xhtml") || it.endsWith(".html") || it.endsWith(".htm") }
+                    }
+                }
+                .distinct()
+            val chapters = readingOrder.mapIndexedNotNull { index, href ->
+                val entryPath = resolveArchivePath(packagePath, href) ?: return@mapIndexedNotNull null
+                val chapterDocument = Jsoup.parse(
+                    readZipText(zip, entryPath) ?: return@mapIndexedNotNull null,
+                    "",
+                    Parser.xmlParser(),
+                )
+                val body = chapterDocument.getAllElements()
+                    .firstOrNull { epubLocalName(it.tagName()) == "body" }
+                    ?: return@mapIndexedNotNull null
+                sanitizeEpubBody(body)
+                val content = body.html().trim()
+                if (content.isEmpty()) return@mapIndexedNotNull null
+                val chapterTitle = body.getAllElements()
+                    .firstOrNull { epubLocalName(it.tagName()) in setOf("h1", "h2", "h3") }
+                    ?.text()
+                    ?.trim()
+                    .orEmpty()
+                    .ifEmpty { href.substringAfterLast('/').substringBeforeLast('.') }
+                chapter(bookUrl, index, chapterTitle, content)
+            }
+            if (chapters.isEmpty()) return@use null
+            EpubBook(title, author, chapters)
+        }
+    }.getOrNull()
+
+    private fun readZipText(zip: ZipFile, rawPath: String): String? {
+        val path = normalizeArchivePath(rawPath) ?: return null
+        val entry = zip.getEntry(path)
+            ?: zip.entries().asSequence().firstOrNull { candidate ->
+                candidate.name.replace('\\', '/') == path
+            }
+            ?: return null
+        if (entry.isDirectory || entry.size > MAX_EPUB_ENTRY_BYTES.toLong()) return null
+        val bytes = zip.getInputStream(entry).use { input -> input.readNBytes(MAX_EPUB_ENTRY_BYTES + 1) }
+        if (bytes.size > MAX_EPUB_ENTRY_BYTES) return null
+        return bytes.toString(StandardCharsets.UTF_8)
+    }
+
+    private fun normalizeArchivePath(rawPath: String): String? {
+        val value = rawPath.substringBefore('#').substringBefore('?').replace('\\', '/').trim()
+        if (value.isEmpty() || value.startsWith('/')) return null
+        val normalized = Paths.get(value).normalize().toString().replace('\\', '/')
+        return normalized.takeIf { it.isNotEmpty() && it != "." && !it.startsWith("../") }
+    }
+
+    private fun resolveArchivePath(basePath: String, href: String): String? {
+        val target = href.substringBefore('#').substringBefore('?').trim()
+        if (target.isEmpty()) return null
+        val base = basePath.substringBeforeLast('/', "")
+        return normalizeArchivePath(if (base.isEmpty()) target else "$base/$target")
+    }
+
+    private fun epubLocalName(name: String): String = name.substringAfterLast(':').lowercase()
+
+    private fun epubText(document: org.jsoup.nodes.Document, name: String): String = document.getAllElements()
+        .firstOrNull { epubLocalName(it.tagName()) == name }
+        ?.text()
+        ?.trim()
+        .orEmpty()
+
+    private fun sanitizeEpubBody(body: org.jsoup.nodes.Element) {
+        body.select("script, style, iframe, frame, object, embed, form, svg, link, meta, img").remove()
+        body.getAllElements().forEach { element ->
+            element.attributes().asList()
+                .filter { attribute ->
+                    val key = attribute.key.lowercase()
+                    key.startsWith("on") || key == "style" || key == "href" || key == "src"
+                }
+                .forEach { attribute -> element.removeAttr(attribute.key) }
+        }
     }
 
     @Synchronized
