@@ -2629,11 +2629,11 @@ class LegadoStore(
         }
     }
 
-    private data class JavaScriptRuleContext(val key: String = "", val baseUrl: String = "")
+    private data class JavaScriptRuleContext(val key: String = "", val baseUrl: String = "", val index: Int = 0)
 
-    private fun <T> withJavaScriptRuleContext(key: String, baseUrl: String, block: () -> T): T {
+    private fun <T> withJavaScriptRuleContext(key: String, baseUrl: String, index: Int = 0, block: () -> T): T {
         val previous = javaScriptRuleContext.get()
-        javaScriptRuleContext.set(JavaScriptRuleContext(key, baseUrl))
+        javaScriptRuleContext.set(JavaScriptRuleContext(key, baseUrl, index))
         return try {
             block()
         } finally {
@@ -2912,12 +2912,15 @@ class LegadoStore(
                 val ruleContext = javaScriptRuleContext.get() ?: JavaScriptRuleContext()
                 bindings.putMember("inputKey", ruleContext.key)
                 bindings.putMember("inputBaseUrl", ruleContext.baseUrl)
+                bindings.putMember("inputIndex", ruleContext.index)
                 val expression = """
                     (function () {
                       const result = String(input);
                       const key = String(inputKey);
                       const searchKey = key;
                       const baseUrl = String(inputBaseUrl);
+                      const title = result;
+                      const index = Number(inputIndex);
                       let resultJson = null;
                       try { resultJson = JSON.parse(result); } catch (_) {}
                       const __value = ($script);
@@ -2930,6 +2933,8 @@ class LegadoStore(
                       const key = String(inputKey);
                       const searchKey = key;
                       const baseUrl = String(inputBaseUrl);
+                      const title = result;
+                      const index = Number(inputIndex);
                       let resultJson = null;
                       try { resultJson = JSON.parse(result); } catch (_) {}
                       const __value = (function () {
@@ -3589,7 +3594,8 @@ class LegadoStore(
         val entries = extractRuleValues(response, rule.string("chapterList").orEmpty())
         val bookUrl = book.string("bookUrl").orEmpty()
         return entries.mapIndexedNotNull { index, entry ->
-            val title = extractRuleValue(entry, rule.string("chapterName")).trim()
+            val rawTitle = extractRuleValue(entry, rule.string("chapterName")).trim()
+            val title = formatChapterTitle(rawTitle, rule.string("formatJs"), index + 1)
             val chapterUrl = resolveSearchUrl(tocUrl, extractRuleValue(entry, rule.string("chapterUrl")).trim())
             if (title.isBlank() || chapterUrl.isBlank()) return@mapIndexedNotNull null
             JsonObject().apply {
@@ -3608,6 +3614,14 @@ class LegadoStore(
                 extractRuleValue(entry, rule.string("chapterTag") ?: rule.string("updateTime")).trim().takeIf(String::isNotBlank)
                     ?.let { addProperty("tag", it) }
             }
+        }
+    }
+
+    private fun formatChapterTitle(title: String, formatJs: String?, index: Int): String {
+        if (title.isBlank() || formatJs.isNullOrBlank()) return title
+        val script = if (isJavaScriptRule(formatJs)) formatJs else "@js:$formatJs"
+        return withJavaScriptRuleContext("", "", index) {
+            evaluateJavaScriptRule(title, script).asValue().trim().ifBlank { title }
         }
     }
 
