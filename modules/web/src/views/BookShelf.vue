@@ -95,6 +95,12 @@
         <button class="batch-source-button" type="button" title="管理书籍分组" @click="router.push({ path: '/features', query: { kind: 'bookGroups' } })">
           管理分组
         </button>
+        <button class="batch-source-button" type="button" :disabled="selectedGroupId === 0 || books.length === 0" @click="updateFilteredGroup(true)">
+          加入分组
+        </button>
+        <button class="batch-source-button" type="button" :disabled="selectedGroupId === 0 || groupFilteredBooks.length === 0" @click="updateFilteredGroup(false)">
+          移出分组
+        </button>
       </div>
       <div
         v-if="bookGroups.length > 0 && groupStyle !== '2'"
@@ -403,6 +409,31 @@ async function createBookGroup() {
     ElMessage.success('分组已创建')
   } catch (error) {
     if (error !== 'cancel') ElMessage.error(error instanceof Error ? error.message : '创建分组失败')
+  }
+}
+
+async function updateFilteredGroup(add: boolean) {
+  const groupId = selectedGroupId.value
+  if (groupId === 0) return
+  const targetBooks = add ? books.value : groupFilteredBooks.value
+  const candidates = targetBooks.filter((book): book is Book => !('respondTime' in book))
+  if (candidates.length === 0) return
+  const groupName = groupOptions.value.find(group => group.id === groupId)?.name || String(groupId)
+  try {
+    await ElMessageBox.confirm(
+      `${add ? '将当前筛选书籍加入' : '将当前筛选书籍移出'}分组“${groupName}”？`,
+      '更新书籍分组',
+      { type: 'warning', confirmButtonText: '确认', cancelButtonText: '取消' },
+    )
+    for (const book of candidates) {
+      const current = Number(book.group || 0)
+      const group = add ? (current | groupId) : (current & ~groupId)
+      if (group !== current) await API.saveBook({ ...(book as Record<string, unknown>), group } as any)
+    }
+    await loadShelf()
+    ElMessage.success('书籍分组已更新')
+  } catch (error) {
+    if (error !== 'cancel') ElMessage.error(error instanceof Error ? error.message : '更新书籍分组失败')
   }
 }
 function updateScrollProgress() {
