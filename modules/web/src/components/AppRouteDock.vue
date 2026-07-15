@@ -18,6 +18,7 @@
 import { computed, onMounted, ref, type Component } from 'vue'
 import {
   Collection,
+  Compass,
   DataAnalysis,
   Link,
   Reading,
@@ -45,14 +46,22 @@ const navigationLabels = computed(() => {
   return { shelf: '书架', sources: '书源', rss: '订阅源', features: '功能', settings: '设置', server: '控制台' }
 })
 
+const exploreLabel = computed(() => {
+  const language = String(appSettings.value.main?.language ?? 'auto')
+  if (language === 'en') return 'Discover'
+  if (language === 'zh-rTW') return '發現'
+  return '发现'
+})
+
 const navItems = computed<NavItem[]>(() => {
   const main = appSettings.value.main || {}
   const labels = navigationLabels.value
   return [
     { label: labels.shelf, path: '/', icon: Reading },
     { label: labels.sources, path: '/bookSource', icon: Collection },
+    ...(main.showDiscovery !== false ? [{ label: exploreLabel.value, path: '/explore', icon: Compass }] : []),
     ...(main.showRss !== false ? [{ label: labels.rss, path: '/rss', icon: Link }] : []),
-    ...(main.showDiscovery !== false ? [{ label: labels.features, path: '/features', icon: SetUp }] : []),
+    { label: labels.features, path: '/features', icon: SetUp },
     { label: labels.settings, path: '/settings', icon: Setting },
     { label: labels.server, path: '/server', icon: DataAnalysis },
   ]

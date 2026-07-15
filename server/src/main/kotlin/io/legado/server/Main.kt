@@ -283,6 +283,7 @@ class LegadoHttpServer(
                 parameters.first("url"),
                 parameters.first("index")?.toIntOrNull(),
             )
+            "/getExploreSources" -> store.getExploreSources()
 
             "/getReadConfig" -> store.getReadConfig()
             "/downloadTaskFile" -> throw DownloadResponse(store.downloadTaskFile(parameters.first("id")))
@@ -306,6 +307,7 @@ class LegadoHttpServer(
             "/deleteReplaceRule" -> store.deleteReplaceRule(post.postData)
             "/testReplaceRule" -> store.testReplaceRule(post.postData)
             "/searchBooks" -> store.searchBooks(post.postData)
+            "/exploreBooks" -> store.exploreBooks(post.postData)
             "/debugSource" -> store.debugSource(post.postData)
             "/refreshRssSources" -> store.refreshRssSources(post.postData)
             "/getRssArticleContent" -> store.getRssArticleContent(post.postData)
@@ -1480,6 +1482,109 @@ class LegadoStore(
         if (key.isBlank()) return ReturnData.error("key is required")
         val group = payload.string("group")?.trim().orEmpty()
         return ReturnData.ok(searchBookSources(key, group))
+    }
+
+    @Synchronized
+    fun getExploreSources(): ReturnData {
+        val sources = readList("bookSources")
+            .filter { it["enabled"]?.safeBoolean() != false && it["enabledExplore"]?.safeBoolean() != false }
+            .mapNotNull { source ->
+                val entries = exploreEntries(source)
+                if (entries.isEmpty()) return@mapNotNull null
+                mapOf(
+                    "sourceUrl" to source.string("bookSourceUrl").orEmpty(),
+                    "sourceName" to source.string("bookSourceName").orEmpty(),
+                    "entries" to entries.map { entry -> mapOf("title" to entry.title, "url" to entry.url) },
+                )
+            }
+        return ReturnData.ok(sources)
+    }
+
+    @Synchronized
+    fun exploreBooks(postData: String?): ReturnData {
+        val payload = parseJson(postData)?.asObjectOrNull() ?: return ReturnData.error("Expected JSON object")
+        val sourceUrl = payload.string("sourceUrl")?.trim().orEmpty()
+        val entryUrl = payload.string("url")?.trim().orEmpty()
+        if (sourceUrl.isBlank() || entryUrl.isBlank()) return ReturnData.error("sourceUrl and url are required")
+        val page = payload["page"].safeInt().coerceIn(1, 999)
+        val source = readList("bookSources").firstOrNull {
+            it.string("bookSourceUrl") == sourceUrl &&
+                it["enabled"]?.safeBoolean() != false &&
+                it["enabledExplore"]?.safeBoolean() != false
+        } ?: return ReturnData.error("Explore source is unavailable")
+        val entry = exploreEntries(source).firstOrNull { it.url == entryUrl }
+            ?: return ReturnData.error("Explore entry is not declared by this source")
+        return ReturnData.ok(exploreSource(source, entry, page))
+    }
+
+    private data class ExploreEntry(val title: String, val url: String)
+
+    private fun exploreEntries(source: JsonObject): List<ExploreEntry> {
+        val raw = source.string("exploreUrl")?.trim().orEmpty()
+        if (raw.isBlank()) return emptyList()
+        val items = if (isJavaScriptRule(raw)) {
+            evaluateJavaScriptRule("", raw).asValues()
+        } else {
+            runCatching { JsonParser.parseString(raw) }.getOrNull()?.let { value ->
+                when {
+                    value.isJsonArray -> value.asJsonArray.map { it.toString() }
+                    value.isJsonObject -> listOf(value.toString())
+                    else -> emptyList()
+                }
+            } ?: raw.split(Regex("\\r?\\n|&&")).map(String::trim).filter(String::isNotBlank)
+        }
+        return items.mapNotNull { item ->
+            val objectValue = runCatching { JsonParser.parseString(item).asObjectOrNull() }.getOrNull()
+            val pair = if (objectValue != null) {
+                val url = objectValue.string("url")?.trim().orEmpty()
+                val title = objectValue.string("title")?.trim().orEmpty()
+                title to url
+            } else if ("::" in item) {
+                item.substringBefore("::").trim() to item.substringAfter("::").trim()
+            } else {
+                source.string("bookSourceName").orEmpty() to item.trim()
+            }
+            val resolvedUrl = resolveSearchUrl(source.string("bookSourceUrl").orEmpty(), pair.second)
+            if (resolvedUrl.startsWith("http://", true) || resolvedUrl.startsWith("https://", true)) {
+                ExploreEntry(pair.first.ifBlank { source.string("bookSourceName").orEmpty() }, resolvedUrl)
+            } else null
+        }.distinctBy { it.url }
+    }
+
+    private fun exploreSource(source: JsonObject, entry: ExploreEntry, page: Int): List<JsonObject> {
+        val rule = source["ruleExplore"].asObjectOrNull() ?: return emptyList()
+        val requestUrl = entry.url
+            .replace("{{page}}", page.toString())
+            .replace("{page}", page.toString())
+        val startedAt = System.nanoTime()
+        val body = fetchSourceText(source, requestUrl) ?: return emptyList()
+        val latency = ((System.nanoTime() - startedAt) / 1_000_000).coerceAtLeast(0)
+        return extractRuleValues(body, rule.string("bookList").orEmpty()).mapNotNull { item ->
+            val name = extractRuleValue(item, rule.string("name")).trim()
+            val bookUrl = resolveSearchUrl(requestUrl, extractRuleValue(item, rule.string("bookUrl")).trim())
+            if (name.isBlank() || bookUrl.isBlank()) return@mapNotNull null
+            JsonObject().apply {
+                addProperty("name", name)
+                addProperty("author", extractRuleValue(item, rule.string("author")).trim())
+                addProperty("bookUrl", bookUrl)
+                addProperty("kind", extractRuleValue(item, rule.string("kind")).trim())
+                addProperty("wordCount", extractRuleValue(item, rule.string("wordCount")).trim())
+                addProperty("origin", source.string("bookSourceUrl") ?: "")
+                addProperty("originName", source.string("bookSourceName") ?: "")
+                addProperty("type", source["bookSourceType"].safeInt())
+                val cover = resolveSearchUrl(requestUrl, extractRuleValue(item, rule.string("coverUrl")).trim())
+                if (cover.isNotBlank()) addProperty("coverUrl", cover)
+                extractRuleValue(item, rule.string("intro")).trim().takeIf(String::isNotBlank)
+                    ?.let { addProperty("intro", it) }
+                extractRuleValue(item, rule.string("lastChapter")).trim().takeIf(String::isNotBlank)
+                    ?.let { addProperty("latestChapterTitle", it) }
+                addProperty("tocUrl", bookUrl)
+                addProperty("time", System.currentTimeMillis())
+                addProperty("originOrder", source["customOrder"].safeInt())
+                addProperty("chapterWordCount", 0)
+                addProperty("respondTime", latency)
+            }
+        }
     }
 
     @Synchronized

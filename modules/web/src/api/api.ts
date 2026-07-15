@@ -56,6 +56,13 @@ export type UpdateCheckResult = {
 export type AuthState = { required: boolean }
 export type AuthSession = { token: string; expiresAt: number }
 
+export type ExploreEntry = { title: string; url: string }
+export type ExploreSource = {
+  sourceUrl: string
+  sourceName: string
+  entries: ExploreEntry[]
+}
+
 export type TxtTocRule = {
   id?: string | number
   name: string
@@ -334,6 +341,12 @@ const search = (
     .finally(onFinish)
 }
 
+const getExploreSources = () =>
+  ajax.get<LeagdoApiResponse<ExploreSource[]>>('getExploreSources')
+
+const exploreBooks = (sourceUrl: string, url: string, page = 1) =>
+  ajax.post<LeagdoApiResponse<SeachBook[]>>('exploreBooks', { sourceUrl, url, page })
+
 const findBookSourceCandidates = (bookUrl: string) =>
   ajax.post<LeagdoApiResponse<SeachBook[]>>('findBookSourceCandidates', { bookUrl })
 
@@ -602,6 +615,8 @@ export default {
   getChapterList,
   getBookContent,
   search,
+  getExploreSources,
+  exploreBooks,
   findBookSourceCandidates,
   changeBookSource,
   autoChangeBookSource,

@@ -86,7 +86,7 @@ void ensureLocalAuthentication()
     const home = String(response.data.data.main?.defaultHomePage || 'bookshelf')
     const destination = {
       bookshelf: '/',
-      explore: '/features',
+      explore: '/explore',
       rss: '/rss',
       my: '/settings',
     }[home]

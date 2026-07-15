@@ -80,7 +80,7 @@ onUnmounted(() => {
   if (welcomeTimer) clearTimeout(welcomeTimer)
 })
 const showRouteDock = computed(() =>
-  ['shelf', 'book-home', 'rss-home', 'rss-reader', 'chapter', 'feature-workbench', 'settings-center', 'server-console'].includes(String(route.name || '')),
+  ['shelf', 'book-home', 'rss-home', 'rss-reader', 'chapter', 'feature-workbench', 'explore-books', 'settings-center', 'server-console'].includes(String(route.name || '')),
 )
 </script>
 
