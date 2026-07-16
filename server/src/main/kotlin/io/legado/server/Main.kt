@@ -580,6 +580,7 @@ class LegadoStore(
     @Volatile private var sourceCheckClient = buildNetworkClient(false)
     private val authSessions = ConcurrentHashMap<String, Long>()
     private val sourceCookieLock = Any()
+    private val sourceRateLocks = ConcurrentHashMap<String, SourceRateState>()
     private val javaScriptRuleContext = ThreadLocal<JavaScriptRuleContext?>()
     private val javaScriptRuleExecutor = Executors.newFixedThreadPool(2) { runnable ->
         Thread(runnable, "legado-js-rule").apply { isDaemon = true }
@@ -1639,9 +1640,9 @@ class LegadoStore(
             ?: return mapOf("error" to "searchUrl is not a portable HTTP request", "results" to emptyList<JsonObject>())
         val startedAt = System.nanoTime()
         return try {
-            val response = networkClient().send(requestSpec.request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
-            captureSourceCookies(response, source)
-            val body = response.body()
+            val response = sendSourceResponse(source, requestSpec.requestUrl, Duration.ofSeconds(20))
+                ?: return mapOf("error" to "Source request failed", "results" to emptyList<JsonObject>())
+            val body = response.body().decodeSourceText(response.headers())
             val latency = ((System.nanoTime() - startedAt) / 1_000_000).coerceAtLeast(0)
             val accepted = response.statusCode() in 200..299 && matchesSearchCheckWord(body, rule.string("checkKeyWord"))
             val entries = if (accepted) {
@@ -1653,7 +1654,7 @@ class LegadoStore(
                 }
             } else emptyList()
             mapOf(
-                "request" to mapOf("url" to requestSpec.baseUrl, "method" to requestSpec.request.method()),
+                "request" to mapOf("url" to requestSpec.baseUrl, "method" to sourceRequestMethod(requestSpec.requestUrl)),
                 "response" to mapOf(
                     "statusCode" to response.statusCode(),
                     "bytes" to body.toByteArray(StandardCharsets.UTF_8).size,
@@ -1669,7 +1670,7 @@ class LegadoStore(
             )
         } catch (error: Exception) {
             mapOf(
-                "request" to mapOf("url" to requestSpec.baseUrl, "method" to requestSpec.request.method()),
+                "request" to mapOf("url" to requestSpec.baseUrl, "method" to sourceRequestMethod(requestSpec.requestUrl)),
                 "error" to (error.message ?: error.javaClass.simpleName),
                 "results" to emptyList<JsonObject>(),
             )
@@ -1682,25 +1683,13 @@ class LegadoStore(
             ?: return mapOf("error" to "sourceUrl is not a portable HTTP request", "articles" to emptyList<JsonObject>())
         val startedAt = System.nanoTime()
         return try {
-            val builder = HttpRequest.newBuilder(URI.create(requestUrl.url))
-                .timeout(Duration.ofSeconds(20))
-                .header("User-Agent", networkUserAgent())
-            applySourceHeaders(builder, source)
-            applySourceCookies(builder, source)
-            requestUrl.options?.get("headers")?.asObjectOrNull()?.entrySet()?.forEach { (name, value) ->
-                if (name.isNotBlank()) builder.header(name, value.asString)
-            }
-            when (requestUrl.options?.string("method")?.uppercase()) {
-                "POST" -> builder.POST(HttpRequest.BodyPublishers.ofString(requestUrl.options["body"]?.let(gson::toJson) ?: ""))
-                else -> builder.GET()
-            }
-            val response = networkClient().send(builder.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
-            captureSourceCookies(response, source)
-            val body = response.body()
+            val response = sendSourceResponse(source, requestUrl, Duration.ofSeconds(20))
+                ?: return mapOf("error" to "Source request failed", "articles" to emptyList<JsonObject>())
+            val body = response.body().decodeSourceText(response.headers())
             val articles = if (response.statusCode() in 200..299) parseRssArticles(source, body) else emptyList()
             if (articles.isNotEmpty()) cacheRssArticles(articles)
             mapOf(
-                "request" to mapOf("url" to requestUrl.url, "method" to (requestUrl.options?.string("method")?.uppercase() ?: "GET")),
+                "request" to mapOf("url" to requestUrl.url, "method" to sourceRequestMethod(requestUrl)),
                 "response" to mapOf("statusCode" to response.statusCode(), "bytes" to body.toByteArray(StandardCharsets.UTF_8).size, "preview" to body.take(8_000)),
                 "articleRule" to source.string("ruleArticles").orEmpty(),
                 "latencyMs" to ((System.nanoTime() - startedAt) / 1_000_000).coerceAtLeast(0),
@@ -2210,22 +2199,7 @@ class LegadoStore(
     private fun fetchSourceBytes(source: JsonObject, rawUrl: String): SourceBytesResponse? {
         val requestUrl = parseSourceRequestUrl(expandSourceVariables(source, rawUrl)) ?: return null
         return try {
-            val builder = HttpRequest.newBuilder(URI.create(requestUrl.url))
-                .timeout(Duration.ofSeconds(60))
-                .header("User-Agent", networkUserAgent())
-            applySourceHeaders(builder, source)
-            applySourceCookies(builder, source)
-            requestUrl.options?.get("headers")?.asObjectOrNull()?.entrySet()?.forEach { (name, value) ->
-                if (name.isNotBlank()) builder.header(name, value.asString)
-            }
-            when (requestUrl.options?.string("method")?.uppercase()) {
-                "POST" -> builder.POST(HttpRequest.BodyPublishers.ofString(
-                    requestUrl.options["body"]?.let { gson.toJson(it) } ?: "", StandardCharsets.UTF_8,
-                ))
-                else -> builder.GET()
-            }
-            val response = networkClient().send(builder.build(), HttpResponse.BodyHandlers.ofByteArray())
-            captureSourceCookies(response, source)
+            val response = sendSourceResponse(source, requestUrl, Duration.ofSeconds(60)) ?: return null
             if (response.statusCode() !in 200..299 || response.body().size > MAX_LOCAL_BOOK_BYTES) return null
             val disposition = response.headers().firstValue("content-disposition").orElse("")
             val fileName = Regex("""filename\\*?=(?:UTF-8''|[\"])?([^;\"]+)""", RegexOption.IGNORE_CASE)
@@ -2708,13 +2682,13 @@ class LegadoStore(
         val searchUrl = source.string("searchUrl").orEmpty()
         val requestSpec = sourceSearchRequest(source, searchUrl, key) ?: return emptyList()
         return try {
-            val response = networkClient().send(requestSpec.request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
-            captureSourceCookies(response, source)
+            val response = sendSourceResponse(source, requestSpec.requestUrl, Duration.ofSeconds(15)) ?: return emptyList()
+            val body = response.body().decodeSourceText(response.headers())
             if (response.statusCode() !in 200..299) return emptyList()
-            if (!matchesSearchCheckWord(response.body(), rule.string("checkKeyWord"))) return emptyList()
+            if (!matchesSearchCheckWord(body, rule.string("checkKeyWord"))) return emptyList()
             val latency = ((System.nanoTime() - startedAt) / 1_000_000).coerceAtLeast(0)
             withJavaScriptRuleContext(key, requestSpec.baseUrl) {
-                extractSourceBooks(source, rule, response.body(), requestSpec.baseUrl, latency)
+                extractSourceBooks(source, rule, body, requestSpec.baseUrl, latency)
             }
         } catch (_: Exception) {
             emptyList()
@@ -2778,7 +2752,7 @@ class LegadoStore(
         }
     }
 
-    private data class SourceSearchRequest(val request: HttpRequest, val baseUrl: String)
+    private data class SourceSearchRequest(val requestUrl: SourceRequestUrl, val baseUrl: String)
 
     private fun sourceSearchRequest(source: JsonObject, rawSearchUrl: String, key: String): SourceSearchRequest? {
         val separator = rawSearchUrl.indexOf(",{")
@@ -2794,19 +2768,7 @@ class LegadoStore(
         val url = expandSourceVariables(source, substitute(rawUrl)).trim()
         if (!url.startsWith("http://", true) && !url.startsWith("https://", true)) return null
         val options = runCatching { JsonParser.parseString(expandSourceVariables(source, substitute(rawOptions))).asObjectOrNull() }.getOrNull()
-        val builder = HttpRequest.newBuilder(URI.create(url))
-            .timeout(Duration.ofSeconds(15))
-            .header("User-Agent", networkUserAgent())
-        applySourceHeaders(builder, source)
-        applySourceCookies(builder, source)
-        options?.get("headers")?.asObjectOrNull()?.entrySet()?.forEach { (name, value) ->
-            if (name.isNotBlank()) builder.header(name, value.asString)
-        }
-        when (options?.string("method")?.uppercase()) {
-            "POST" -> builder.POST(HttpRequest.BodyPublishers.ofString(options["body"]?.let { gson.toJson(it) } ?: "", StandardCharsets.UTF_8))
-            else -> builder.GET()
-        }
-        return SourceSearchRequest(builder.build(), url)
+        return SourceSearchRequest(SourceRequestUrl(url, options), url)
     }
 
     private fun applySourceHeaders(builder: HttpRequest.Builder, source: JsonObject) {
@@ -3806,32 +3768,108 @@ class LegadoStore(
     private fun fetchSourceText(source: JsonObject, rawUrl: String): String? {
         val requestUrl = parseSourceRequestUrl(expandSourceVariables(source, rawUrl)) ?: return null
         return try {
-            val builder = HttpRequest.newBuilder(URI.create(requestUrl.url))
-                .timeout(Duration.ofSeconds(20))
-                .header("User-Agent", networkUserAgent())
-            applySourceHeaders(builder, source)
-            applySourceCookies(builder, source)
-            requestUrl.options?.get("headers")?.asObjectOrNull()?.entrySet()?.forEach { (name, value) ->
-                if (name.isNotBlank()) builder.header(name, value.asString)
-            }
-            when (requestUrl.options?.string("method")?.uppercase()) {
-                "POST" -> builder.POST(
-                    HttpRequest.BodyPublishers.ofString(
-                        requestUrl.options["body"]?.let { gson.toJson(it) } ?: "",
-                        StandardCharsets.UTF_8,
-                    )
-                )
-                else -> builder.GET()
-            }
-            val response = networkClient().send(builder.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
-            captureSourceCookies(response, source)
-            response.body().takeIf { response.statusCode() in 200..299 }
+            val response = sendSourceResponse(source, requestUrl, Duration.ofSeconds(20)) ?: return null
+            response.body().decodeSourceText(response.headers()).takeIf { response.statusCode() in 200..299 }
         } catch (_: Exception) {
             null
         }
     }
 
+    private data class SourceRateState(
+        var windowStart: Long = 0,
+        var requestCount: Int = 0,
+        var lastRequestAt: Long = 0,
+    )
+
+    private fun waitForSourceRate(source: JsonObject) {
+        val rawRate = source.string("concurrentRate")?.trim().orEmpty()
+        if (rawRate.isEmpty() || rawRate == "0") return
+        val sourceKey = source.string("bookSourceUrl") ?: source.string("sourceUrl") ?: return
+        val state = sourceRateLocks.computeIfAbsent(sourceKey) { SourceRateState() }
+        synchronized(state) {
+            val now = System.currentTimeMillis()
+            val ratio = Regex("^(\\d+)\\s*/\\s*(\\d+)$").matchEntire(rawRate)
+            if (ratio != null) {
+                val maximum = ratio.groupValues[1].toIntOrNull()?.coerceIn(1, 1000) ?: return
+                val windowMillis = ratio.groupValues[2].toLongOrNull()?.coerceIn(1, 3_600_000) ?: return
+                if (state.windowStart == 0L || now - state.windowStart >= windowMillis) {
+                    state.windowStart = now
+                    state.requestCount = 0
+                }
+                if (state.requestCount >= maximum) {
+                    Thread.sleep((windowMillis - (now - state.windowStart)).coerceAtLeast(1))
+                    state.windowStart = System.currentTimeMillis()
+                    state.requestCount = 0
+                }
+                state.requestCount += 1
+                return
+            }
+            val interval = rawRate.toLongOrNull()?.coerceIn(0, 3_600_000) ?: return
+            val delay = interval - (now - state.lastRequestAt)
+            if (delay > 0) Thread.sleep(delay)
+            state.lastRequestAt = System.currentTimeMillis()
+        }
+    }
+
+    private fun sourceRequestBody(options: JsonObject?): String {
+        val body = options?.get("body") ?: return ""
+        return if (body.isJsonPrimitive && body.asJsonPrimitive.isString) body.asString else gson.toJson(body)
+    }
+
+    private fun sourceRequestBuilder(source: JsonObject, requestUrl: SourceRequestUrl, timeout: Duration): HttpRequest.Builder {
+        val builder = HttpRequest.newBuilder(URI.create(requestUrl.url))
+            .timeout(timeout)
+            .header("User-Agent", networkUserAgent())
+        applySourceHeaders(builder, source)
+        applySourceCookies(builder, source)
+        requestUrl.options?.get("headers")?.asObjectOrNull()?.entrySet()?.forEach { (name, value) ->
+            if (name.isNotBlank()) builder.header(name, value.asString)
+        }
+        val method = requestUrl.options?.string("method")?.uppercase()?.takeIf(String::isNotBlank) ?: "GET"
+        return when (method) {
+            "GET" -> builder.GET()
+            "POST", "PUT", "PATCH", "DELETE" -> builder.method(
+                method,
+                HttpRequest.BodyPublishers.ofString(sourceRequestBody(requestUrl.options), StandardCharsets.UTF_8),
+            )
+            else -> builder.GET()
+        }
+    }
+
+    private fun sendSourceResponse(
+        source: JsonObject,
+        requestUrl: SourceRequestUrl,
+        timeout: Duration,
+    ): HttpResponse<ByteArray>? {
+        val retries = requestUrl.options?.get("retry")?.safeIntOrNull()?.coerceIn(0, 3) ?: 0
+        repeat(retries + 1) { attempt ->
+            try {
+                waitForSourceRate(source)
+                val response = networkClient().send(
+                    sourceRequestBuilder(source, requestUrl, timeout).build(),
+                    HttpResponse.BodyHandlers.ofByteArray(),
+                )
+                captureSourceCookies(response, source)
+                if (response.statusCode() in 200..299 || attempt == retries) return response
+            } catch (_: Exception) {
+                if (attempt == retries) return null
+            }
+        }
+        return null
+    }
+
+    private fun ByteArray.decodeSourceText(headers: java.net.http.HttpHeaders): String {
+        val declared = headers.firstValue("content-type").orElse("")
+            .let { Regex("charset=([^;\\s]+)", RegexOption.IGNORE_CASE).find(it)?.groupValues?.getOrNull(1) }
+        val charset = declared?.let { runCatching { Charset.forName(it.trim('"', '\'')) }.getOrNull() }
+            ?: Charsets.UTF_8
+        return toString(charset)
+    }
+
     private data class SourceRequestUrl(val url: String, val options: JsonObject?)
+
+    private fun sourceRequestMethod(requestUrl: SourceRequestUrl): String =
+        requestUrl.options?.string("method")?.uppercase()?.takeIf(String::isNotBlank) ?: "GET"
 
     private fun parseSourceRequestUrl(rawUrl: String): SourceRequestUrl? {
         val separator = rawUrl.indexOf(",{")
