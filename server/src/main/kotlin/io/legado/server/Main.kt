@@ -317,8 +317,11 @@ class LegadoHttpServer(
             "/requestHttpTts" -> throw AudioResponse(store.requestHttpTts(post.postData))
             "/lookupDictionary" -> store.lookupDictionary(post.postData)
             "/applyThemeConfig" -> store.applyThemeConfig(post.postData)
+            "/applyReadStyle" -> store.applyReadStyle(post.postData)
             "/startBookDownload" -> store.startBookDownload(post.postData)
             "/cancelBookDownload" -> store.cancelBookDownload(post.postData)
+            "/retryBookDownload" -> store.retryBookDownload(post.postData)
+            "/clearExpiredCacheRecords" -> store.clearExpiredCacheRecords()
             "/findBookSourceCandidates" -> store.findBookSourceCandidates(post.postData)
             "/changeBookSource" -> store.changeBookSource(post.postData)
             "/autoChangeBookSource" -> store.autoChangeBookSource(post.postData)
@@ -601,7 +604,7 @@ class LegadoStore(
         AppDataKind("rssArticles", "RSS 文章缓存", "订阅源规则解析后的文章列表、分组和阅读状态", "link", "Web 可用"),
         AppDataKind("rssReadRecords", "RSS 阅读记录", "订阅阅读进度和已读记录", "record", "Web 可用"),
         AppDataKind("rssStars", "RSS 收藏", "订阅文章收藏和星标", "link", "Web 可用"),
-        AppDataKind("cacheRecords", "缓存记录", "通用缓存、源变量和临时数据", "key", "配置保留"),
+        AppDataKind("cacheRecords", "缓存记录", "通用缓存、源变量和临时数据", "key", "Web 可用"),
         AppDataKind("downloadTasks", "下载任务", "离线下载、缓存书籍、媒体下载队列", "id", "Web 可用"),
         AppDataKind("themeConfigs", "主题方案", "Android 主题方案列表", "themeName", "Web 可用"),
         AppDataKind("readStyles", "阅读样式", "阅读排版方案、背景、字体和提示栏", "name", "Web 可用"),
@@ -709,6 +712,7 @@ class LegadoStore(
         val completedAt = java.time.Instant.now().toString()
         maintenance.addProperty("lastMaintenanceAt", completedAt)
         writeAppSettings(settings)
+        val expiredCacheRecords = clearExpiredCacheRecordsCount()
         val compactResult = if (maintenance["shrinkDatabase"]?.safeBoolean() == true) {
             compactJsonStores()
         } else {
@@ -718,6 +722,7 @@ class LegadoStore(
             "completedAt" to completedAt,
             "cacheEntriesCleared" to (cacheResult["entries"] ?: 0),
             "cacheBytesCleared" to (cacheResult["bytes"] ?: 0),
+            "expiredCacheRecordsRemoved" to expiredCacheRecords,
             "jsonFilesCompacted" to compactResult.files,
             "jsonBytesSaved" to compactResult.bytesSaved,
             "scheduled" to scheduled,
@@ -1443,6 +1448,22 @@ class LegadoStore(
     }
 
     @Synchronized
+    fun applyReadStyle(postData: String?): ReturnData {
+        val payload = parseJson(postData)?.asObjectOrNull() ?: return ReturnData.error("Expected JSON object")
+        val styleName = payload.string("name")?.trim().orEmpty()
+        if (styleName.isBlank()) return ReturnData.error("name is required")
+        val styles = readList("readStyles")
+        val index = styles.indexOfFirst { it.string("name") == styleName }
+        if (index < 0) return ReturnData.error("Read style not found")
+        val settings = readAppSettings()
+        val read = settings["read"].asObjectOrNull() ?: JsonObject().also { settings.add("read", it) }
+        val target = payload["target"]?.asString?.takeIf { it == "comic" } ?: "normal"
+        read.addProperty(if (target == "comic") "comicStyleSelect" else "readStyleSelect", index)
+        writeAppSettings(settings)
+        return ReturnData.ok(mapOf("settings" to settings, "style" to styles[index], "index" to index, "target" to target))
+    }
+
+    @Synchronized
     fun deleteAppData(kindName: String?, postData: String?): ReturnData {
         val kind = appDataKind(kindName) ?: return ReturnData.error("Unsupported app data kind: $kindName")
         val data = parseJson(postData) ?: return ReturnData.error("Request body is required")
@@ -2092,6 +2113,27 @@ class LegadoStore(
         task.addProperty("status", "cancelled")
         task.addProperty("updatedAt", System.currentTimeMillis())
         writeList("downloadTasks", tasks)
+        return ReturnData.ok(task)
+    }
+
+    @Synchronized
+    fun retryBookDownload(postData: String?): ReturnData {
+        val payload = parseJson(postData)?.asObjectOrNull() ?: return ReturnData.error("Expected JSON object")
+        val taskId = payload.string("id")?.trim().orEmpty()
+        if (taskId.isBlank()) return ReturnData.error("id is required")
+        val tasks = readList("downloadTasks")
+        val task = tasks.firstOrNull { it.string("id") == taskId }
+            ?: return ReturnData.error("Download task not found")
+        val bookUrl = task.string("bookUrl")?.trim().orEmpty()
+        if (bookUrl.isBlank()) return ReturnData.error("Download task has no book URL")
+        if (task.string("status") in setOf("queued", "running")) return ReturnData.ok(task)
+        task.addProperty("status", "queued")
+        task.addProperty("progress", 0)
+        task.remove("error")
+        task.remove("path")
+        task.addProperty("updatedAt", System.currentTimeMillis())
+        writeList("downloadTasks", tasks)
+        downloadExecutor.submit { runBookDownload(taskId, bookUrl) }
         return ReturnData.ok(task)
     }
 
@@ -2899,6 +2941,25 @@ class LegadoStore(
             record.string("key")?.let { variables[it] = record.string("value").orEmpty() }
         }
         return variables
+    }
+
+    @Synchronized
+    fun clearExpiredCacheRecords(): ReturnData {
+        val removed = clearExpiredCacheRecordsCount()
+        val remaining = readList("cacheRecords").size
+        return ReturnData.ok(mapOf("removed" to removed, "remaining" to remaining, "at" to System.currentTimeMillis()))
+    }
+
+    private fun clearExpiredCacheRecordsCount(): Int {
+        val now = System.currentTimeMillis()
+        val records = readList("cacheRecords")
+        val kept = records.filterNot { record ->
+            val expires = record["expires"].safeLong()
+            expires > 0 && expires <= now
+        }
+        val removed = records.size - kept.size
+        if (removed > 0) writeList("cacheRecords", kept)
+        return removed
     }
 
     private fun saveSourceVariable(source: JsonObject, key: String, value: String) {

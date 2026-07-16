@@ -18,7 +18,7 @@
         inactive-text="停"
         :aria-label="`${getSourceName(source)}启用状态`"
         @click.stop
-        @change="value => updateSourceState({ enabled: value === true })"
+        @change="(value: boolean | string | number) => updateSourceState({ enabled: value === true })"
       />
       <el-switch
         v-if="isBookSource"
@@ -29,7 +29,7 @@
         inactive-text="隐"
         :aria-label="`${getSourceName(source)}发现状态`"
         @click.stop
-        @change="value => updateSourceState({ enabledExplore: value === true })"
+        @change="(value: boolean | string | number) => updateSourceState({ enabledExplore: value === true })"
       />
     </span>
     <el-button text :icon="Edit" @click="handleSourceClick(source)" />

@@ -391,6 +391,9 @@ const startBookDownload = (bookUrl: string) =>
 const cancelBookDownload = (id: string) =>
   ajax.post<LeagdoApiResponse<AppDataItem>>('cancelBookDownload', { id })
 
+const retryBookDownload = (id: string) =>
+  ajax.post<LeagdoApiResponse<AppDataItem>>('retryBookDownload', { id })
+
 const getDownloadTaskFile = (taskId: string) =>
   ajax.get<Blob>('downloadTaskFile?id=' + encodeURIComponent(taskId), { responseType: 'blob' })
 
@@ -399,6 +402,19 @@ const lookupDictionary = (text: string, names?: string[]) =>
 
 const applyThemeConfig = (themeName: string) =>
   ajax.post<LeagdoApiResponse<AppSettings>>('applyThemeConfig', { themeName })
+
+const applyReadStyle = (name: string, target: 'normal' | 'comic' = 'normal') =>
+  ajax.post<LeagdoApiResponse<{
+    settings: AppSettings
+    style: AppDataItem
+    index: number
+    target: string
+  }>>('applyReadStyle', { name, target })
+
+const clearExpiredCacheRecords = () =>
+  ajax.post<LeagdoApiResponse<{ removed: number; remaining: number; at: number }>>(
+    'clearExpiredCacheRecords',
+  )
 
 const saveBook = (book: BaseBook) =>
   ajax.post<LeagdoApiResponse<string>>('saveBook', book)
@@ -642,9 +658,12 @@ export default {
   requestHttpTts,
   startBookDownload,
   cancelBookDownload,
+  retryBookDownload,
   getDownloadTaskFile,
   lookupDictionary,
   applyThemeConfig,
+  applyReadStyle,
+  clearExpiredCacheRecords,
   saveBook,
   exportBook,
   exportBookEpisodes,

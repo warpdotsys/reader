@@ -25,7 +25,7 @@ The upstream project remains the reference for Legado data formats and user-faci
 
 ## Requirements
 
-- JDK 17 or newer to build and run the server.
+- JDK 21 or newer to build and run the server. The maintained Linux test host uses OpenJDK 21.
 - Node.js 20+ and pnpm only when changing the Vue frontend.
 - Docker is optional.
 

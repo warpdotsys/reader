@@ -133,6 +133,22 @@
             <el-button :icon="Files" @click="openReplaceEditor">
               批量替换
             </el-button>
+            <el-button
+              v-if="activeKind?.kind === 'cacheRecords'"
+              :icon="Refresh"
+              @click="clearExpiredCache"
+            >
+              清理过期
+            </el-button>
+            <el-button
+              v-if="selectedRows.length > 0"
+              :icon="Delete"
+              type="danger"
+              plain
+              @click="removeSelected"
+            >
+              删除所选 {{ selectedRows.length }} 项
+            </el-button>
           </div>
         </div>
 
@@ -165,7 +181,9 @@
           height="430"
           :row-key="rowIdentity"
           empty-text="暂无数据，可新增或导入 JSON"
+          @selection-change="handleSelectionChange"
         >
+          <el-table-column type="selection" width="46" fixed="left" />
           <el-table-column
             v-for="column in tableColumns"
             :key="column.key"
@@ -218,6 +236,22 @@
                 @click="applyThemeConfig(row)"
               />
               <el-button
+                v-if="activeKind?.kind === 'readStyles'"
+                :icon="Check"
+                text
+                type="success"
+                title="应用阅读样式"
+                @click="applyReadStyle(row)"
+              />
+              <el-button
+                v-if="activeKind?.kind === 'dictRules'"
+                :icon="Search"
+                text
+                type="primary"
+                title="试查字典规则"
+                @click="testDictionaryRule(row)"
+              />
+              <el-button
                 v-if="activeKind?.kind === 'downloadTasks' && row.status === 'done'"
                 :icon="Download"
                 text
@@ -229,6 +263,14 @@
                 text
                 type="warning"
                 @click="cancelDownloadTask(row)"
+              />
+              <el-button
+                v-if="activeKind?.kind === 'downloadTasks' && ['failed', 'cancelled'].includes(String(row.status))"
+                :icon="VideoPlay"
+                text
+                type="success"
+                title="重试下载任务"
+                @click="retryDownloadTask(row)"
               />
               <el-button
                 :icon="Delete"
@@ -505,6 +547,7 @@ const rawEditor = ref(false)
 const searchText = ref('')
 const formDraft = ref<Record<string, any>>({})
 const dataInput = ref<HTMLInputElement>()
+const selectedRows = ref<AppDataItem[]>([])
 let downloadTaskPoller: ReturnType<typeof setInterval> | null = null
 
 const activeKind = computed(() =>
@@ -630,6 +673,11 @@ async function loadKinds() {
 async function loadAppData() {
   if (!selectedKindName.value) return
   appData.value = unwrap(await API.getAppData(selectedKindName.value))
+  selectedRows.value = []
+}
+
+function handleSelectionChange(rows: AppDataItem[]) {
+  selectedRows.value = rows
 }
 
 function statusTagType(status: string) {
@@ -876,6 +924,30 @@ function downloadJson(data: unknown, fileName: string) {
   URL.revokeObjectURL(url)
 }
 
+async function removeSelected() {
+  const kind = activeKind.value
+  if (!kind || selectedRows.value.length === 0) return
+  try {
+    await ElMessageBox.confirm(
+      `确认删除 ${selectedRows.value.length} 条 ${kind.label}？`,
+      '批量删除数据',
+      {
+        type: 'warning',
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+      },
+    )
+    appData.value = unwrap(await API.deleteAppData(kind.kind, selectedRows.value))
+    selectedRows.value = []
+    await Promise.all([loadKinds(), loadServerInfo()])
+    ElMessage.success('已批量删除')
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error instanceof Error ? error.message : '批量删除失败')
+    }
+  }
+}
+
 async function downloadTaskFile(task: AppDataItem) {
   const id = String(task.id || '')
   if (!id) return
@@ -905,6 +977,18 @@ async function cancelDownloadTask(task: AppDataItem) {
   }
 }
 
+async function retryDownloadTask(task: AppDataItem) {
+  const id = String(task.id || '')
+  if (!id) return
+  try {
+    unwrap(await API.retryBookDownload(id))
+    await loadAppData()
+    ElMessage.success('已重新加入下载队列')
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '重试下载任务失败')
+  }
+}
+
 async function applyThemeConfig(config: AppDataItem) {
   const themeName = String(config.themeName || '').trim()
   if (!themeName) return
@@ -914,6 +998,55 @@ async function applyThemeConfig(config: AppDataItem) {
     ElMessage.success(`已应用主题：${themeName}`)
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '应用主题失败')
+  }
+}
+
+async function applyReadStyle(style: AppDataItem) {
+  const name = String(style.name || '').trim()
+  if (!name) return
+  try {
+    const result = unwrap(await API.applyReadStyle(name))
+    applyAppSettings(result.settings)
+    ElMessage.success(`已应用阅读样式：${name}`)
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '应用阅读样式失败')
+  }
+}
+
+async function testDictionaryRule(rule: AppDataItem) {
+  const name = String(rule.name || '').trim()
+  try {
+    const { value } = await ElMessageBox.prompt('输入要查询的词语', `试查 ${name || '字典规则'}`, {
+      confirmButtonText: '查询',
+      cancelButtonText: '取消',
+      inputPlaceholder: '例如：legado',
+      inputPattern: /\S+/,
+      inputErrorMessage: '请输入查询内容',
+    })
+    const results = unwrap(await API.lookupDictionary(value, name ? [name] : undefined))
+    const successful = results.filter(result => result.isSuccess && result.content)
+    if (successful.length === 0) {
+      throw new Error(results.map(result => result.errorMsg || '没有返回内容').join('；'))
+    }
+    await ElMessageBox.alert(
+      successful.map(result => `${result.name}\n${result.content}`).join('\n\n'),
+      '字典查询结果',
+      { confirmButtonText: '关闭' },
+    )
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error instanceof Error ? error.message : '字典查询失败')
+    }
+  }
+}
+
+async function clearExpiredCache() {
+  try {
+    const result = unwrap(await API.clearExpiredCacheRecords())
+    await Promise.all([loadAppData(), loadKinds(), loadServerInfo()])
+    ElMessage.success(`已清理 ${result.removed} 条过期缓存`)
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '清理过期缓存失败')
   }
 }
 
