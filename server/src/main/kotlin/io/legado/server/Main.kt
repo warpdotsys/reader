@@ -2927,7 +2927,10 @@ class LegadoStore(
         if (rule.isBlank()) return emptyList()
         val portableRule = parsePortableRule(rule)
         applyRulePuts(sourceRuleContext.get(), input, portableRule.puts)
-        val expression = expandRuleVariables(sourceRuleContext.get() ?: JsonObject(), portableRule.expression)
+        val expression = normalizePortableRuleExpression(
+            expandRuleVariables(sourceRuleContext.get() ?: JsonObject(), portableRule.expression),
+            listRule = true,
+        )
         val values = when {
             expression.isBlank() -> emptyList()
             isJavaScriptRule(expression) -> evaluateJavaScriptRule(input, expression).asValues()
@@ -2967,7 +2970,10 @@ class LegadoStore(
         if (rule.isNullOrBlank()) return ""
         val portableRule = parsePortableRule(rule)
         applyRulePuts(sourceRuleContext.get(), input, portableRule.puts)
-        val expression = expandRuleVariables(sourceRuleContext.get() ?: JsonObject(), portableRule.expression)
+        val expression = normalizePortableRuleExpression(
+            expandRuleVariables(sourceRuleContext.get() ?: JsonObject(), portableRule.expression),
+            listRule = false,
+        )
         val value = when {
             expression.isBlank() -> ""
             isJavaScriptRule(expression) -> evaluateJavaScriptRule(input, expression).asValue()
@@ -2998,6 +3004,17 @@ class LegadoStore(
             }.getOrDefault("")
         }
         return value
+    }
+
+    private fun normalizePortableRuleExpression(rawRule: String, listRule: Boolean): String {
+        val rule = rawRule.trim()
+        return when {
+            rule.startsWith("@@") -> rule.substring(2).trim()
+            rule.startsWith("@json:", true) -> rule.substring(6).trim()
+            rule.startsWith("@regex:", true) -> rule.substring(7).trim()
+            listRule && rule.startsWith(':') -> rule.substring(1).trim()
+            else -> rule
+        }
     }
 
     private fun elementRuleValue(element: org.jsoup.nodes.Element, attribute: String?, outerHtmlWhenUnspecified: Boolean = false): String =
