@@ -116,9 +116,6 @@
               <div class="setting-copy">
                 <div class="setting-title-line">
                   <strong>{{ field.label }}</strong>
-                  <el-tag :type="fieldStatusType(field.status)" effect="plain">
-                    {{ fieldStatusLabel(field.status) }}
-                  </el-tag>
                 </div>
                 <span>{{ field.summary }}</span>
                 <code>{{ field.path }}</code>
@@ -785,18 +782,6 @@ function numberValue(path: string) {
 
 function booleanValue(path: string) {
   return Boolean(getField(path))
-}
-
-function fieldStatusLabel(status: FieldStatus) {
-  return status === 'live'
-    ? 'Web 可用'
-    : status === 'stored'
-      ? '配置保留'
-      : 'Linux 需实现'
-}
-
-function fieldStatusType(status: FieldStatus) {
-  return status === 'live' ? 'success' : status === 'stored' ? 'info' : 'warning'
 }
 
 async function loadSettings() {
