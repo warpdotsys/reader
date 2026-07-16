@@ -1646,7 +1646,7 @@ class LegadoStore(
         return try {
             val response = sendSourceResponse(source, requestSpec.requestUrl, Duration.ofSeconds(20))
                 ?: return mapOf("error" to "Source request failed", "results" to emptyList<JsonObject>())
-            val body = response.body().decodeSourceText(response.headers())
+            val body = response.body().decodeSourceText(response.headers(), requestSpec.requestUrl.options)
             val latency = ((System.nanoTime() - startedAt) / 1_000_000).coerceAtLeast(0)
             val accepted = response.statusCode() in 200..299 && matchesSearchCheckWord(body, rule.string("checkKeyWord"))
             val entries = if (accepted) {
@@ -1689,7 +1689,7 @@ class LegadoStore(
         return try {
             val response = sendSourceResponse(source, requestUrl, Duration.ofSeconds(20))
                 ?: return mapOf("error" to "Source request failed", "articles" to emptyList<JsonObject>())
-            val body = response.body().decodeSourceText(response.headers())
+            val body = response.body().decodeSourceText(response.headers(), requestUrl.options)
             val articles = if (response.statusCode() in 200..299) parseRssArticles(source, body) else emptyList()
             if (articles.isNotEmpty()) cacheRssArticles(articles)
             mapOf(
@@ -2693,7 +2693,7 @@ class LegadoStore(
             val requestSpec = sourceSearchRequest(source, searchUrl, key) ?: return@withSourceRuleContext emptyList()
             try {
                 val response = sendSourceResponse(source, requestSpec.requestUrl, Duration.ofSeconds(15)) ?: return@withSourceRuleContext emptyList()
-                val body = response.body().decodeSourceText(response.headers())
+                val body = response.body().decodeSourceText(response.headers(), requestSpec.requestUrl.options)
                 if (response.statusCode() !in 200..299) return@withSourceRuleContext emptyList()
                 if (!matchesSearchCheckWord(body, rule.string("checkKeyWord"))) return@withSourceRuleContext emptyList()
                 val latency = ((System.nanoTime() - startedAt) / 1_000_000).coerceAtLeast(0)
@@ -3979,7 +3979,7 @@ class LegadoStore(
         val requestUrl = parseSourceRequestUrl(expandSourceVariables(source, rawUrl)) ?: return null
         return try {
             val response = sendSourceResponse(source, requestUrl, Duration.ofSeconds(20)) ?: return null
-            response.body().decodeSourceText(response.headers()).takeIf { response.statusCode() in 200..299 }
+            response.body().decodeSourceText(response.headers(), requestUrl.options).takeIf { response.statusCode() in 200..299 }
         } catch (_: Exception) {
             null
         }
@@ -4026,6 +4026,12 @@ class LegadoStore(
         return if (body.isJsonPrimitive && body.asJsonPrimitive.isString) body.asString else gson.toJson(body)
     }
 
+    private fun sourceRequestCharset(options: JsonObject?): Charset = options?.string("charset")
+        ?.trim()
+        ?.takeIf(String::isNotBlank)
+        ?.let { runCatching { Charset.forName(it) }.getOrNull() }
+        ?: Charsets.UTF_8
+
     private fun sourceRequestBuilder(source: JsonObject, requestUrl: SourceRequestUrl, timeout: Duration): HttpRequest.Builder {
         val builder = HttpRequest.newBuilder(URI.create(requestUrl.url))
             .timeout(timeout)
@@ -4040,7 +4046,7 @@ class LegadoStore(
             "GET" -> builder.GET()
             "POST", "PUT", "PATCH", "DELETE" -> builder.method(
                 method,
-                HttpRequest.BodyPublishers.ofString(sourceRequestBody(requestUrl.options), StandardCharsets.UTF_8),
+                HttpRequest.BodyPublishers.ofString(sourceRequestBody(requestUrl.options), sourceRequestCharset(requestUrl.options)),
             )
             else -> builder.GET()
         }
@@ -4068,10 +4074,14 @@ class LegadoStore(
         return null
     }
 
-    private fun ByteArray.decodeSourceText(headers: java.net.http.HttpHeaders): String {
+    private fun ByteArray.decodeSourceText(headers: java.net.http.HttpHeaders, options: JsonObject?): String {
         val declared = headers.firstValue("content-type").orElse("")
             .let { Regex("charset=([^;\\s]+)", RegexOption.IGNORE_CASE).find(it)?.groupValues?.getOrNull(1) }
-        val charset = declared?.let { runCatching { Charset.forName(it.trim('"', '\'')) }.getOrNull() }
+        val charset = options?.string("charset")
+            ?.trim()
+            ?.takeIf(String::isNotBlank)
+            ?.let { runCatching { Charset.forName(it) }.getOrNull() }
+            ?: declared?.let { runCatching { Charset.forName(it.trim('"', '\'')) }.getOrNull() }
             ?: Charsets.UTF_8
         return toString(charset)
     }
