@@ -168,6 +168,16 @@
             <el-button :icon="Connection" :loading="loadingWebDavBackups" @click="loadWebDavBackups">
               远端快照
             </el-button>
+            <el-button :icon="Search" :loading="checkingBackup" @click="checkRemoteBackup">
+              检查远端更新
+            </el-button>
+          </div>
+          <div v-if="backupCheck" class="backup-check-status" :class="{ newer: backupCheck.newer }">
+            <el-icon><Connection /></el-icon>
+            <span>{{ backupCheckMessage }}</span>
+            <el-button v-if="backupCheck.newer" text type="primary" @click="loadWebDavBackups">
+              查看远端快照
+            </el-button>
           </div>
           <div v-if="backups.length" class="backup-list">
             <div v-for="backup in backups" :key="backup.fileName" class="backup-row">
@@ -415,6 +425,16 @@
                   </template>
                 </el-table-column>
                 <el-table-column min-width="260" prop="sourceUrl" label="地址" show-overflow-tooltip />
+                <el-table-column width="150" fixed="right" label="操作" align="right">
+                  <template #default="{ row }: { row: SourceCheckReport }">
+                    <el-button :icon="DocumentCopy" text @click="copySourceUrl(row.sourceUrl)">
+                      复制
+                    </el-button>
+                    <el-button :icon="EditPen" text @click="openSourceManager(row.kind)">
+                      管理
+                    </el-button>
+                  </template>
+                </el-table-column>
               </el-table>
             </div>
           </el-tab-pane>
@@ -545,6 +565,7 @@ import type {
   ReplaceRule,
   ServerBackup,
   WebDavBackup,
+  BackupCheckResult,
   ServerExportData,
   ServerInfo,
   SourceCheckReport,
@@ -591,6 +612,7 @@ const creatingBackup = ref(false)
 const exportingBooks = ref(false)
 const restoringBackup = ref('')
 const loadingWebDavBackups = ref(false)
+const checkingBackup = ref(false)
 const checkingSources = ref(false)
 const checkingUpdates = ref(false)
 const serverInfo = ref<ServerInfo>()
@@ -600,6 +622,7 @@ const lastLocalBook = ref<Book>()
 const appSettings = ref<AppSettings>({})
 const backups = ref<ServerBackup[]>([])
 const webDavBackups = ref<WebDavBackup[]>([])
+const backupCheck = ref<BackupCheckResult>()
 const sourceChecks = ref<SourceCheckReport[]>([])
 const updateCheck = ref<UpdateCheckResult>()
 
@@ -623,6 +646,15 @@ const wsEndpoint = computed(() => legado_webSocket_entry_point || '-')
 const backupDirHint = computed(
   () => backups.value[0]?.path.replace(/[\\/][^\\/]+$/, '') || '本地备份目录',
 )
+const backupCheckMessage = computed(() => {
+  const result = backupCheck.value
+  if (!result) return ''
+  if (!result.enabled) return '远端备份检查已关闭'
+  if (result.configured === false) return '尚未配置 WebDAV'
+  if (result.newer) return `发现远端更新：${result.remote?.fileName || '最新快照'}`
+  if (result.message) return result.message
+  return '远端没有更新的备份'
+})
 
 const countCards = computed(() => {
   const counts = serverInfo.value?.counts
@@ -782,14 +814,14 @@ const coverageRows = [
   },
   {
     name: '在线搜索与抓取',
-    scope: 'Android 规则引擎待抽取到 JVM core',
-    status: '兼容入口',
+    scope: 'HTTP 搜索、详情抓取、章节目录与正文读取',
+    status: '可用',
     icon: Search,
   },
   {
     name: 'TTS / WebDAV / 通知',
-    scope: 'WebDAV 账号已配置落盘，远程协议继续接入',
-    status: '规划中',
+    scope: '浏览器 TTS、WebDAV 备份快照与远端更新检查；通知受浏览器权限限制',
+    status: '部分可用',
     icon: SetUp,
   },
 ]
@@ -839,7 +871,7 @@ function createReplaceRule(): ReplaceRule {
 
 function statusTagType(status: string) {
   if (status === '可用') return 'success'
-  if (status === '兼容入口') return 'warning'
+  if (status === '兼容入口' || status === '部分可用') return 'warning'
   return 'info'
 }
 
@@ -886,6 +918,27 @@ async function loadWebDavBackups() {
     ElMessage.error(error instanceof Error ? error.message : '无法读取 WebDAV 快照')
   } finally {
     loadingWebDavBackups.value = false
+  }
+}
+
+async function checkRemoteBackup() {
+  checkingBackup.value = true
+  try {
+    backupCheck.value = unwrap(await API.checkNewBackup())
+    if (backupCheck.value.newer) {
+      await loadWebDavBackups()
+      ElMessage.warning(`发现远端更新备份：${backupCheck.value.remote?.fileName || '请查看远端快照'}`)
+    } else if (backupCheck.value.configured === false) {
+      ElMessage.info('请先在设置中配置 WebDAV')
+    } else if (backupCheck.value.message) {
+      ElMessage.warning(backupCheck.value.message)
+    } else {
+      ElMessage.success('远端没有更新的备份')
+    }
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '检查远端备份失败')
+  } finally {
+    checkingBackup.value = false
   }
 }
 
@@ -1212,6 +1265,16 @@ async function copyEndpoint(value: string) {
   if (!value || value === '-') return
   await navigator.clipboard?.writeText(value)
   ElMessage.success('已复制')
+}
+
+async function copySourceUrl(value: string) {
+  if (!value) return
+  await navigator.clipboard?.writeText(value)
+  ElMessage.success('源地址已复制')
+}
+
+function openSourceManager(kind: string) {
+  void router.push(kind === 'rssSource' ? '/rssSource' : '/bookSource')
 }
 
 function openTocEditor(rule?: TxtTocRule) {
@@ -1705,6 +1768,38 @@ onMounted(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.backup-check-status {
+  margin-top: 12px;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid #dbe5ee;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+
+  .el-icon {
+    color: #0f766e;
+  }
+
+  .el-button {
+    margin-left: auto;
+  }
+
+  &.newer {
+    border-color: #f5c26b;
+    background: #fffbeb;
+    color: #92400e;
+
+    .el-icon {
+      color: #b45309;
+    }
+  }
 }
 
 .backup-list {

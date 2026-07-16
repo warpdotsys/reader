@@ -71,12 +71,8 @@
           <strong>{{ serverInfo?.counts.appData ?? 0 }}</strong>
         </div>
         <div class="stat-item">
-          <span>Web 可用面</span>
-          <strong>{{ usableFeatureCount }}</strong>
-        </div>
-        <div class="stat-item">
-          <span>待接 Linux 能力</span>
-          <strong>{{ linuxFeatureCount }}</strong>
+          <span>当前集合</span>
+          <strong>{{ activeKind?.label || '未选择' }}</strong>
         </div>
       </section>
 
@@ -96,9 +92,6 @@
             </div>
           </div>
           <div class="feature-status">
-            <el-tag :type="statusTagType(group.status)" effect="plain">
-              {{ group.status }}
-            </el-tag>
             <span>{{ group.coverage }}</span>
           </div>
           <div class="feature-actions">
@@ -124,9 +117,6 @@
             </p>
           </div>
           <div class="vault-actions">
-            <el-tag v-if="activeKind" :type="statusTagType(activeKind.status)" effect="plain">
-              {{ activeKind.status }}
-            </el-tag>
             <el-button :icon="EditPen" type="primary" @click="openCreateEditor">
               新增
             </el-button>
@@ -426,7 +416,6 @@ type FeatureGroup = {
   name: string
   description: string
   coverage: string
-  status: string
   tone: string
   icon: Component
   actions: FeatureAction[]
@@ -453,7 +442,6 @@ const featureGroups: FeatureGroup[] = [
     name: '书架与阅读',
     description: '书架、分组、书签、阅读记录、阅读样式以及 TXT、EPUB、CBZ 本地书。',
     coverage: '核心链路已在 Web 端可用',
-    status: 'Web 可用',
     tone: 'tone-green',
     icon: Reading,
     actions: [
@@ -467,7 +455,6 @@ const featureGroups: FeatureGroup[] = [
     name: '书源与订阅源',
     description: '书源/RSS 源编辑、导入导出、调试入口、源变量和 Cookie。',
     coverage: '管理、调试及 HTTP、JSONPath、正则、CSS、XPath 与受限 JS 转换规则均可用',
-    status: 'Web 可用',
     tone: 'tone-blue',
     icon: Collection,
     actions: [
@@ -481,7 +468,6 @@ const featureGroups: FeatureGroup[] = [
     name: '规则工具',
     description: '替换规则、TXT 目录规则、字典规则和检查源配置。',
     coverage: '替换/TXT/划词字典均可执行，JavaScript 规则降级为可读正文。',
-    status: 'Web 可用',
     tone: 'tone-amber',
     icon: Search,
     actions: [
@@ -494,7 +480,6 @@ const featureGroups: FeatureGroup[] = [
     name: '备份与同步',
     description: '整包备份、WebDAV 快照、同步进度和恢复忽略项。',
     coverage: '本地与 WebDAV 快照可创建、列出、恢复和删除',
-    status: 'Web 可用',
     tone: 'tone-cyan',
     icon: Connection,
     actions: [
@@ -507,7 +492,6 @@ const featureGroups: FeatureGroup[] = [
     name: '朗读与媒体',
     description: 'HTTP TTS、朗读按键、音频焦点、漫画和视频配置。',
     coverage: '浏览器系统朗读、HTTP TTS 音频代理、下载任务和漫画阅读设置可用。',
-    status: 'Web 可用',
     tone: 'tone-violet',
     icon: VideoPlay,
     actions: [
@@ -520,7 +504,6 @@ const featureGroups: FeatureGroup[] = [
     name: '维护与系统',
     description: '缓存、日志、主题方案、Web 端口和升级渠道。',
     coverage: '日志、维护、主题、缓存、更新检查和 Linux 服务端配置均可持久化。',
-    status: 'Web 可用',
     tone: 'tone-red',
     icon: Files,
     actions: [
@@ -601,13 +584,6 @@ const collectionMetrics = computed(() => {
   ]
 })
 
-const usableFeatureCount = computed(
-  () => featureGroups.filter(group => group.status === 'Web 可用').length,
-)
-const linuxFeatureCount = computed(
-  () => featureGroups.filter(group => group.status.includes('Linux')).length,
-)
-
 watch(
   () => route.query.kind,
   value => {
@@ -678,13 +654,6 @@ async function loadAppData() {
 
 function handleSelectionChange(rows: AppDataItem[]) {
   selectedRows.value = rows
-}
-
-function statusTagType(status: string) {
-  if (status === 'Web 可用') return 'success'
-  if (status === 'Linux 需实现') return 'warning'
-  if (status === '部分可用' || status === '兼容入口') return 'warning'
-  return 'info'
 }
 
 function runFeatureAction(action: FeatureAction) {

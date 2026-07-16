@@ -22,7 +22,8 @@
       type="danger"
       :icon="Delete"
       @click="deleteSelectSources"
-      :disabled="sourceSelect.length === 0"
+      :loading="deletingSources"
+      :disabled="sourceSelect.length === 0 || deletingSources"
       >删除</el-button
     >
     <el-button
@@ -83,6 +84,7 @@ const appSettings = ref<AppSettings>({})
 const sourceUrlSelect = ref<string[]>([])
 const searchKey = ref('')
 const savingEnabled = ref(false)
+const deletingSources = ref(false)
 const sources = computed(() => store.sources)
 const defaultScope = computed(() => String(appSettings.value.main?.searchScope ?? '').trim())
 const defaultGroup = computed(() => String(appSettings.value.main?.searchGroup ?? '').trim())
@@ -180,10 +182,18 @@ async function setSelectedEnabled(enabled: boolean) {
   }
 }
 
-const deleteSelectSources = () => {
+const deleteSelectSources = async () => {
   const sourceSelectValue = sourceSelect.value
-  API.deleteSource(sourceSelectValue).then(({ data }) => {
-    if (!data.isSuccess) return ElMessage.error(data.errorMsg)
+  if (sourceSelectValue.length === 0) return
+  try {
+    await ElMessageBox.confirm(
+      `将删除当前选中的 ${sourceSelectValue.length} 个源。`,
+      '删除源',
+      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' },
+    )
+    deletingSources.value = true
+    const { data } = await API.deleteSource(sourceSelectValue)
+    if (!data.isSuccess) throw new Error(data.errorMsg || '删除源失败')
     store.deleteSources(sourceSelectValue)
     const sourceUrlSelectRawValue = toRaw(sourceUrlSelect.value)
     sourceSelectValue.forEach(source => {
@@ -191,11 +201,33 @@ const deleteSelectSources = () => {
       if (index > -1) sourceUrlSelectRawValue.splice(index, 1)
     })
     sourceUrlSelect.value = sourceUrlSelectRawValue
-  })
+    ElMessage.success(`已删除 ${sourceSelectValue.length} 个源`)
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error instanceof Error ? error.message : '删除源失败')
+    }
+  } finally {
+    deletingSources.value = false
+  }
 }
-const clearAllSources = () => {
-  store.clearAllSource()
-  sourceUrlSelect.value = []
+const clearAllSources = async () => {
+  if (sources.value.length === 0) return
+  try {
+    await ElMessageBox.confirm(
+      `将删除当前 ${sources.value.length} 个源，另一种源类型不会受到影响。`,
+      '清空当前源',
+      { type: 'warning', confirmButtonText: '清空', cancelButtonText: '取消' },
+    )
+    const response = await API.deleteSource(sources.value)
+    if (!response.data.isSuccess) throw new Error(response.data.errorMsg || '清空源失败')
+    store.saveSources([])
+    sourceUrlSelect.value = []
+    ElMessage.success('当前源已清空')
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error instanceof Error ? error.message : '清空源失败')
+    }
+  }
 }
 
 //导入本地文件
@@ -210,7 +242,7 @@ const importSourceFile = () => {
     }
     const reader = new FileReader()
     reader.readAsText(files[0])
-    reader.onload = () => {
+    reader.onload = async () => {
       try {
         const jsonData = JSON.parse(reader.result as string)
         if (!Array.isArray(jsonData)) throw new Error('导入内容必须是源数组')
@@ -240,7 +272,10 @@ const importSourceFile = () => {
           }
           merged.set(key, next)
         })
-        store.saveSources(Array.from(merged.values()))
+        const mergedSources = Array.from(merged.values())
+        const response = await API.saveSources(mergedSources)
+        if (!response.data.isSuccess) throw new Error(response.data.errorMsg || '导入源失败')
+        store.saveSources(Array.isArray(response.data.data) ? response.data.data : mergedSources)
         if (comments.length) {
           void ElMessageBox.alert(comments.slice(0, 20).join('\n'), `已导入 ${imported.length} 个源`, {
             confirmButtonText: '确定',

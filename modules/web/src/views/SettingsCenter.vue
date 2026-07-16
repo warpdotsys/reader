@@ -692,11 +692,11 @@ const appEntries: AppEntry[] = [
   { label: '备份与 WebDAV', summary: '配置备份、恢复和同步偏好', icon: Connection, path: '/settings', query: { section: 'backup' } },
 ]
 const parityItems = [
-  { name: '书架/阅读', state: 'Web 已有基础阅读，设置项继续接入', icon: Reading },
-  { name: '书源/RSS 源', state: '管理 UI 已有，规则执行引擎待抽 JVM core', icon: Collection },
+  { name: '书架/阅读', state: '书籍列表、章节目录、正文、进度与阅读样式已在 Web 端可用', icon: Reading },
+  { name: '书源/RSS 源', state: '管理、调试、HTTP 规则执行、导入导出与服务端持久化已可用', icon: Collection },
   { name: 'TXT/替换规则', state: 'Web 已可管理并被服务端使用', icon: Files },
   { name: 'App 数据工作台', state: '分组、书签、TTS、Cookie、字典规则等可在 Web 端管理并执行', icon: SetUp },
-  { name: '备份/同步', state: '本地快照可用，WebDAV 协议继续接入', icon: Connection },
+  { name: '备份/同步', state: '本地与 WebDAV 快照、远端更新检查、恢复忽略项与进度同步已可用', icon: Connection },
   { name: 'TTS/媒体键', state: '浏览器系统朗读与 HTTP TTS 音频代理均可用', icon: VideoPlay },
   { name: '漫画/图片处理', state: '配置保留，图像管线待服务化', icon: Monitor },
 ]
