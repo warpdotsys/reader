@@ -2893,11 +2893,17 @@ class LegadoStore(
         }
     }
 
-    private data class PortableRule(val expression: String, val puts: Map<String, String>)
+    private data class PortableRule(
+        val expression: String,
+        val puts: Map<String, String>,
+        val replacePattern: String? = null,
+        val replacement: String = "",
+        val replaceFirst: Boolean = false,
+    )
 
     private fun parsePortableRule(rule: String): PortableRule {
         val puts = linkedMapOf<String, String>()
-        val expression = Regex("""@put:(\{[^{}]*})""", RegexOption.IGNORE_CASE).replace(rule) { match ->
+        val withoutPuts = Regex("""@put:(\{[^{}]*})""", RegexOption.IGNORE_CASE).replace(rule) { match ->
             val objectValue = runCatching { JsonParser.parseString(match.groupValues[1]).asObjectOrNull() }.getOrNull()
             objectValue?.entrySet()?.forEach { (key, value) ->
                 if (key.matches(Regex("[A-Za-z0-9_.-]{1,100}"))) {
@@ -2905,8 +2911,15 @@ class LegadoStore(
                 }
             }
             ""
-        }.trim()
-        return PortableRule(expression, puts)
+        }
+        val parts = withoutPuts.split("##")
+        return PortableRule(
+            expression = parts.firstOrNull().orEmpty().trim(),
+            puts = puts,
+            replacePattern = parts.getOrNull(1),
+            replacement = parts.getOrNull(2).orEmpty(),
+            replaceFirst = parts.size > 3,
+        )
     }
 
     private fun applyRulePuts(source: JsonObject?, input: String, puts: Map<String, String>) {
@@ -2932,6 +2945,7 @@ class LegadoStore(
             listRule = true,
         )
         val values = when {
+            expression.isBlank() && portableRule.replacePattern != null -> listOf(input)
             expression.isBlank() -> emptyList()
             isJavaScriptRule(expression) -> evaluateJavaScriptRule(input, expression).asValues()
             splitJavaScriptTransform(expression) != null -> {
@@ -2963,7 +2977,7 @@ class LegadoStore(
                     .toList()
             }.getOrDefault(emptyList())
         }
-        return values
+        return values.map { value -> applyPortableRuleReplacement(value, portableRule) }
     }
 
     private fun extractRuleValue(input: String, rule: String?): String {
@@ -2975,6 +2989,7 @@ class LegadoStore(
             listRule = false,
         )
         val value = when {
+            expression.isBlank() && portableRule.replacePattern != null -> input
             expression.isBlank() -> ""
             isJavaScriptRule(expression) -> evaluateJavaScriptRule(input, expression).asValue()
             splitJavaScriptTransform(expression) != null -> {
@@ -3003,7 +3018,20 @@ class LegadoStore(
                 match.groups.drop(1).firstOrNull { it != null }?.value ?: match.value
             }.getOrDefault("")
         }
-        return value
+        return applyPortableRuleReplacement(value, portableRule)
+    }
+
+    private fun applyPortableRuleReplacement(value: String, rule: PortableRule): String {
+        val rawPattern = rule.replacePattern ?: return value
+        val source = sourceRuleContext.get() ?: JsonObject()
+        val pattern = expandRuleVariables(source, rawPattern)
+        val replacement = expandRuleVariables(source, rule.replacement)
+        if (pattern.isBlank()) return value
+        val regex = runCatching { Regex(pattern) }.getOrNull()
+        if (regex == null) return value.replace(pattern, replacement)
+        if (!rule.replaceFirst) return regex.replace(value, replacement)
+        val match = regex.find(value) ?: return ""
+        return regex.replaceFirst(match.value, replacement)
     }
 
     private fun normalizePortableRuleExpression(rawRule: String, listRule: Boolean): String {
