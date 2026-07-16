@@ -581,6 +581,7 @@ class LegadoStore(
     private val authSessions = ConcurrentHashMap<String, Long>()
     private val sourceCookieLock = Any()
     private val sourceRateLocks = ConcurrentHashMap<String, SourceRateState>()
+    private val sourceRuleContext = ThreadLocal<JsonObject?>()
     private val javaScriptRuleContext = ThreadLocal<JavaScriptRuleContext?>()
     private val javaScriptRuleExecutor = Executors.newFixedThreadPool(2) { runnable ->
         Thread(runnable, "legado-js-rule").apply { isDaemon = true }
@@ -1555,14 +1556,15 @@ class LegadoStore(
     }
 
     private fun exploreSource(source: JsonObject, entry: ExploreEntry, page: Int): List<JsonObject> {
-        val rule = source["ruleExplore"].asObjectOrNull() ?: return emptyList()
-        val requestUrl = entry.url
-            .replace("{{page}}", page.toString())
-            .replace("{page}", page.toString())
-        val startedAt = System.nanoTime()
-        val body = fetchSourceText(source, requestUrl) ?: return emptyList()
-        val latency = ((System.nanoTime() - startedAt) / 1_000_000).coerceAtLeast(0)
-        return extractRuleValues(body, rule.string("bookList").orEmpty()).mapNotNull { item ->
+        return withSourceRuleContext(source) {
+            val rule = source["ruleExplore"].asObjectOrNull() ?: return@withSourceRuleContext emptyList()
+            val requestUrl = entry.url
+                .replace("{{page}}", page.toString())
+                .replace("{page}", page.toString())
+            val startedAt = System.nanoTime()
+            val body = fetchSourceText(source, requestUrl) ?: return@withSourceRuleContext emptyList()
+            val latency = ((System.nanoTime() - startedAt) / 1_000_000).coerceAtLeast(0)
+            extractRuleValues(body, rule.string("bookList").orEmpty()).mapNotNull { item ->
             val name = extractRuleValue(item, rule.string("name")).trim()
             val bookUrl = resolveSearchUrl(requestUrl, extractRuleValue(item, rule.string("bookUrl")).trim())
             if (name.isBlank() || bookUrl.isBlank()) return@mapNotNull null
@@ -1586,6 +1588,7 @@ class LegadoStore(
                 addProperty("originOrder", source["customOrder"].safeInt())
                 addProperty("chapterWordCount", 0)
                 addProperty("respondTime", latency)
+            }
             }
         }
     }
@@ -2178,16 +2181,18 @@ class LegadoStore(
     }
 
     private fun loadRemoteFileUrls(book: JsonObject, source: JsonObject): List<String> {
-        val rule = source["ruleBookInfo"].asObjectOrNull() ?: return emptyList()
-        val downloadRule = rule.string("downloadUrls") ?: return emptyList()
-        val detailUrl = book.string("bookUrl").orEmpty()
-        val detail = fetchSourceText(source, detailUrl) ?: return emptyList()
-        val scope = extractBookInfoScope(detail, rule.string("init"))
-        return extractRuleValues(scope, downloadRule)
-            .map { resolveSearchUrl(detailUrl, it.trim()) }
-            .filter { it.startsWith("http://", true) || it.startsWith("https://", true) }
-            .distinct()
-            .take(8)
+        return withSourceRuleContext(source) {
+            val rule = source["ruleBookInfo"].asObjectOrNull() ?: return@withSourceRuleContext emptyList()
+            val downloadRule = rule.string("downloadUrls") ?: return@withSourceRuleContext emptyList()
+            val detailUrl = book.string("bookUrl").orEmpty()
+            val detail = fetchSourceText(source, detailUrl) ?: return@withSourceRuleContext emptyList()
+            val scope = extractBookInfoScope(detail, rule.string("init"))
+            extractRuleValues(scope, downloadRule)
+                .map { resolveSearchUrl(detailUrl, it.trim()) }
+                .filter { it.startsWith("http://", true) || it.startsWith("https://", true) }
+                .distinct()
+                .take(8)
+        }
     }
 
     private data class SourceBytesResponse(
@@ -2282,12 +2287,13 @@ class LegadoStore(
     }
 
     private fun refreshRssSource(source: JsonObject): List<JsonObject> {
-        val sourceUrl = source.string("sourceUrl").orEmpty()
-        val body = fetchSourceText(source, sourceUrl) ?: return emptyList()
-        val articles = parseRssArticles(source, body)
-        if (articles.isEmpty()) return emptyList()
-        cacheRssArticles(articles)
-        return articles
+        return withSourceRuleContext(source) {
+            val sourceUrl = source.string("sourceUrl").orEmpty()
+            val body = fetchSourceText(source, sourceUrl) ?: return@withSourceRuleContext emptyList()
+            val articles = parseRssArticles(source, body)
+            if (articles.isNotEmpty()) cacheRssArticles(articles)
+            articles
+        }
     }
 
     private fun cacheRssArticles(articles: List<JsonObject>) {
@@ -2525,22 +2531,24 @@ class LegadoStore(
     }
 
     private fun enrichCandidateBookInfo(candidate: JsonObject, source: JsonObject) {
-        val rule = source["ruleBookInfo"].asObjectOrNull() ?: return
-        val detailUrl = candidate.string("bookUrl").orEmpty()
-        val detail = fetchSourceText(source, detailUrl) ?: return
-        val detailScope = extractBookInfoScope(detail, rule.string("init"))
-        for (field in listOf("name", "author", "kind", "wordCount", "intro")) {
-            val value = extractRuleValue(detailScope, rule.string(field)).trim()
-            if (value.isNotBlank()) candidate.addProperty(field, value)
+        withSourceRuleContext(source) {
+            val rule = source["ruleBookInfo"].asObjectOrNull() ?: return@withSourceRuleContext
+            val detailUrl = candidate.string("bookUrl").orEmpty()
+            val detail = fetchSourceText(source, detailUrl) ?: return@withSourceRuleContext
+            val detailScope = extractBookInfoScope(detail, rule.string("init"))
+            for (field in listOf("name", "author", "kind", "wordCount", "intro")) {
+                val value = extractRuleValue(detailScope, rule.string(field)).trim()
+                if (value.isNotBlank()) candidate.addProperty(field, value)
+            }
+            val cover = extractRuleValue(detailScope, rule.string("coverUrl")).trim()
+            if (cover.isNotBlank()) candidate.addProperty("coverUrl", resolveSearchUrl(detailUrl, cover))
+            val toc = extractRuleValue(detailScope, rule.string("tocUrl")).trim()
+            if (toc.isNotBlank()) candidate.addProperty("tocUrl", resolveSearchUrl(detailUrl, toc))
+            val latest = extractRuleValue(detailScope, rule.string("lastChapter")).trim()
+            if (latest.isNotBlank()) candidate.addProperty("latestChapterTitle", latest)
+            val updateTime = extractRuleValue(detailScope, rule.string("updateTime")).trim()
+            if (updateTime.isNotBlank()) candidate.addProperty("latestChapterTime", updateTime)
         }
-        val cover = extractRuleValue(detailScope, rule.string("coverUrl")).trim()
-        if (cover.isNotBlank()) candidate.addProperty("coverUrl", resolveSearchUrl(detailUrl, cover))
-        val toc = extractRuleValue(detailScope, rule.string("tocUrl")).trim()
-        if (toc.isNotBlank()) candidate.addProperty("tocUrl", resolveSearchUrl(detailUrl, toc))
-        val latest = extractRuleValue(detailScope, rule.string("lastChapter")).trim()
-        if (latest.isNotBlank()) candidate.addProperty("latestChapterTitle", latest)
-        val updateTime = extractRuleValue(detailScope, rule.string("updateTime")).trim()
-        if (updateTime.isNotBlank()) candidate.addProperty("latestChapterTime", updateTime)
     }
 
     private fun extractBookInfoScope(response: String, initRule: String?): String {
@@ -2677,21 +2685,23 @@ class LegadoStore(
         .asObjectOrNull()?.get("changeSourceLoadWordCount")?.safeBoolean() == true
 
     private fun searchSource(source: JsonObject, key: String): List<JsonObject> {
-        val startedAt = System.nanoTime()
-        val rule = source["ruleSearch"].asObjectOrNull() ?: return emptyList()
-        val searchUrl = source.string("searchUrl").orEmpty()
-        val requestSpec = sourceSearchRequest(source, searchUrl, key) ?: return emptyList()
-        return try {
-            val response = sendSourceResponse(source, requestSpec.requestUrl, Duration.ofSeconds(15)) ?: return emptyList()
-            val body = response.body().decodeSourceText(response.headers())
-            if (response.statusCode() !in 200..299) return emptyList()
-            if (!matchesSearchCheckWord(body, rule.string("checkKeyWord"))) return emptyList()
-            val latency = ((System.nanoTime() - startedAt) / 1_000_000).coerceAtLeast(0)
-            withJavaScriptRuleContext(key, requestSpec.baseUrl) {
-                extractSourceBooks(source, rule, body, requestSpec.baseUrl, latency)
+        return withSourceRuleContext(source) {
+            val startedAt = System.nanoTime()
+            val rule = source["ruleSearch"].asObjectOrNull() ?: return@withSourceRuleContext emptyList()
+            val searchUrl = source.string("searchUrl").orEmpty()
+            val requestSpec = sourceSearchRequest(source, searchUrl, key) ?: return@withSourceRuleContext emptyList()
+            try {
+                val response = sendSourceResponse(source, requestSpec.requestUrl, Duration.ofSeconds(15)) ?: return@withSourceRuleContext emptyList()
+                val body = response.body().decodeSourceText(response.headers())
+                if (response.statusCode() !in 200..299) return@withSourceRuleContext emptyList()
+                if (!matchesSearchCheckWord(body, rule.string("checkKeyWord"))) return@withSourceRuleContext emptyList()
+                val latency = ((System.nanoTime() - startedAt) / 1_000_000).coerceAtLeast(0)
+                withJavaScriptRuleContext(key, requestSpec.baseUrl) {
+                    extractSourceBooks(source, rule, body, requestSpec.baseUrl, latency)
+                }
+            } catch (_: Exception) {
+                emptyList()
             }
-        } catch (_: Exception) {
-            emptyList()
         }
     }
 
@@ -2825,16 +2835,84 @@ class LegadoStore(
     private fun sourceCookieJarEnabled(source: JsonObject): Boolean = source["enabledCookieJar"]?.safeBoolean() == true
 
     private fun expandSourceVariables(source: JsonObject, value: String): String {
-        if (!value.contains("{{")) return value
+        val context = sourceRuleContext.get() ?: source
+        return expandRuleVariables(context, value)
+    }
+
+    private fun <T> withSourceRuleContext(source: JsonObject, block: () -> T): T {
+        val previous = sourceRuleContext.get()
+        sourceRuleContext.set(source)
+        return try {
+            block()
+        } finally {
+            sourceRuleContext.set(previous)
+        }
+    }
+
+    private fun expandRuleVariables(source: JsonObject, value: String): String {
+        if (!value.contains("{{") && !value.contains("@get:", true)) return value
         val sourceUrl = source.string("bookSourceUrl") ?: source.string("sourceUrl").orEmpty()
+        val variables = sourceVariables(sourceUrl)
+        val bracesExpanded = Regex("""\{\{([A-Za-z0-9_.-]+)}}""").replace(value) { match ->
+            variables[match.groupValues[1]] ?: match.value
+        }
+        return Regex("""@get:\{([A-Za-z0-9_.-]+)}""", RegexOption.IGNORE_CASE)
+            .replace(bracesExpanded) { match -> variables[match.groupValues[1]] ?: "" }
+    }
+
+    private fun sourceVariables(sourceUrl: String): Map<String, String> {
         val now = System.currentTimeMillis()
         val records = readList("cacheRecords")
+            .asSequence()
             .filter { it["expires"].safeLong().let { expires -> expires <= 0 || expires > now } }
-        return Regex("""\{\{([A-Za-z0-9_.-]+)}}""").replace(value) { match ->
-            val key = match.groupValues[1]
+            .toList()
+        val variables = linkedMapOf<String, String>()
+        records.filter { it.string("sourceUrl").isNullOrBlank() }.forEach { record ->
+            record.string("key")?.let { variables[it] = record.string("value").orEmpty() }
+        }
+        records.filter { it.string("sourceUrl") == sourceUrl }.forEach { record ->
+            record.string("key")?.let { variables[it] = record.string("value").orEmpty() }
+        }
+        return variables
+    }
+
+    private fun saveSourceVariable(source: JsonObject, key: String, value: String) {
+        if (key.isBlank() || key.length > 100 || value.length > 65_536) return
+        val sourceUrl = source.string("bookSourceUrl") ?: source.string("sourceUrl").orEmpty()
+        synchronized(this) {
+            val records = readList("cacheRecords")
             val record = records.firstOrNull { it.string("key") == key && it.string("sourceUrl") == sourceUrl }
-                ?: records.firstOrNull { it.string("key") == key && it.string("sourceUrl").isNullOrBlank() }
-            record?.string("value") ?: match.value
+                ?: JsonObject().also(records::add)
+            record.addProperty("key", key)
+            record.addProperty("value", value)
+            record.addProperty("sourceUrl", sourceUrl)
+            record.addProperty("updatedAt", System.currentTimeMillis())
+            record.remove("expires")
+            writeList("cacheRecords", records)
+        }
+    }
+
+    private data class PortableRule(val expression: String, val puts: Map<String, String>)
+
+    private fun parsePortableRule(rule: String): PortableRule {
+        val puts = linkedMapOf<String, String>()
+        val expression = Regex("""@put:(\{[^{}]*})""", RegexOption.IGNORE_CASE).replace(rule) { match ->
+            val objectValue = runCatching { JsonParser.parseString(match.groupValues[1]).asObjectOrNull() }.getOrNull()
+            objectValue?.entrySet()?.forEach { (key, value) ->
+                if (key.matches(Regex("[A-Za-z0-9_.-]{1,100}"))) {
+                    puts[key] = runCatching { value.asString }.getOrDefault("")
+                }
+            }
+            ""
+        }.trim()
+        return PortableRule(expression, puts)
+    }
+
+    private fun applyRulePuts(source: JsonObject?, input: String, puts: Map<String, String>) {
+        val activeSource = source ?: sourceRuleContext.get() ?: return
+        puts.forEach { (key, valueRule) ->
+            val value = extractRuleValue(input, valueRule)
+            saveSourceVariable(activeSource, key, value)
         }
     }
 
@@ -2846,71 +2924,79 @@ class LegadoStore(
 
     private fun extractRuleValues(input: String, rule: String): List<String> {
         if (rule.isBlank()) return emptyList()
-        if (isJavaScriptRule(rule)) return evaluateJavaScriptRule(input, rule).asValues()
-        splitJavaScriptTransform(rule)?.let { (baseRule, transform) ->
-            return extractRuleValues(input, baseRule)
-                .flatMap { value -> evaluateJavaScriptRule(value, transform).asValues() }
-        }
-        if (rule.trimStart().startsWith("$")) {
-            val root = runCatching { JsonParser.parseString(input) }.getOrNull() ?: return emptyList()
-            return jsonPath(root, rule).map { gson.toJson(it) }
-        }
-        if (isXpathRule(rule)) {
-            val (expression, attribute) = xpathRuleParts(rule)
-            if (expression.isBlank()) return emptyList()
-            return runCatching {
-                Jsoup.parseBodyFragment(input).body().selectXpath(expression)
-                    .map { elementRuleValue(it, attribute, outerHtmlWhenUnspecified = true) }
+        val portableRule = parsePortableRule(expandRuleVariables(sourceRuleContext.get() ?: JsonObject(), rule))
+        applyRulePuts(sourceRuleContext.get(), input, portableRule.puts)
+        val expression = portableRule.expression
+        val values = when {
+            expression.isBlank() -> emptyList()
+            isJavaScriptRule(expression) -> evaluateJavaScriptRule(input, expression).asValues()
+            splitJavaScriptTransform(expression) != null -> {
+                val (baseRule, transform) = splitJavaScriptTransform(expression)!!
+                extractRuleValues(input, baseRule)
+                    .flatMap { value -> evaluateJavaScriptRule(value, transform).asValues() }
             }
-                .getOrDefault(emptyList())
-        }
-        if (isCssRule(rule)) {
-            val (selector, attribute) = cssRuleParts(rule)
-            if (selector.isBlank()) return emptyList()
-            return runCatching {
-                Jsoup.parseBodyFragment(input).select(selector)
-                    .map { elementRuleValue(it, attribute, outerHtmlWhenUnspecified = true) }
+            expression.trimStart().startsWith("$") -> {
+                val root = runCatching { JsonParser.parseString(input) }.getOrNull()
+                root?.let { jsonPath(it, expression).map { value -> gson.toJson(value) } } ?: emptyList()
             }
-                .getOrDefault(emptyList())
+            isXpathRule(expression) -> {
+                val (xpath, attribute) = xpathRuleParts(expression)
+                if (xpath.isBlank()) emptyList() else runCatching {
+                    Jsoup.parseBodyFragment(input).body().selectXpath(xpath)
+                        .map { elementRuleValue(it, attribute, outerHtmlWhenUnspecified = true) }
+                }.getOrDefault(emptyList())
+            }
+            isCssRule(expression) -> {
+                val (selector, attribute) = cssRuleParts(expression)
+                if (selector.isBlank()) emptyList() else runCatching {
+                    Jsoup.parseBodyFragment(input).select(selector)
+                        .map { elementRuleValue(it, attribute, outerHtmlWhenUnspecified = true) }
+                }.getOrDefault(emptyList())
+            }
+            else -> runCatching {
+                Regex(expression, setOf(RegexOption.DOT_MATCHES_ALL)).findAll(input)
+                    .map { match -> match.groups.drop(1).firstOrNull { it != null }?.value ?: match.value }
+                    .toList()
+            }.getOrDefault(emptyList())
         }
-        return runCatching {
-            Regex(rule, setOf(RegexOption.DOT_MATCHES_ALL)).findAll(input)
-                .map { match -> match.groups.drop(1).firstOrNull { it != null }?.value ?: match.value }
-                .toList()
-        }.getOrDefault(emptyList())
+        return values
     }
 
     private fun extractRuleValue(input: String, rule: String?): String {
         if (rule.isNullOrBlank()) return ""
-        if (isJavaScriptRule(rule)) return evaluateJavaScriptRule(input, rule).asValue()
-        splitJavaScriptTransform(rule)?.let { (baseRule, transform) ->
-            return evaluateJavaScriptRule(extractRuleValue(input, baseRule), transform).asValue()
-        }
-        if (rule.trimStart().startsWith("$")) {
-            val root = runCatching { JsonParser.parseString(input) }.getOrNull() ?: return ""
-            val value = jsonPath(root, rule).firstOrNull() ?: return ""
-            return if (value.isJsonPrimitive) value.asString else gson.toJson(value)
-        }
-        if (isXpathRule(rule)) {
-            return runCatching {
-                val (expression, attribute) = xpathRuleParts(rule)
-                val element = Jsoup.parseBodyFragment(input).body().selectXpath(expression).firstOrNull() ?: return ""
+        val portableRule = parsePortableRule(expandRuleVariables(sourceRuleContext.get() ?: JsonObject(), rule))
+        applyRulePuts(sourceRuleContext.get(), input, portableRule.puts)
+        val expression = portableRule.expression
+        val value = when {
+            expression.isBlank() -> ""
+            isJavaScriptRule(expression) -> evaluateJavaScriptRule(input, expression).asValue()
+            splitJavaScriptTransform(expression) != null -> {
+                val (baseRule, transform) = splitJavaScriptTransform(expression)!!
+                evaluateJavaScriptRule(extractRuleValue(input, baseRule), transform).asValue()
+            }
+            expression.trimStart().startsWith("$") -> {
+                val root = runCatching { JsonParser.parseString(input) }.getOrNull()
+                val item = root?.let { jsonPath(it, expression).firstOrNull() }
+                if (item == null) "" else if (item.isJsonPrimitive) item.asString else gson.toJson(item)
+            }
+            isXpathRule(expression) -> runCatching {
+                val (xpath, attribute) = xpathRuleParts(expression)
+                val element = Jsoup.parseBodyFragment(input).body().selectXpath(xpath).firstOrNull() ?: return@runCatching ""
                 elementRuleValue(element, attribute)
             }.getOrDefault("")
-        }
-        if (isCssRule(rule)) {
-            return runCatching {
-                val (selector, attribute) = cssRuleParts(rule)
+            isCssRule(expression) -> runCatching {
+                val (selector, attribute) = cssRuleParts(expression)
                 val element = if (selector.isBlank()) Jsoup.parseBodyFragment(input).body()
                     else Jsoup.parseBodyFragment(input).selectFirst(selector)
-                    ?: return ""
+                    ?: return@runCatching ""
                 elementRuleValue(element, attribute)
             }.getOrDefault("")
+            else -> runCatching {
+                val match = Regex(expression, setOf(RegexOption.DOT_MATCHES_ALL)).find(input) ?: return@runCatching ""
+                match.groups.drop(1).firstOrNull { it != null }?.value ?: match.value
+            }.getOrDefault("")
         }
-        return runCatching {
-            val match = Regex(rule, setOf(RegexOption.DOT_MATCHES_ALL)).find(input) ?: return ""
-            match.groups.drop(1).firstOrNull { it != null }?.value ?: match.value
-        }.getOrDefault("")
+        return value
     }
 
     private fun elementRuleValue(element: org.jsoup.nodes.Element, attribute: String?, outerHtmlWhenUnspecified: Boolean = false): String =
@@ -3658,15 +3744,16 @@ class LegadoStore(
     }
 
     private fun loadRemoteChapters(book: JsonObject, source: JsonObject): List<JsonObject> {
-        val rule = source["ruleToc"].asObjectOrNull() ?: return emptyList()
-        val bookUrl = book.string("bookUrl").orEmpty()
-        var pageUrl = resolveRemoteTocUrl(book, source)
-        val visited = linkedSetOf<String>()
-        val chapters = mutableListOf<JsonObject>()
-        for (page in 0 until 5) {
-            if (pageUrl.isBlank() || !visited.add(pageUrl)) break
-            val response = fetchSourceText(source, pageUrl) ?: break
-            extractRuleValues(response, rule.string("chapterList").orEmpty()).forEach { entry ->
+        return withSourceRuleContext(source) {
+            val rule = source["ruleToc"].asObjectOrNull() ?: return@withSourceRuleContext emptyList()
+            val bookUrl = book.string("bookUrl").orEmpty()
+            var pageUrl = resolveRemoteTocUrl(book, source)
+            val visited = linkedSetOf<String>()
+            val chapters = mutableListOf<JsonObject>()
+            for (page in 0 until 5) {
+                if (pageUrl.isBlank() || !visited.add(pageUrl)) break
+                val response = fetchSourceText(source, pageUrl) ?: break
+                extractRuleValues(response, rule.string("chapterList").orEmpty()).forEach { entry ->
                 val rawTitle = extractRuleValue(entry, rule.string("chapterName")).trim()
                 val title = formatChapterTitle(rawTitle, rule.string("formatJs"), chapters.size + 1)
                 val chapterUrl = resolveSearchUrl(pageUrl, extractRuleValue(entry, rule.string("chapterUrl")).trim())
@@ -3682,12 +3769,13 @@ class LegadoStore(
                     addProperty("isPay", sourceRuleBoolean(rule.string("isPay")?.let { extractRuleValue(entry, it) }))
                     extractRuleValue(entry, rule.string("chapterTag") ?: rule.string("updateTime")).trim().takeIf(String::isNotBlank)?.let { addProperty("tag", it) }
                 }
+                }
+                val next = rule.string("nextTocUrl")?.let { extractRuleValue(response, it).trim() }.orEmpty()
+                if (next.isBlank()) break
+                pageUrl = resolveSearchUrl(pageUrl, next)
             }
-            val next = rule.string("nextTocUrl")?.let { extractRuleValue(response, it).trim() }.orEmpty()
-            if (next.isBlank()) break
-            pageUrl = resolveSearchUrl(pageUrl, next)
+            chapters
         }
-        return chapters
     }
 
     private fun formatChapterTitle(title: String, formatJs: String?, index: Int): String {
@@ -3699,31 +3787,34 @@ class LegadoStore(
     }
 
     private fun loadRemoteChapterContent(chapter: JsonObject, source: JsonObject): String? {
-        val rules = source["ruleContent"].asObjectOrNull() ?: return fetchSourceText(source, chapter.string("url").orEmpty())
-        val contentRule = rules.string("content")
-        val subContentRule = rules.string("subContent")
-        val titleRule = rules.string("title")
-        val nextRule = rules.string("nextContentUrl")
-        val replaceRule = rules.string("replaceRegex")
-        var pageUrl = chapter.string("url").orEmpty()
-        val visited = linkedSetOf<String>()
-        val pages = mutableListOf<String>()
-        for (attempt in 0 until 5) {
-            if (pageUrl.isBlank() || !visited.add(pageUrl)) break
-            val response = fetchSourceText(source, pageUrl) ?: break
-            val mainContent = if (contentRule.isNullOrBlank()) response else extractRuleValue(response, contentRule)
-            val subContent = subContentRule?.let { extractRuleValue(response, it) }.orEmpty()
-            val content = listOf(mainContent, subContent).filter(String::isNotBlank).joinToString("\n\n")
-            content.trim().takeIf(String::isNotBlank)?.let(pages::add)
-            if (titleRule != null) {
-                extractRuleValue(response, titleRule).trim().takeIf(String::isNotBlank)
-                    ?.let { chapter.addProperty("title", it) }
+        return withSourceRuleContext(source) {
+            val rules = source["ruleContent"].asObjectOrNull()
+                ?: return@withSourceRuleContext fetchSourceText(source, chapter.string("url").orEmpty())
+            val contentRule = rules.string("content")
+            val subContentRule = rules.string("subContent")
+            val titleRule = rules.string("title")
+            val nextRule = rules.string("nextContentUrl")
+            val replaceRule = rules.string("replaceRegex")
+            var pageUrl = chapter.string("url").orEmpty()
+            val visited = linkedSetOf<String>()
+            val pages = mutableListOf<String>()
+            for (attempt in 0 until 5) {
+                if (pageUrl.isBlank() || !visited.add(pageUrl)) break
+                val response = fetchSourceText(source, pageUrl) ?: break
+                val mainContent = if (contentRule.isNullOrBlank()) response else extractRuleValue(response, contentRule)
+                val subContent = subContentRule?.let { extractRuleValue(response, it) }.orEmpty()
+                val content = listOf(mainContent, subContent).filter(String::isNotBlank).joinToString("\n\n")
+                content.trim().takeIf(String::isNotBlank)?.let(pages::add)
+                if (titleRule != null) {
+                    extractRuleValue(response, titleRule).trim().takeIf(String::isNotBlank)
+                        ?.let { chapter.addProperty("title", it) }
+                }
+                val next = nextRule?.let { extractRuleValue(response, it).trim() }.orEmpty()
+                pageUrl = resolveSearchUrl(pageUrl, next)
+                if (next.isBlank()) break
             }
-            val next = nextRule?.let { extractRuleValue(response, it).trim() }.orEmpty()
-            pageUrl = resolveSearchUrl(pageUrl, next)
-            if (next.isBlank()) break
+            applyContentReplaceRules(pages.joinToString("\n\n"), replaceRule).takeIf(String::isNotBlank)
         }
-        return applyContentReplaceRules(pages.joinToString("\n\n"), replaceRule).takeIf(String::isNotBlank)
     }
 
     private fun applyContentReplaceRules(content: String, rawRules: String?): String {
