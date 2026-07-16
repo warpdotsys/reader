@@ -315,6 +315,11 @@ const refreshToc = (/** @type {string} */ bookUrl: string) =>
     'refreshToc?url=' + encodeURIComponent(bookUrl),
   )
 
+const refreshBookInfo = (/** @type {string} */ bookUrl: string) =>
+  ajax.get<LeagdoApiResponse<Book>>(
+    'refreshBookInfo?url=' + encodeURIComponent(bookUrl),
+  )
+
 const getBookContent = (
   /** @type {string} */ bookUrl: string,
   /** @type {number} */ chapterIndex: number,
@@ -622,6 +627,7 @@ export default {
   getBookShelf,
   getChapterList,
   refreshToc,
+  refreshBookInfo,
   getBookContent,
   search,
   getExploreSources,

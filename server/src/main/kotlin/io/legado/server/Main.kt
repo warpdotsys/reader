@@ -278,6 +278,7 @@ class LegadoHttpServer(
             "/getReplaceRules" -> store.getReplaceRules()
             "/getTxtTocRules" -> store.getTxtTocRules()
             "/getBookshelf" -> store.getBookshelf()
+            "/refreshBookInfo" -> store.refreshBookInfo(parameters.first("url"))
             "/getChapterList" -> store.getChapterList(parameters.first("url"))
             "/refreshToc" -> store.getChapterList(parameters.first("url"), refresh = true)
             "/getBookContent" -> store.getBookContent(
@@ -2532,25 +2533,37 @@ class LegadoStore(
     }
 
     private fun enrichCandidateBookInfo(candidate: JsonObject, source: JsonObject) {
-        withSourceRuleContext(source) {
-            val rule = source["ruleBookInfo"].asObjectOrNull() ?: return@withSourceRuleContext
-            val detailUrl = candidate.string("bookUrl").orEmpty()
-            val detail = fetchSourceText(source, detailUrl) ?: return@withSourceRuleContext
-            val detailScope = extractBookInfoScope(detail, rule.string("init"))
-            for (field in listOf("name", "author", "kind", "wordCount", "intro")) {
-                val value = extractRuleValue(detailScope, rule.string(field)).trim()
-                if (value.isNotBlank()) candidate.addProperty(field, value)
-            }
-            val cover = extractRuleValue(detailScope, rule.string("coverUrl")).trim()
-            if (cover.isNotBlank()) candidate.addProperty("coverUrl", resolveSearchUrl(detailUrl, cover))
-            val toc = extractRuleValue(detailScope, rule.string("tocUrl")).trim()
-            if (toc.isNotBlank()) candidate.addProperty("tocUrl", resolveSearchUrl(detailUrl, toc))
-            val latest = extractRuleValue(detailScope, rule.string("lastChapter")).trim()
-            if (latest.isNotBlank()) candidate.addProperty("latestChapterTitle", latest)
-            val updateTime = extractRuleValue(detailScope, rule.string("updateTime")).trim()
-            if (updateTime.isNotBlank()) candidate.addProperty("latestChapterTime", updateTime)
-        }
+        applyBookInfoRules(candidate, source, allowRename = true)
     }
+
+    private fun applyBookInfoRules(book: JsonObject, source: JsonObject, allowRename: Boolean): Boolean =
+        withSourceRuleContext(source) {
+            val rule = source["ruleBookInfo"].asObjectOrNull() ?: return@withSourceRuleContext false
+            val detailUrl = book.string("bookUrl").orEmpty()
+            val detail = fetchSourceText(source, detailUrl) ?: return@withSourceRuleContext false
+            val detailScope = extractBookInfoScope(detail, rule.string("init"))
+            if (allowRename) {
+                extractRuleValue(detailScope, rule.string("name")).trim()
+                    .takeIf(String::isNotBlank)?.let { book.addProperty("name", it) }
+                extractRuleValue(detailScope, rule.string("author")).trim()
+                    .takeIf(String::isNotBlank)?.let { book.addProperty("author", it) }
+            }
+            for (field in listOf("kind", "wordCount", "intro")) {
+                extractRuleValue(detailScope, rule.string(field)).trim()
+                    .takeIf(String::isNotBlank)?.let { book.addProperty(field, it) }
+            }
+            extractRuleValue(detailScope, rule.string("coverUrl")).trim()
+                .takeIf(String::isNotBlank)
+                ?.let { book.addProperty("coverUrl", resolveSearchUrl(detailUrl, it)) }
+            extractRuleValue(detailScope, rule.string("tocUrl")).trim()
+                .takeIf(String::isNotBlank)
+                ?.let { book.addProperty("tocUrl", resolveSearchUrl(detailUrl, it)) }
+            extractRuleValue(detailScope, rule.string("lastChapter")).trim()
+                .takeIf(String::isNotBlank)?.let { book.addProperty("latestChapterTitle", it) }
+            extractRuleValue(detailScope, rule.string("updateTime")).trim()
+                .takeIf(String::isNotBlank)?.let { book.addProperty("latestChapterTimeText", it) }
+            true
+        }
 
     private fun extractBookInfoScope(response: String, initRule: String?): String {
         if (initRule.isNullOrBlank()) return response
@@ -2718,11 +2731,22 @@ class LegadoStore(
         }
     }
 
-    private data class JavaScriptRuleContext(val key: String = "", val baseUrl: String = "", val index: Int = 0)
+    private data class JavaScriptRuleContext(
+        val key: String = "",
+        val baseUrl: String = "",
+        val index: Int = 0,
+        val gInt: Int = 0,
+    )
 
-    private fun <T> withJavaScriptRuleContext(key: String, baseUrl: String, index: Int = 0, block: () -> T): T {
+    private fun <T> withJavaScriptRuleContext(
+        key: String,
+        baseUrl: String,
+        index: Int = 0,
+        gInt: Int = 0,
+        block: () -> T,
+    ): T {
         val previous = javaScriptRuleContext.get()
-        javaScriptRuleContext.set(JavaScriptRuleContext(key, baseUrl, index))
+        javaScriptRuleContext.set(JavaScriptRuleContext(key, baseUrl, index, gInt))
         return try {
             block()
         } finally {
@@ -3092,7 +3116,11 @@ class LegadoStore(
      * no Java, file, network, process, or thread access. Each invocation gets a
      * fresh context so state cannot leak across sources or requests.
      */
-    private fun evaluateJavaScriptRule(input: String, rule: String): JavaScriptRuleResult {
+    private fun evaluateJavaScriptRule(
+        input: String,
+        rule: String,
+        includeGInt: Boolean = false,
+    ): JavaScriptRuleResult {
         val script = rule.trimStart().substringAfter("@js:", "").trim()
         if (script.isBlank()) return JavaScriptRuleResult(error = "JavaScript rule is empty")
 
@@ -3115,18 +3143,22 @@ class LegadoStore(
                 bindings.putMember("inputKey", ruleContext.key)
                 bindings.putMember("inputBaseUrl", ruleContext.baseUrl)
                 bindings.putMember("inputIndex", ruleContext.index)
+                bindings.putMember("inputGInt", ruleContext.gInt)
                 val expression = """
                     (function () {
                       const result = String(input);
                       const key = String(inputKey);
                       const searchKey = key;
                       const baseUrl = String(inputBaseUrl);
-                      const title = result;
+                      ${if (includeGInt) "let" else "const"} title = result;
                       const index = Number(inputIndex);
+                      ${if (includeGInt) "let" else "const"} gInt = Number(inputGInt);
                       let resultJson = null;
                       try { resultJson = JSON.parse(result); } catch (_) {}
                       const __value = ($script);
-                      return JSON.stringify(__value === undefined ? "" : __value);
+                      return JSON.stringify($includeGInt
+                        ? { value: __value === undefined ? "" : __value, gInt: gInt }
+                        : (__value === undefined ? "" : __value));
                     })()
                 """.trimIndent()
                 val statement = """
@@ -3135,15 +3167,18 @@ class LegadoStore(
                       const key = String(inputKey);
                       const searchKey = key;
                       const baseUrl = String(inputBaseUrl);
-                      const title = result;
+                      ${if (includeGInt) "let" else "const"} title = result;
                       const index = Number(inputIndex);
+                      let gInt = Number(inputGInt);
                       let resultJson = null;
                       try { resultJson = JSON.parse(result); } catch (_) {}
                       const __value = (function () {
                         $script
                         return result;
                       })();
-                      return JSON.stringify(__value === undefined ? "" : __value);
+                      return JSON.stringify($includeGInt
+                        ? { value: __value === undefined ? "" : __value, gInt: gInt }
+                        : (__value === undefined ? "" : __value));
                     })()
                 """.trimIndent()
                 val value = runCatching { context.eval("js", expression) }
@@ -3359,6 +3394,26 @@ class LegadoStore(
     fun getBookshelf(): ReturnData {
         val books = readList("books").sortedByDescending { it["durChapterTime"].safeLong() }
         return if (books.isEmpty()) ReturnData.error("No books saved") else ReturnData.ok(books)
+    }
+
+    @Synchronized
+    fun refreshBookInfo(bookUrl: String?): ReturnData {
+        if (bookUrl.isNullOrBlank()) return ReturnData.error("Parameter url is required")
+        val books = readList("books")
+        val book = books.firstOrNull { it.string("bookUrl") == bookUrl }
+            ?: return ReturnData.error("Book not found")
+        val source = sourceForBook(book)
+            ?: return ReturnData.error("This book has no portable remote source rule")
+        val previousLatest = book.string("latestChapterTitle").orEmpty()
+        if (!applyBookInfoRules(book, source, allowRename = false)) {
+            return ReturnData.error("Unable to load book details with this source rule")
+        }
+        val currentLatest = book.string("latestChapterTitle").orEmpty()
+        book.addProperty("lastCheckTime", System.currentTimeMillis())
+        book.addProperty("lastCheckCount", if (currentLatest.isNotBlank() && currentLatest != previousLatest) 1 else 0)
+        book.withBookDefaults()
+        writeList("books", books)
+        return ReturnData.ok(book)
     }
 
     @Synchronized
@@ -3830,36 +3885,50 @@ class LegadoStore(
                 if (pageUrl.isBlank() || !visited.add(pageUrl)) break
                 val response = fetchSourceText(source, pageUrl) ?: break
                 extractRuleValues(response, rule.string("chapterList").orEmpty()).forEach { entry ->
-                val rawTitle = extractRuleValue(entry, rule.string("chapterName")).trim()
-                val title = formatChapterTitle(rawTitle, rule.string("formatJs"), chapters.size + 1)
-                val chapterUrl = resolveSearchUrl(pageUrl, extractRuleValue(entry, rule.string("chapterUrl")).trim())
-                if (title.isBlank() || chapterUrl.isBlank() || chapters.any { it.string("url") == chapterUrl }) return@forEach
-                chapters += JsonObject().apply {
-                    addProperty("url", chapterUrl)
-                    addProperty("title", title)
-                    addProperty("isVolume", sourceRuleBoolean(rule.string("isVolume")?.let { extractRuleValue(entry, it) }))
-                    addProperty("baseUrl", pageUrl)
-                    addProperty("bookUrl", bookUrl)
-                    addProperty("index", chapters.size)
-                    addProperty("isVip", sourceRuleBoolean(rule.string("isVip")?.let { extractRuleValue(entry, it) }))
-                    addProperty("isPay", sourceRuleBoolean(rule.string("isPay")?.let { extractRuleValue(entry, it) }))
-                    if (source["bookSourceType"].safeInt() in setOf(1, 2, 4)) addProperty("resourceUrl", chapterUrl)
-                    extractRuleValue(entry, rule.string("chapterTag") ?: rule.string("updateTime")).trim().takeIf(String::isNotBlank)?.let { addProperty("tag", it) }
-                }
+                    val title = extractRuleValue(entry, rule.string("chapterName")).trim()
+                    val chapterUrl = resolveSearchUrl(pageUrl, extractRuleValue(entry, rule.string("chapterUrl")).trim())
+                    if (title.isBlank() || chapterUrl.isBlank() || chapters.any { it.string("url") == chapterUrl }) return@forEach
+                    chapters += JsonObject().apply {
+                        addProperty("url", chapterUrl)
+                        addProperty("title", title)
+                        addProperty("isVolume", sourceRuleBoolean(rule.string("isVolume")?.let { extractRuleValue(entry, it) }))
+                        addProperty("baseUrl", pageUrl)
+                        addProperty("bookUrl", bookUrl)
+                        addProperty("index", chapters.size)
+                        addProperty("isVip", sourceRuleBoolean(rule.string("isVip")?.let { extractRuleValue(entry, it) }))
+                        addProperty("isPay", sourceRuleBoolean(rule.string("isPay")?.let { extractRuleValue(entry, it) }))
+                        if (source["bookSourceType"].safeInt() in setOf(1, 2, 4)) addProperty("resourceUrl", chapterUrl)
+                        extractRuleValue(entry, rule.string("chapterTag") ?: rule.string("updateTime"))
+                            .trim()
+                            .takeIf(String::isNotBlank)
+                            ?.let { addProperty("tag", it) }
+                    }
                 }
                 val next = rule.string("nextTocUrl")?.let { extractRuleValue(response, it).trim() }.orEmpty()
                 if (next.isBlank()) break
                 pageUrl = resolveSearchUrl(pageUrl, next)
             }
+            formatChapterTitles(chapters, rule.string("formatJs"))
             chapters
         }
     }
 
-    private fun formatChapterTitle(title: String, formatJs: String?, index: Int): String {
-        if (title.isBlank() || formatJs.isNullOrBlank()) return title
+    private fun formatChapterTitles(chapters: List<JsonObject>, formatJs: String?) {
+        if (formatJs.isNullOrBlank()) return
         val script = if (isJavaScriptRule(formatJs)) formatJs else "@js:$formatJs"
-        return withJavaScriptRuleContext("", "", index) {
-            evaluateJavaScriptRule(title, script).asValue().trim().ifBlank { title }
+        var gInt = 0
+        chapters.forEachIndexed { index, chapter ->
+            val title = chapter.string("title").orEmpty()
+            if (title.isBlank()) return@forEachIndexed
+            val result = withJavaScriptRuleContext("", chapter.string("baseUrl").orEmpty(), index + 1, gInt) {
+                evaluateJavaScriptRule(title, script, includeGInt = true)
+            }
+            val objectResult = result.json
+                ?.let { runCatching { JsonParser.parseString(it).asObjectOrNull() }.getOrNull() }
+            val formatted = objectResult?.string("value")?.trim().orEmpty()
+                .ifBlank { result.asValue().trim() }
+            if (formatted.isNotBlank()) chapter.addProperty("title", formatted)
+            objectResult?.get("gInt")?.safeIntOrNull()?.let { gInt = it }
         }
     }
 

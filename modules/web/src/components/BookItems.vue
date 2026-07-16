@@ -55,6 +55,23 @@
             已读：{{ (book as Book).durChapterTitle }}
           </div>
           <div class="last-chapter">最新：{{ book.latestChapterTitle }}</div>
+          <div v-if="!isSearch && showActions" class="book-actions" @click.stop>
+            <button type="button" title="刷新详情和目录" aria-label="刷新详情和目录" @click="emit('bookAction', 'refresh', book)">
+              <el-icon><Refresh /></el-icon>
+            </button>
+            <button type="button" title="换源" aria-label="换源" @click="emit('bookAction', 'source', book)">
+              <el-icon><SwitchButton /></el-icon>
+            </button>
+            <button type="button" title="创建离线任务" aria-label="创建离线任务" @click="emit('bookAction', 'offline', book)">
+              <el-icon><Download /></el-icon>
+            </button>
+            <button type="button" title="导出整书" aria-label="导出整书" @click="emit('bookAction', 'export', book)">
+              <el-icon><Document /></el-icon>
+            </button>
+            <button type="button" title="移出书架" aria-label="移出书架" @click="emit('bookAction', 'delete', book)">
+              <el-icon><Delete /></el-icon>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -64,6 +81,7 @@
 import type { Book, SeachBook } from '@/book'
 import { dateFormat, isLegadoUrl } from '../utils/utils'
 import API from '@api'
+import { Delete, Document, Download, Refresh, SwitchButton } from '@element-plus/icons-vue'
 const props = defineProps<{
   books: Array<Book | SeachBook>
   isSearch: boolean
@@ -76,6 +94,7 @@ const props = defineProps<{
   showCoverAuthor?: boolean
   loadCovers?: boolean
   fallbackCoverStyle?: Record<string, string | undefined>
+  showActions?: boolean
 }>()
 
 const layout = computed(() => props.layout || 'list')
@@ -83,6 +102,7 @@ const showLastUpdate = computed(() => props.showLastUpdate !== false)
 const showUnread = computed(() => props.showUnread !== false)
 const showCoverName = computed(() => props.showCoverName !== false)
 const showCoverAuthor = computed(() => props.showCoverAuthor !== false)
+const showActions = computed(() => props.showActions === true)
 const shelfStyle = computed(() => ({
   padding: `${Math.max(0, props.margin || 0)}px`,
 }))
@@ -94,7 +114,10 @@ const unreadCount = (book: Book | SeachBook) => {
   return Math.max(0, total - readIndex - 1)
 }
 
-const emit = defineEmits(['bookClick'])
+const emit = defineEmits<{
+  bookClick: [book: Book | SeachBook]
+  bookAction: [action: 'refresh' | 'source' | 'offline' | 'export' | 'delete', book: Book | SeachBook]
+}>()
 const handleClick = (book: Book | SeachBook) => emit('bookClick', book)
 const coverUrl = (book: Book | SeachBook) => {
   if (props.loadCovers === false) return ''
@@ -235,6 +258,31 @@ const subJustify = computed(() =>
           line-clamp: 1;
           text-align: left;
         }
+
+        .book-actions {
+          display: flex;
+          gap: 4px;
+          margin-top: 4px;
+
+          button {
+            display: inline-grid;
+            place-items: center;
+            width: 26px;
+            height: 26px;
+            padding: 0;
+            border: 1px solid #dbe2e8;
+            border-radius: 5px;
+            background: transparent;
+            color: #64748b;
+            cursor: pointer;
+          }
+
+          button:hover {
+            border-color: var(--legado-primary);
+            color: var(--legado-primary);
+            background: #f0fdfa;
+          }
+        }
       }
     }
 
@@ -311,6 +359,13 @@ const subJustify = computed(() =>
 
           .name {
             font-size: 14px;
+          }
+
+          .book-actions {
+            button {
+              width: 24px;
+              height: 24px;
+            }
           }
         }
       }

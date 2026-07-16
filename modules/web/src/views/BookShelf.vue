@@ -145,6 +145,8 @@
         :show-cover-author="showCoverAuthor"
         :fallback-cover-style="fallbackCoverStyle"
         :load-covers="loadCovers"
+        :show-actions="true"
+        @bookAction="handleBookAction"
       ></book-items>
       <div v-if="showWaitUpCount && waitUpCount > 0" class="wait-up-count" role="status">
         {{ waitUpLabel }} {{ waitUpCount }}
@@ -629,8 +631,9 @@ async function refreshBookshelf(showMessage = true) {
     while (cursor < candidates.length) {
       const book = candidates[cursor++]
       try {
-        const response = await API.refreshToc(book.bookUrl)
-        if (response.data.isSuccess) succeeded += 1
+        const infoResponse = await API.refreshBookInfo(book.bookUrl)
+        const tocResponse = await API.refreshToc(book.bookUrl)
+        if (tocResponse.data.isSuccess || infoResponse.data.isSuccess) succeeded += 1
         else failed += 1
       } catch {
         failed += 1
@@ -675,6 +678,81 @@ async function batchChangeSources() {
   } finally {
     batchChanging.value = false
   }
+}
+
+async function handleBookAction(action: 'refresh' | 'source' | 'offline' | 'export' | 'delete', value: Book | SeachBook) {
+  if ('respondTime' in value) return
+  const book = value as Book
+  try {
+    if (action === 'refresh') {
+      const info = await API.refreshBookInfo(book.bookUrl)
+      if (!info.data.isSuccess) throw new Error(info.data.errorMsg || '刷新详情失败')
+      const toc = await API.refreshToc(book.bookUrl)
+      if (!toc.data.isSuccess) throw new Error(toc.data.errorMsg || '刷新目录失败')
+      await store.loadBookShelf()
+      ElMessage.success(`《${book.name}》已刷新`)
+      return
+    }
+    if (action === 'offline') {
+      const response = await API.startBookDownload(book.bookUrl)
+      if (!response.data.isSuccess) throw new Error(response.data.errorMsg || '创建离线任务失败')
+      ElMessage.success('已创建离线任务，可在功能页查看进度')
+      return
+    }
+    if (action === 'export') {
+      const response = await API.exportBook(book.bookUrl)
+      if (!response.data.isSuccess) throw new Error(response.data.errorMsg || '导出失败')
+      downloadShelfExport(response.data.data)
+      return
+    }
+    if (action === 'delete') {
+      await ElMessageBox.confirm(`确定移出《${book.name}》吗？`, '移出书架', {
+        confirmButtonText: '移出', cancelButtonText: '取消', type: 'warning',
+      })
+      const response = await API.deleteBook(book)
+      if (!response.data.isSuccess) throw new Error(response.data.errorMsg || '移出失败')
+      await store.loadBookShelf()
+      ElMessage.success('已移出书架')
+      return
+    }
+    await openBookSourceSwitch(book)
+  } catch (error) {
+    if (error !== 'cancel') ElMessage.error(error instanceof Error ? error.message : '操作失败')
+  }
+}
+
+async function openBookSourceSwitch(book: Book) {
+  const response = await API.findBookSourceCandidates(book.bookUrl)
+  if (!response.data.isSuccess) throw new Error(response.data.errorMsg || '无法查询可用书源')
+  const candidates = response.data.data || []
+  if (!candidates.length) {
+    ElMessage.info('没有找到匹配的备用书源')
+    return
+  }
+  const options = candidates.map((candidate, index) => `${index + 1}. ${candidate.originName || candidate.origin} · ${candidate.latestChapterTitle || candidate.intro || ''}`)
+  const choice = await ElMessageBox.prompt(options.join('\n'), `为《${book.name}》换源`, {
+    inputValue: '1', inputPattern: /^[1-9]\d*$/, inputErrorMessage: '请输入候选编号',
+    confirmButtonText: '切换', cancelButtonText: '取消', type: 'info',
+  })
+  const index = Number(choice.value) - 1
+  const candidate = candidates[index]
+  if (!candidate) throw new Error('候选编号不存在')
+  const switched = await API.changeBookSource(book.bookUrl, candidate)
+  if (!switched.data.isSuccess) throw new Error(switched.data.errorMsg || '换源失败')
+  await store.loadBookShelf()
+  ElMessage.success(`已切换到 ${candidate.originName || candidate.origin}`)
+}
+
+function downloadShelfExport(result: import('@/api/api').BookExportResult) {
+  const binary = atob(result.base64)
+  const bytes = Uint8Array.from(binary, character => character.charCodeAt(0))
+  const url = URL.createObjectURL(new Blob([bytes], { type: result.mime }))
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = result.fileName
+  anchor.click()
+  URL.revokeObjectURL(url)
+  ElMessage.success(`已导出 ${result.fileName}`)
 }
 
 async function initializeShelf() {
