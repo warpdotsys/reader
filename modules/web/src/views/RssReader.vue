@@ -9,8 +9,12 @@
         <el-button :icon="Setting" @click="router.push('/rssSource')">管理订阅源</el-button>
         <el-button :icon="Download" :disabled="filteredArticles.length === 0" @click="exportFilteredArticles">导出当前筛选</el-button>
         <el-button :icon="CircleCheck" :disabled="filteredArticles.length === 0" :loading="batching" @click="markFilteredRead">当前筛选已读</el-button>
+        <el-button :icon="Reading" :disabled="filteredArticles.length === 0" :loading="batching" @click="markFilteredUnread">当前筛选未读</el-button>
+        <el-button :icon="Star" :disabled="filteredArticles.length === 0" :loading="batching" @click="setFilteredStarred(true)">当前筛选星标</el-button>
+        <el-button :icon="Star" :disabled="filteredArticles.length === 0" :loading="batching" @click="setFilteredStarred(false)">取消筛选星标</el-button>
         <el-button :icon="Collection" :disabled="filteredArticles.length === 0" :loading="batching" @click="setFilteredGroup">设置分组</el-button>
-        <el-button type="primary" :icon="Refresh" :loading="refreshing" @click="refreshFeeds">刷新订阅</el-button>
+        <el-button :icon="Delete" type="danger" plain :disabled="filteredArticles.length === 0" :loading="batching" @click="deleteFilteredArticles">删除筛选缓存</el-button>
+        <el-button type="primary" :icon="Refresh" :loading="refreshing" @click="refreshFeeds">{{ sourceFilter ? '刷新当前源' : '刷新全部订阅' }}</el-button>
       </div>
     </header>
 
@@ -75,7 +79,7 @@
 
 <script setup lang="ts">
 import API, { type AppDataItem } from '@/api/api'
-import { CircleCheck, Collection, Download, Link, Reading, Refresh, Search, Setting, Star } from '@element-plus/icons-vue'
+import { CircleCheck, Collection, Delete, Download, Link, Reading, Refresh, Search, Setting, Star } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
 
 type RssArticle = AppDataItem & {
@@ -210,6 +214,27 @@ async function markFilteredRead() {
     if (error !== 'cancel') ElMessage.error(error instanceof Error ? error.message : '批量更新失败')
   }
 }
+
+async function markFilteredUnread() {
+  try {
+    await ElMessageBox.confirm(`将当前筛选的 ${filteredArticles.value.length} 篇文章标记为未读？`, '批量标记', {
+      type: 'warning',
+      confirmButtonText: '标记未读',
+      cancelButtonText: '取消',
+    })
+    await updateFiltered({ isRead: false }, '已标记')
+  } catch (error) {
+    if (error !== 'cancel') ElMessage.error(error instanceof Error ? error.message : '批量更新失败')
+  }
+}
+
+async function setFilteredStarred(starred: boolean) {
+  try {
+    await updateFiltered({ starred }, starred ? '已加入星标' : '已取消星标')
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '批量更新失败')
+  }
+}
 async function setFilteredGroup() {
   try {
     const result = await ElMessageBox.prompt('留空可清除当前筛选文章的分组。', '设置文章分组', {
@@ -220,6 +245,31 @@ async function setFilteredGroup() {
     await updateFiltered({ group: result.value.trim() }, '已更新')
   } catch (error) {
     if (error !== 'cancel') ElMessage.error(error instanceof Error ? error.message : '批量更新失败')
+  }
+}
+
+async function deleteFilteredArticles() {
+  const links = filteredArticles.value.map(article => article.link)
+  if (links.length === 0) return
+  try {
+    await ElMessageBox.confirm(
+      `将永久删除当前筛选的 ${links.length} 篇文章及其阅读状态、收藏状态和正文缓存。`,
+      '删除订阅缓存',
+      {
+        type: 'warning',
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+      },
+    )
+    batching.value = true
+    const response = await API.deleteAppData('rssArticles', links.map(link => ({ link })))
+    if (!response.data.isSuccess) throw new Error(response.data.errorMsg || '删除订阅缓存失败')
+    await loadArticles()
+    ElMessage.success(`已删除 ${links.length} 篇订阅文章`)
+  } catch (error) {
+    if (error !== 'cancel') ElMessage.error(error instanceof Error ? error.message : '删除订阅缓存失败')
+  } finally {
+    batching.value = false
   }
 }
 function exportFilteredArticles() {
@@ -267,7 +317,7 @@ async function loadArticles() {
 async function refreshFeeds() {
   refreshing.value = true
   try {
-    const response = await API.refreshRssSources()
+    const response = await API.refreshRssSources(sourceFilter.value ? [sourceFilter.value] : undefined)
     if (!response.data.isSuccess) throw new Error(response.data.errorMsg || '刷新订阅失败')
     await loadArticles()
     const result = response.data.data
