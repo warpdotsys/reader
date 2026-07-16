@@ -310,6 +310,11 @@ const getChapterList = (/** @type {string} */ bookUrl: string) =>
     'getChapterList?url=' + encodeURIComponent(bookUrl),
   )
 
+const refreshToc = (/** @type {string} */ bookUrl: string) =>
+  ajax.get<LeagdoApiResponse<BookChapter[]>>(
+    'refreshToc?url=' + encodeURIComponent(bookUrl),
+  )
+
 const getBookContent = (
   /** @type {string} */ bookUrl: string,
   /** @type {number} */ chapterIndex: number,
@@ -616,6 +621,7 @@ export default {
   saveBookProgressWithBeacon,
   getBookShelf,
   getChapterList,
+  refreshToc,
   getBookContent,
   search,
   getExploreSources,

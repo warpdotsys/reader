@@ -278,7 +278,8 @@ class LegadoHttpServer(
             "/getReplaceRules" -> store.getReplaceRules()
             "/getTxtTocRules" -> store.getTxtTocRules()
             "/getBookshelf" -> store.getBookshelf()
-            "/getChapterList", "/refreshToc" -> store.getChapterList(parameters.first("url"))
+            "/getChapterList" -> store.getChapterList(parameters.first("url"))
+            "/refreshToc" -> store.getChapterList(parameters.first("url"), refresh = true)
             "/getBookContent" -> store.getBookContent(
                 parameters.first("url"),
                 parameters.first("index")?.toIntOrNull(),
@@ -2924,9 +2925,9 @@ class LegadoStore(
 
     private fun extractRuleValues(input: String, rule: String): List<String> {
         if (rule.isBlank()) return emptyList()
-        val portableRule = parsePortableRule(expandRuleVariables(sourceRuleContext.get() ?: JsonObject(), rule))
+        val portableRule = parsePortableRule(rule)
         applyRulePuts(sourceRuleContext.get(), input, portableRule.puts)
-        val expression = portableRule.expression
+        val expression = expandRuleVariables(sourceRuleContext.get() ?: JsonObject(), portableRule.expression)
         val values = when {
             expression.isBlank() -> emptyList()
             isJavaScriptRule(expression) -> evaluateJavaScriptRule(input, expression).asValues()
@@ -2964,9 +2965,9 @@ class LegadoStore(
 
     private fun extractRuleValue(input: String, rule: String?): String {
         if (rule.isNullOrBlank()) return ""
-        val portableRule = parsePortableRule(expandRuleVariables(sourceRuleContext.get() ?: JsonObject(), rule))
+        val portableRule = parsePortableRule(rule)
         applyRulePuts(sourceRuleContext.get(), input, portableRule.puts)
-        val expression = portableRule.expression
+        val expression = expandRuleVariables(sourceRuleContext.get() ?: JsonObject(), portableRule.expression)
         val value = when {
             expression.isBlank() -> ""
             isJavaScriptRule(expression) -> evaluateJavaScriptRule(input, expression).asValue()
@@ -3682,17 +3683,22 @@ class LegadoStore(
     }
 
     @Synchronized
-    fun getChapterList(bookUrl: String?): ReturnData {
+    fun getChapterList(bookUrl: String?, refresh: Boolean = false): ReturnData {
         if (bookUrl.isNullOrBlank()) return ReturnData.error("Parameter url is required")
         var chapters = readChapterList(bookUrl)
-        if (chapters.isEmpty()) {
+        if (chapters.isEmpty() || refresh) {
+            val cachedChapters = chapters
             val book = readList("books").firstOrNull { it.string("bookUrl") == bookUrl }
                 ?: return ReturnData.error("Book not found")
             val source = sourceForBook(book) ?: return ReturnData.error("This book has no portable remote source rule")
-            chapters = loadRemoteChapters(book, source)
-            if (chapters.isNotEmpty()) {
+            runPortablePreUpdate(book, source)
+            val refreshedChapters = loadRemoteChapters(book, source)
+            if (refreshedChapters.isNotEmpty()) {
+                chapters = refreshedChapters
                 writeChapterList(bookUrl, chapters)
                 updateBookChapterCount(bookUrl, chapters.size)
+            } else if (cachedChapters.isNotEmpty()) {
+                chapters = cachedChapters
             }
         }
         return if (chapters.isEmpty()) {
@@ -3700,6 +3706,31 @@ class LegadoStore(
         } else {
             ReturnData.ok(chapters.map { it.withoutInternalContent() })
         }
+    }
+
+    private fun runPortablePreUpdate(book: JsonObject, source: JsonObject) {
+        val script = source["ruleToc"].asObjectOrNull()?.string("preUpdateJs")?.trim().orEmpty()
+        if (script.isBlank()) return
+        val input = gson.toJson(book)
+        val output = withSourceRuleContext(source) {
+            withJavaScriptRuleContext(book.string("name").orEmpty(), book.string("tocUrl").orEmpty()) {
+                evaluateJavaScriptRule(input, if (isJavaScriptRule(script)) script else "@js:$script").asValue().trim()
+            }
+        }
+        if (output.isBlank()) return
+        val rawTocUrl = runCatching { JsonParser.parseString(output).asObjectOrNull()?.string("tocUrl") }.getOrNull()
+            ?: output
+        val updatedTocUrl = resolveSearchUrl(book.string("bookUrl").orEmpty(), rawTocUrl.trim())
+        if (!updatedTocUrl.startsWith("http://", true) && !updatedTocUrl.startsWith("https://", true)) return
+        book.addProperty("tocUrl", updatedTocUrl)
+        val books = readList("books")
+        books.indexOfFirst { it.string("bookUrl") == book.string("bookUrl") }
+            .takeIf { it >= 0 }
+            ?.let { index ->
+                books[index].addProperty("tocUrl", updatedTocUrl)
+                books[index].addProperty("tocUrlUpdatedAt", System.currentTimeMillis())
+                writeList("books", books)
+            }
     }
 
     @Synchronized

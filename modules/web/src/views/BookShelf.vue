@@ -629,7 +629,7 @@ async function refreshBookshelf(showMessage = true) {
     while (cursor < candidates.length) {
       const book = candidates[cursor++]
       try {
-        const response = await API.getChapterList(book.bookUrl)
+        const response = await API.refreshToc(book.bookUrl)
         if (response.data.isSuccess) succeeded += 1
         else failed += 1
       } catch {
