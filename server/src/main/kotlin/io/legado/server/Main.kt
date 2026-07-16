@@ -3843,6 +3843,7 @@ class LegadoStore(
                     addProperty("index", chapters.size)
                     addProperty("isVip", sourceRuleBoolean(rule.string("isVip")?.let { extractRuleValue(entry, it) }))
                     addProperty("isPay", sourceRuleBoolean(rule.string("isPay")?.let { extractRuleValue(entry, it) }))
+                    if (source["bookSourceType"].safeInt() in setOf(1, 2, 4)) addProperty("resourceUrl", chapterUrl)
                     extractRuleValue(entry, rule.string("chapterTag") ?: rule.string("updateTime")).trim().takeIf(String::isNotBlank)?.let { addProperty("tag", it) }
                 }
                 }
@@ -3865,7 +3866,11 @@ class LegadoStore(
     private fun loadRemoteChapterContent(chapter: JsonObject, source: JsonObject): String? {
         return withSourceRuleContext(source) {
             val rules = source["ruleContent"].asObjectOrNull()
-                ?: return@withSourceRuleContext fetchSourceText(source, chapter.string("url").orEmpty())
+                ?: return@withSourceRuleContext mediaChapterContent(
+                    chapter.string("resourceUrl") ?: chapter.string("url").orEmpty(),
+                    chapter.string("url").orEmpty(),
+                    source["bookSourceType"].safeInt(),
+                ) ?: fetchSourceText(source, chapter.string("url").orEmpty())
             val contentRule = rules.string("content")
             val subContentRule = rules.string("subContent")
             val titleRule = rules.string("title")
@@ -3874,13 +3879,23 @@ class LegadoStore(
             var pageUrl = chapter.string("url").orEmpty()
             val visited = linkedSetOf<String>()
             val pages = mutableListOf<String>()
+            val mediaType = source["bookSourceType"].safeInt()
+            if (contentRule.isNullOrBlank() && mediaType in setOf(1, 2, 4)) {
+                return@withSourceRuleContext mediaChapterContent(
+                    chapter.string("resourceUrl") ?: pageUrl,
+                    pageUrl,
+                    mediaType,
+                )
+            }
             for (attempt in 0 until 5) {
                 if (pageUrl.isBlank() || !visited.add(pageUrl)) break
                 val response = fetchSourceText(source, pageUrl) ?: break
                 val mainContent = if (contentRule.isNullOrBlank()) response else extractRuleValue(response, contentRule)
                 val subContent = subContentRule?.let { extractRuleValue(response, it) }.orEmpty()
                 val content = listOf(mainContent, subContent).filter(String::isNotBlank).joinToString("\n\n")
-                content.trim().takeIf(String::isNotBlank)?.let(pages::add)
+                content.trim().takeIf(String::isNotBlank)?.let { extracted ->
+                    pages += mediaChapterContent(extracted, pageUrl, mediaType) ?: extracted
+                }
                 if (titleRule != null) {
                     extractRuleValue(response, titleRule).trim().takeIf(String::isNotBlank)
                         ?.let { chapter.addProperty("title", it) }
@@ -3892,6 +3907,34 @@ class LegadoStore(
             applyContentReplaceRules(pages.joinToString("\n\n"), replaceRule).takeIf(String::isNotBlank)
         }
     }
+
+    private fun mediaChapterContent(content: String, baseUrl: String, sourceType: Int): String? {
+        if (sourceType !in setOf(1, 2, 4)) return null
+        val value = content.trim()
+        if (value.isBlank()) return null
+        if (Regex("""<\s*(?:img|audio|video)\b""", RegexOption.IGNORE_CASE).containsMatchIn(value)) {
+            return absolutizeMediaSources(value, baseUrl)
+        }
+        if (value.contains('\n') || value.contains('<') || value.contains('>')) return null
+        val url = resolveSearchUrl(baseUrl, value).substringBefore(",{").trim()
+        if (!url.startsWith("http://", true) && !url.startsWith("https://", true)) return null
+        val escapedUrl = xmlEscape(url)
+        return when (sourceType) {
+            1 -> "<audio controls preload=\"metadata\" src=\"$escapedUrl\"></audio>"
+            2 -> "<img src=\"$escapedUrl\"/>"
+            4 -> "<video controls preload=\"metadata\" src=\"$escapedUrl\"></video>"
+            else -> null
+        }
+    }
+
+    private fun absolutizeMediaSources(content: String, baseUrl: String): String = runCatching {
+        val document = Jsoup.parseBodyFragment(content)
+        document.select("img[src], audio[src], video[src], source[src]").forEach { element ->
+            val source = element.attr("src").trim()
+            if (source.isNotBlank()) element.attr("src", resolveSearchUrl(baseUrl, source).substringBefore(",{"))
+        }
+        document.body().html()
+    }.getOrDefault(content)
 
     private fun applyContentReplaceRules(content: String, rawRules: String?): String {
         if (content.isBlank() || rawRules.isNullOrBlank()) return content

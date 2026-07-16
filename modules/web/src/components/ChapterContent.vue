@@ -25,6 +25,20 @@
       :class="{ 'manga-scale-disabled': disableMangaScale }"
       :style="{ filter: mangaImageFilter }"
     />
+    <audio
+      v-else-if="mediaTag(para) === 'audio'"
+      class="media-control"
+      controls
+      preload="metadata"
+      :src="getMediaSrc(para)"
+    />
+    <video
+      v-else-if="mediaTag(para) === 'video'"
+      class="media-control"
+      controls
+      preload="metadata"
+      :src="getMediaSrc(para)"
+    />
     <p v-else :class="{ justified, selectable, 'zh-layout': zhLayout, 'bottom-justified': bottomJustify, 'line-height-grid': bodyToLineHeight, 'manga-scale-disabled': disableMangaScale }" :style="{ fontFamily, fontSize, '--manga-image-filter': mangaImageFilter }" v-html="replaceImage(para)" @click="handleContentClick" @error.capture="handleImgLoadError" />
   </div>
 </template>
@@ -112,6 +126,7 @@ const imgPatternStr = '<img[^>]*src=[\'"]([^\'"]*(?:[\'"][^>]+\\})?)[\'"][^>]*>'
 const imgPattern = lazyRegex(imgPatternStr)
 const imgPatternAll = lazyRegex(imgPatternStr, 'g')
 const imgDataUrlPattern = lazyRegex('data:image[^;]+;base64,[^,]{39,}')
+const mediaPattern = /^\s*<(audio|video)\b[^>]*\bsrc\s*=\s*(['"])(.*?)\2[^>]*>/i
 
 const replaceImage = (content: string) => {
   const rendered = content.replace(imgPatternAll(), (match, src) => {
@@ -154,6 +169,8 @@ const handleTitleClick = (event: MouseEvent) => {
   event.stopPropagation()
   emit('titleClick')
 }
+const mediaTag = (content: string) => content.match(mediaPattern)?.[1].toLowerCase() || ''
+const getMediaSrc = (content: string) => content.match(mediaPattern)?.[3] || ''
 const handleImageClick = (event: MouseEvent) => {
   const image = event.currentTarget as HTMLImageElement
   event.preventDefault()
@@ -353,5 +370,11 @@ img.manga-scale-disabled,
 .full {
   display: block;
   width: 100%;
+}
+
+.media-control {
+  display: block;
+  width: min(100%, 720px);
+  margin: 14px 0;
 }
 </style>
