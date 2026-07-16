@@ -32,6 +32,26 @@
       :disabled="sources.length === 0"
       >清空</el-button
     >
+    <el-button
+      :icon="Select"
+      :disabled="sourcesFiltered.length === 0"
+      @click="selectAllFiltered"
+    >全选筛选</el-button>
+    <el-button
+      :disabled="sourcesFiltered.length === 0"
+      @click="invertFilteredSelection"
+    >反选筛选</el-button>
+    <el-button
+      type="success"
+      :icon="Check"
+      :disabled="sourceSelect.length === 0 || savingEnabled"
+      @click="setSelectedEnabled(true)"
+    >启用所选</el-button>
+    <el-button
+      :icon="Close"
+      :disabled="sourceSelect.length === 0 || savingEnabled"
+      @click="setSelectedEnabled(false)"
+    >停用所选</el-button>
   </div>
   <el-checkbox-group id="source-list" v-model="sourceUrlSelect">
     <virtual-list
@@ -46,7 +66,7 @@
 
 <script setup lang="ts">
 import API from '@api'
-import { Folder, Delete, Download, Search } from '@element-plus/icons-vue'
+import { Check, Close, Delete, Download, Folder, Search, Select } from '@element-plus/icons-vue'
 import {
   isSourceMatches,
   getSourceUniqueKey,
@@ -62,6 +82,7 @@ const store = useSourceStore()
 const appSettings = ref<AppSettings>({})
 const sourceUrlSelect = ref<string[]>([])
 const searchKey = ref('')
+const savingEnabled = ref(false)
 const sources = computed(() => store.sources)
 const defaultScope = computed(() => String(appSettings.value.main?.searchScope ?? '').trim())
 const defaultGroup = computed(() => String(appSettings.value.main?.searchGroup ?? '').trim())
@@ -117,6 +138,47 @@ const sourceSelect = computed<Source[]>(() => {
     return sources
   }, [] as Source[])
 })
+
+const filteredKeys = computed(() => sourcesFiltered.value.map(getSourceUniqueKey))
+
+const selectAllFiltered = () => {
+  sourceUrlSelect.value = Array.from(new Set([...sourceUrlSelect.value, ...filteredKeys.value]))
+}
+
+const invertFilteredSelection = () => {
+  const selected = new Set(sourceUrlSelect.value)
+  sourceUrlSelect.value = sourceUrlSelect.value
+    .filter(key => !filteredKeys.value.includes(key))
+    .concat(filteredKeys.value.filter(key => !selected.has(key)))
+}
+
+async function setSelectedEnabled(enabled: boolean) {
+  const selectedKeys = new Set(sourceSelect.value.map(getSourceUniqueKey))
+  if (!selectedKeys.size) return
+  try {
+    await ElMessageBox.confirm(
+      `${enabled ? '启用' : '停用'}当前选中的 ${selectedKeys.size} 个源？`,
+      `${enabled ? '启用' : '停用'}书源`,
+      { confirmButtonText: '确认', cancelButtonText: '取消', type: enabled ? 'info' : 'warning' },
+    )
+  } catch {
+    return
+  }
+  savingEnabled.value = true
+  try {
+    const updated = sources.value.map(source =>
+      selectedKeys.has(getSourceUniqueKey(source)) ? { ...source, enabled } : source,
+    )
+    const response = await API.saveSources(updated)
+    if (!response.data.isSuccess) throw new Error(response.data.errorMsg || '保存源状态失败')
+    store.saveSources(updated)
+    ElMessage.success(`${enabled ? '已启用' : '已停用'} ${selectedKeys.size} 个源`)
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '保存源状态失败')
+  } finally {
+    savingEnabled.value = false
+  }
+}
 
 const deleteSelectSources = () => {
   const sourceSelectValue = sourceSelect.value
