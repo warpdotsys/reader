@@ -27,6 +27,28 @@
             </div>
           </template>
         </el-popover>
+        <button
+          class="tool-icon auto-read-button"
+          type="button"
+          title="刷新目录"
+          aria-label="刷新目录"
+          :disabled="readerRefreshing"
+          @click.stop="refreshReaderCatalog"
+        >
+          <Refresh :class="{ spinning: readerRefreshing }" />
+          <div class="icon-text">刷新目录</div>
+        </button>
+        <button
+          class="tool-icon auto-read-button"
+          type="button"
+          title="刷新书籍详情"
+          aria-label="刷新书籍详情"
+          :disabled="readerRefreshing"
+          @click.stop="refreshReaderBookInfo"
+        >
+          <InfoFilled />
+          <div class="icon-text">刷新详情</div>
+        </button>
         <el-popover
           placement="right"
           :width="popupWidth"
@@ -322,7 +344,7 @@ import type { Book, SeachBook } from '@/book'
 import { useLoading } from '@/hooks/loading'
 import { useThrottleFn } from '@vueuse/shared'
 import { isNullOrBlank } from '@/utils/utils'
-import { CopyDocument, Document, Download, FolderOpened, Headset, Search, Sunny, Upload, VideoPause, VideoPlay } from '@element-plus/icons-vue'
+import { CopyDocument, Document, Download, FolderOpened, Headset, InfoFilled, Refresh, Search, Sunny, Upload, VideoPause, VideoPlay } from '@element-plus/icons-vue'
 
 const content = ref()
 const imagePreviewUrl = ref('')
@@ -331,6 +353,7 @@ const sourceSwitchVisible = ref(false)
 const sourceCandidatesLoading = ref(false)
 const sourceSwitching = ref(false)
 const sourceCandidates = ref<SeachBook[]>([])
+const readerRefreshing = ref(false)
 let autoSourceChangeAttempted = false
 const appSettings = ref<AppSettings>({})
 const readStyles = ref<AppDataItem[]>([])
@@ -1251,6 +1274,54 @@ const toBottom = () => {
 const router = useRouter()
 const toShelf = () => {
   router.push('/')
+}
+
+async function refreshReaderCatalog() {
+  if (readerRefreshing.value || !store.readingBook.bookUrl) return
+  readerRefreshing.value = true
+  const currentChapterUrl = catalog.value[chapterIndex.value]?.url
+  const currentPosition = chapterPos.value
+  try {
+    const response = await API.refreshToc(store.readingBook.bookUrl)
+    if (!response.data.isSuccess) throw new Error(response.data.errorMsg || '刷新目录失败')
+    const nextCatalog = response.data.data || []
+    if (!nextCatalog.length) throw new Error('刷新后目录为空')
+    store.catalog = nextCatalog
+    contentCache.clear()
+    chapterData.value = []
+    const nextIndex = currentChapterUrl
+      ? nextCatalog.findIndex(chapter => chapter.url === currentChapterUrl)
+      : -1
+    const targetIndex = nextIndex >= 0
+      ? nextIndex
+      : Math.min(chapterIndex.value, nextCatalog.length - 1)
+    chapterIndex.value = targetIndex
+    getContent(targetIndex, true, nextIndex >= 0 ? currentPosition : 0)
+    popCataVisible.value = false
+    ElMessage.success(`目录已刷新，共 ${nextCatalog.length} 章`)
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '刷新目录失败')
+  } finally {
+    readerRefreshing.value = false
+  }
+}
+
+async function refreshReaderBookInfo() {
+  if (readerRefreshing.value || !store.readingBook.bookUrl) return
+  readerRefreshing.value = true
+  try {
+    const response = await API.refreshBookInfo(store.readingBook.bookUrl)
+    if (!response.data.isSuccess) throw new Error(response.data.errorMsg || '刷新书籍详情失败')
+    const refreshed = response.data.data
+    store.readingBook = { ...store.readingBook, ...refreshed }
+    const shelfIndex = store.shelf.findIndex(book => book.bookUrl === refreshed.bookUrl)
+    if (shelfIndex >= 0) store.shelf[shelfIndex] = { ...store.shelf[shelfIndex], ...refreshed }
+    ElMessage.success('书籍详情已刷新')
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '刷新书籍详情失败')
+  } finally {
+    readerRefreshing.value = false
+  }
 }
 async function openSourceCandidates() {
   sourceCandidatesLoading.value = true
