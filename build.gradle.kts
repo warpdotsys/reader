@@ -102,6 +102,24 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test:2.1.6.RELEASE")
 }
 
+// 恢复期编译引导。传 -PrestoreBootstrap=<解包后的 BOOT-INF/classes 目录> 时，把参考制品的
+// 应用类与内嵌依赖挂到 compileOnly 上：尚未迁入的类从制品解析，已迁入的类由本仓库源码提供。
+// 这样每一小批源码都能独立编译、独立核验。不传该参数时制品完全不参与构建。
+val restoreBootstrap: File? =
+    (project.findProperty("restoreBootstrap") as String?)?.let { file(it) }
+if (restoreBootstrap != null) {
+    require(restoreBootstrap.isDirectory) {
+        "-PrestoreBootstrap 必须指向解包后的 BOOT-INF/classes 目录"
+    }
+    val bootstrapLib = restoreBootstrap.parentFile.resolve("lib")
+    dependencies {
+        compileOnly(files(restoreBootstrap))
+        if (bootstrapLib.isDirectory) {
+            compileOnly(fileTree(mapOf("dir" to bootstrapLib, "include" to "*.jar")))
+        }
+    }
+}
+
 tasks.withType<KotlinCompile> {
     kotlinOptions {
         jvmTarget = "1.8"

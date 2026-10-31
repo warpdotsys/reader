@@ -1,17 +1,9 @@
-迁入第 2a 批源码：常量与异常（按 Kotlin 还原）
+第 2b 批（进行中）：迁入 8 个数据实体类
 
-- 确立还原规则：带 @Metadata 的类写成 .kt（src/main/kotlin），纯 Java 来源保持 .java
-- 范围：io.legado.app.exception(5) + io.legado.app.constant(8)，共 13 个类
-- 第 2 批按包拆成 2a-2d，每片独立编译、独立核验、独立提交，主干始终可构建
+- rule/ 全部 6 个 data class + Cookie + SearchKeyword
+- 新增 -PrestoreBootstrap 编译引导：io.legado.app 依赖成环，无法按包切出始终可编译的增量；
+  传该参数时把制品应用类挂到 compileOnly，用于逐片编译与核验。不传则制品完全不参与构建
+- 每片编译后立即 ABI 核验：已比对 107 个类，全部一致
+- 分支 restore/core 上进行，main 保持绿色
 
-为什么必须按 Kotlin 还原：用 CFR 产物直接编译时，第 2 批 87 个文件中有 34 个报语法错误，
-根因是 Java 表达不了 Kotlin 构造——内联类 Result 生成带连字符的方法名 constructor-impl（94 处）、
-内联函数的 void \\$...\ 局部变量、CFR 未输出的 lambda 内部类、协程状态机错位。
-
-核验：
-- gradlew clean build 通过，依赖 85/85 一致
-- scripts/verify-abi.ps1：99 个类 ABI 全一致
-- 额外逐字比对字节码字符串常量：AppPattern(16)、DeepinkBookSource(15)、
-  AppConst 各委托(1+26) 全部一致
-
-注意：行为仍未核验。
+待做：Book/BookSource/RssSource/BaseSource/HttpTTS 等 16 个含业务方法的类。

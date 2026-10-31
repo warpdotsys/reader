@@ -2,6 +2,31 @@
 
 每个已迁入批次的可核验记录。计划与还原规则见 [ROADMAP.md](ROADMAP.md)。
 
+> 第 2b 批起在 `restore/core` 分支上进行。原因是 `io.legado.app` 内部依赖成环
+> （`data.entities` ↔ `help`，两者都引用 `model`/`utils`），无法按包切出"始终可编译"的增量。
+> 该分支上的每片源码通过 `-PrestoreBootstrap` 引导编译后立即做 ABI 核验，见 [BUILD.md](BUILD.md)。
+> `main` 保持绿色。
+
+## 第 2b 批 —— 数据实体（进行中）
+
+**状态：8/24 已完成并核验**
+
+已完成：`rule/` 全部 6 个（`BookListRule`、`BookInfoRule`、`ContentRule`、`ExploreRule`、
+`SearchRule`、`TocRule`）+ `Cookie`、`SearchKeyword`。
+
+这些都是 Kotlin `data class`，声明即可决定 ABI（`componentN`/`copy`/`copy$default`/`toString`/
+`hashCode`/`equals` 全部由编译器生成），所以按 `javap` 的字段顺序与类型、`@Metadata` 的属性名
+逐项还原后 ABI 即一致。默认值从合成构造函数的位掩码分支读出：`rule` 包全部为 `null`。
+
+```
+已比对类数 : 107
+ABI 一致   : 107
+ABI 不一致 : 0
+```
+
+待做 16 个，其中 `Book`(1804 行)、`BookSource`(1565)、`RssSource`(1480)、`BaseSource`(1008)、
+`HttpTTS`(1014) 含大量业务方法，不是纯数据类，需要逐方法从字节码重建。
+
 ## 第 2a 批 —— 常量与异常
 
 **状态：已完成（ABI 与字符串常量均已核验）**

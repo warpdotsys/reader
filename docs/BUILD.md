@@ -76,6 +76,21 @@ Gradle wrapper 首次使用时会下载 Gradle 6.1.1。
 
 注意：ABI 一致**不等于**行为一致。它只保证接口没跑偏。
 
+### 恢复期编译引导
+
+`io.legado.app` 内部依赖成环：`data.entities` 引用 `utils`/`help`/`model`，`help` 又反过来引用
+`data.entities`，因此不存在"按包逐个迁入且始终可编译"的顺序。为此提供一个显式开关：把参考制品的
+应用类与内嵌依赖挂到 `compileOnly` 上，尚未迁入的类从制品解析，已迁入的由本仓库源码提供。
+
+```powershell
+# 需要先解包制品：jar xf reader-pro-3.2.14.jar
+.\gradlew.bat classes -PrestoreBootstrap=D:\path\to\BOOT-INF\classes
+```
+
+这样每一小批源码都能独立编译、独立核验。
+
+**不传该参数时制品完全不参与构建。** 正式构建与发布一律不带它。
+
 ### 确定性打包
 
 `bootJar` 关闭了文件时间戳并固定归档顺序，因此相同输入的重新构建会产生相同归档。它同时会断言入口类。
