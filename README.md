@@ -1,63 +1,71 @@
-# reader (reverse-engineered)
+# reader
 
-Decompiled source recovered from `reader-pro-3.2.14.jar`.
+`reader-pro-3.2.14.jar` 的源码恢复工程 —— 一个用 Kotlin 写的 Spring Boot 2.1.6 / Vert.x 3.8.5 阅读服务。
 
-## Source artifact
+本仓库当前是**构建地基**。它的职责是把参考制品的精确工具链和依赖集合变成可复现的，这样应用源码才能按批次、可核验地迁入，而不是把无法验证的反编译产物直接倒进来。
 
-| Field | Value |
+## 现状
+
+| 部分 | 状态 |
 | --- | --- |
-| Artifact | `reader-pro-3.2.14.jar` |
-| Size | 72,913,887 bytes |
-| Format | Spring Boot 2.1.6.RELEASE executable fat jar |
-| Main-Class | `org.springframework.boot.loader.JarLauncher` |
-| Start-Class | `com.htmake.reader.ReaderApplicationKt` |
-| Language | Kotlin (compiled to JVM bytecode) |
-| Entry point | `com.htmake.reader.ReaderApplicationKt#main` |
+| 工具链（JDK 11、Gradle 6.1.1、Kotlin 1.5.21、Java 8 目标） | 已可复现 |
+| 依赖集合对齐制品 `BOOT-INF/lib` | 85/85 完全一致，由 `build` 强制校验 |
+| 应用资源（从制品提取） | 已在 `src/main/resources` |
+| 应用源码 | **尚未迁入** —— 见 [docs/ROADMAP.md](docs/ROADMAP.md) |
+| fat jar 打包 | `bootJar` 已配置入口 `com.htmake.reader.ReaderApplicationKt` |
 
-## How this tree was produced
+目前 `gradlew build` 可以通过。它打包的是一个空应用，这在源码迁移期间是预期状态 —— **它还不是可运行的服务**。
 
-1. The jar was unpacked with `jar xf`.
-2. Application classes (`BOOT-INF/classes`, 936 `.class` files) were re-archived into a flat
-   classes jar.
-3. The classes jar was decompiled with **CFR 0.152**, with the bundled `BOOT-INF/lib` jars
-   supplied as an extra classpath so library types resolve.
-4. Non-class entries from `BOOT-INF/classes` were copied to `src/main/resources`.
+## 构建
 
-No bytecode was modified and nothing was executed from the artifact beyond the decompiler.
+需要 **JDK 11**（参考制品早于 Gradle 与 Spring Boot 支持 Java 17+ 的版本）。完整说明（含固定版本的 AdoptOpenJDK 11.0.8 下载方式）见 [docs/BUILD.md](docs/BUILD.md)。
 
-## Layout
-
-```
-src/main/java/            Decompiled Java sources
-  com/htmake/reader/       Application code (controllers, services, entities, verticles)
-  io/legado/app/           Vendored/repackaged Legado runtime classes
-  me/ag2s/                 Vendored EPUB and UMD reader utilities
-  org/kxml2/               Vendored XML pull parser
-src/main/resources/       Non-class assets from BOOT-INF/classes
-  application.yml, banner.txt, logback-spring.xml, simplelogger.properties
-  web/, simple-web/        Web UI bundles
-  images/, icons/, epub/, dtd/, defaultData/, bookSourceDebug/
-docs/dependencies.md      Inventory of the 85 bundled third-party jars (not vendored here)
-docs/decompilation-report.txt  CFR per-method report (unstructured methods and failures)
+```bash
+export JAVA_HOME=/path/to/jdk-11
+./gradlew build
 ```
 
-## Known limitations
+```powershell
+$env:JAVA_HOME = "D:\Tools\java\jdk-11.0.8+10"
+.\gradlew.bat build
+```
 
-- **Kotlin coroutines.** `suspend` functions compile to state machines, so every `invokeSuspend`
-  frame and many suspend bodies are reported by CFR as "Unable to fully structure code" and
-  appear as `switch`-based state machines rather than idiomatic linear code. Behaviour is
-  preserved, readability is not.
-- **Two methods failed outright** (`io.legado.app.help.coroutine.Coroutine`,
-  `io.legado.app.model.webBook.BookChapterList#analyzeChapterList`). See
-  `docs/decompilation-report.txt` for the exact list.
-- **No build files.** The original Gradle configuration was not part of the jar; it has not been
-  reconstructed. `docs/dependencies.md` lists what the artifact linked against.
-- **No comments, no original names for synthetic members.** Local variable names, parameter
-  names outside `@Metadata`, and line numbers are not recoverable.
-- Third-party libraries are **not** included. The 85 dependency jars stay out of this repository.
+检查依赖相对参考制品的漂移（`build` 已包含此校验，不一致即失败）：
 
-## Notice
+```bash
+./gradlew verifyDependencyParity
+./gradlew build -PallowParityDrift   # 迁移期间临时放宽为警告
+```
 
-This repository contains decompiled output of a third-party artifact and is published for
-research and interoperability purposes. All rights to the original software remain with its
-authors.
+## 目录结构
+
+```
+build.gradle.kts           Spring Boot / Kotlin / Java 构建脚本
+settings.gradle.kts
+gradle/wrapper/            Gradle 6.1.1 wrapper
+src/main/java/             应用源码（Kotlin 与 Java 共用此根目录）
+src/main/resources/        从制品提取的应用资源
+src/lib/                   制品自带、无法从仓库解析的 jar（rhino、xmlpull）
+src/test/java/             测试
+docs/                      溯源、构建、架构、路线图、依赖记录
+reference/decompiled/      CFR 反编译产物，仅作迁移证据，不参与构建
+```
+
+## 原则
+
+- **以制品为准。** 行为、资源字节和依赖版本都取自 `reader-pro-3.2.14.jar`，不靠记忆或猜测。
+- **反编译产物是证据，不是源码。** `reference/decompiled/` 永远不会进入构建路径，见 [reference/README.md](reference/README.md)。
+- **不做空实现。** 一个方法要么来自可辩护的来源被恢复，要么就不存在并登记在路线图里。
+- **任何声称的能力都必须可核验。** 未验证的内容在文档中一律标注为未验证。
+
+## 文档
+
+- [docs/PROVENANCE.md](docs/PROVENANCE.md) —— 制品是什么，每条结论如何得出
+- [docs/BUILD.md](docs/BUILD.md) —— 工具链、构建与核验
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) —— 参考应用的模块地图
+- [docs/ROADMAP.md](docs/ROADMAP.md) —— 源码迁移批次与验收标准
+- [docs/dependencies.txt](docs/dependencies.txt) —— 85 个内嵌依赖，逐项原样记录
+
+## 许可
+
+GNU General Public License v3.0 —— 见 [LICENSE](LICENSE)。恢复的代码库源自 `reader-pro` 所基于的 GPL-3.0 Legado 血统。

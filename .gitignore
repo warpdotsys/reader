@@ -1,11 +1,28 @@
+.gradle/
 build/
 out/
-.gradle/
+bin/
+
+# Local toolchain (see docs/BUILD.md)
+.tools/
+
+# Runtime state
+work/
+logs/
+storage/
+reader-assets/
+file-uploads/
+
 *.class
-*.jar
-*.war
-.idea/
+*.log
 *.iml
+.idea/
 .vscode/
+.settings/
+.classpath
+.project
+
 .DS_Store
 Thumbs.db
+
+!gradle/wrapper/gradle-wrapper.jar

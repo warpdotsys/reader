@@ -1,0 +1,20 @@
+* text=auto eol=lf
+
+*.java    text diff=java
+*.kt      text diff=kotlin
+*.kts     text diff=kotlin
+*.gradle  text
+*.md      text diff=markdown
+*.yml     text
+*.yaml    text
+*.xml     text
+*.json    text
+
+*.jar     binary
+*.png     binary
+*.jpg     binary
+*.gif     binary
+*.ttf     binary
+*.woff    binary
+*.woff2   binary
+*.zip     binary
