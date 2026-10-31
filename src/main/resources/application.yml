@@ -1,0 +1,41 @@
+reader:
+  app:
+    workDir: "."
+    showUI: false
+    debug: false
+    packaged: false
+    secure: false
+    inviteCode: ""
+    secureKey: ""
+    proxy: false
+    proxyType: "HTTP"
+    proxyHost: ""
+    proxyPort: ""
+    proxyUsername: ""
+    proxyPassword: ""
+    cacheChapterContent: true
+    userLimit: 15
+    userBookLimit: 200
+    debugLog: false
+    autoClearInactiveUser: 0
+    mongoUri: ""
+    mongoDbName: "reader"
+    shelfUpdateInteval: 30
+    remoteWebviewApi: ""
+    defaultUserEnableWebdav: true
+    defaultUserEnableLocalStore: true
+    defaultUserEnableBookSource: true
+    defaultUserEnableRssSource: true
+    defaultUserBookSourceLimit: 100
+    defaultUserBookLimit: 200
+    autoBackupUserData: false
+    minUserPasswordLength: 8
+    remoteBookSourceUpdateInterval: 720
+
+  server:
+    port: 8080
+    contextPath: ""
+    webUrl: http://localhost:${reader.server.port}${reader.server.contextPath}
+
+logging:
+  path: "${reader.app.workDir}/logs"

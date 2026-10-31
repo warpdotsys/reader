@@ -1,0 +1,557 @@
+Summary for D:\Projects\app-classes.jar
+Decompiled with CFR 0.152
+
+
+com.htmake.reader.api.YueduApi
+----------------------------
+
+initRouter$suspendImpl(com.htmake.reader.api.YueduApi io.vertx.ext.web.Router kotlin.coroutines.Continuation )
+  Unable to fully structure code
+  Could not resolve type clashes
+getSystemInfo(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+
+
+com.htmake.reader.api.controller.BaseController
+----------------------------
+
+saveUserSession(io.vertx.ext.web.RoutingContext com.htmake.reader.entity.User boolean kotlin.coroutines.Continuation<? super java.util.Map<java.lang.String, ? extends java.lang.Object>> )
+  Unable to fully structure code
+  Could not resolve type clashes
+checkAuth(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super java.lang.Boolean> )
+  Unable to fully structure code
+  Could not resolve type clashes
+limitConcurrent(int int int kotlin.jvm.functions.Function3<? super kotlinx.coroutines.CoroutineScope, ? super java.lang.Integer, ? super kotlin.coroutines.Continuation<java.lang.Object>, ? extends java.lang.Object> kotlin.jvm.functions.Function2<? super java.util.ArrayList<java.lang.Object>, ? super java.lang.Integer, java.lang.Boolean> kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+
+
+com.htmake.reader.api.controller.BookController
+----------------------------
+
+getInvalidBookSources(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+getBookInfo(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+  Could not resolve type clashes
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+importBookPreview(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+getTxtTocRules(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+getChapterListByRule(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+refreshLocalBook(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+getChapterList(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+  Could not resolve type clashes
+saveBookProgress(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+getBookContent(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+  Could not resolve type clashes
+saveBookContent(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+exploreBook(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+searchBook(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+searchBookMulti(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+searchBookMultiSSE(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+searchBookSource(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+  Could not resolve type clashes
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+searchBookSourceSSE(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+  Could not resolve type clashes
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+searchBookWithSource(java.lang.String io.legado.app.data.entities.Book boolean java.lang.String kotlin.coroutines.Continuation<? super java.util.ArrayList<io.legado.app.data.entities.SearchBook>> )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+getAvailableBookSource(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+  Could not resolve type clashes
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+getBookshelf(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+getShelfBook(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+saveBook(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+saveLocalBookCover(io.legado.app.data.entities.Book java.lang.String kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+saveBookCover(io.legado.app.data.entities.Book java.lang.String java.lang.String kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+setBookSource(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+  Could not resolve type clashes
+saveBookConfig(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+saveBookGroupId(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+addBookGroupMulti(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+removeBookGroupMulti(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+deleteBook(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+deleteBooks(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+getBookShelfBooks(boolean java.lang.String kotlin.coroutines.Continuation<? super java.util.List<io.legado.app.data.entities.Book>> )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+getLocalChapterList(io.legado.app.data.entities.Book java.lang.String boolean java.lang.String boolean kotlinx.coroutines.sync.Mutex kotlin.coroutines.Continuation<? super java.util.List<io.legado.app.data.entities.BookChapter>> )
+  Unable to fully structure code
+  Could not resolve type clashes
+saveShelfBookLatestChapter(io.legado.app.data.entities.Book java.util.List<io.legado.app.data.entities.BookChapter> java.lang.String kotlinx.coroutines.sync.Mutex kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+editShelfBook(io.legado.app.data.entities.Book java.lang.String kotlin.jvm.functions.Function1<? super io.legado.app.data.entities.Book, io.legado.app.data.entities.Book> kotlin.coroutines.Continuation<? super io.legado.app.data.entities.Book> )
+  Unable to fully structure code
+syncFromWebdav(java.lang.String java.lang.String kotlin.coroutines.Continuation<? super java.lang.Boolean> )
+  Unable to fully structure code
+saveToWebdav(java.lang.String java.lang.String kotlin.coroutines.Continuation<? super java.lang.Boolean> )
+  Unable to fully structure code
+bookSourceDebugSSE(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+cacheBookSSE(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+cacheBookOnServer(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+cacheBookOnServer(io.vertx.core.json.JsonArray java.lang.String kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+deleteBookCache(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+textToSpeech(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+  Could not resolve type clashes
+ttsByApi(io.vertx.core.http.HttpServerResponse java.lang.String java.lang.String java.util.Map<java.lang.String, java.lang.String> kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+getSpeakStream(io.legado.app.data.entities.HttpTTS java.lang.String int kotlin.coroutines.Continuation<? super java.io.InputStream> )
+  Unable to fully structure code
+  Could not resolve type clashes
+ttsByTextToSpeechCn(io.vertx.core.http.HttpServerResponse java.lang.String java.util.Map<java.lang.String, java.lang.String> kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+getShelfBookWithCacheInfo(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+exportBook(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+exportToTxt(java.io.File io.legado.app.data.entities.Book java.lang.String java.lang.String kotlin.coroutines.Continuation<? super java.io.File> )
+  Unable to fully structure code
+getAllContents(io.legado.app.data.entities.Book java.lang.String java.lang.String kotlin.jvm.functions.Function2<? super java.lang.String, ? super java.util.ArrayList<kotlin.Triple<java.lang.String, java.lang.Integer, java.lang.String>>, kotlin.Unit> kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+exportToEpub(java.io.File io.legado.app.data.entities.Book java.lang.String java.lang.String kotlin.coroutines.Continuation<? super java.io.File> )
+  Unable to fully structure code
+setCover(io.legado.app.data.entities.Book me.ag2s.epublib.domain.EpubBook java.lang.String kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+setEpubContent(java.lang.String io.legado.app.data.entities.Book me.ag2s.epublib.domain.EpubBook java.lang.String java.lang.String kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+searchBookContent(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+searchChapter(io.legado.app.data.entities.Book io.legado.app.data.entities.BookChapter java.lang.String kotlin.coroutines.Continuation<? super java.util.List<io.legado.app.data.entities.SearchResult>> )
+  Unable to fully structure code
+backupToMongodb(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+  Could not resolve type clashes
+restoreFromMongodb(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+  Could not resolve type clashes
+
+
+com.htmake.reader.api.controller.BookGroupController
+----------------------------
+
+saveBookGroupOrder(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+  Could not resolve type clashes
+
+
+com.htmake.reader.api.controller.BookSourceController
+----------------------------
+
+saveBookSource(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+saveBookSources(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+getBookSource(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+getBookSources(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+  Could not resolve type clashes
+deleteBookSource(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+deleteBookSources(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+deleteAllBookSources(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+setAsDefaultBookSources(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+  Could not resolve type clashes
+saveFromRemoteSource(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+updateRemoteSourceSub(java.lang.String com.htmake.reader.entity.User kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+deleteUserBookSource(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+deleteBookSourcesFile(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+
+
+com.htmake.reader.api.controller.CURD
+----------------------------
+
+list(com.htmake.reader.api.controller.CURD<T> io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+save(com.htmake.reader.api.controller.CURD<T> io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+saveMulti(com.htmake.reader.api.controller.CURD<T> io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+delete(com.htmake.reader.api.controller.CURD<T> io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+deleteMulti(com.htmake.reader.api.controller.CURD<T> io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+
+
+com.htmake.reader.api.controller.FileController
+----------------------------
+
+checkAccess(io.vertx.ext.web.RoutingContext boolean boolean kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+  Could not resolve type clashes
+list(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+upload(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+download(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+get(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+save(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+mkdir(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+delete(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+deleteMulti(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+importPreview(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+restore(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+parse(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+
+
+com.htmake.reader.api.controller.LicenseController
+----------------------------
+
+importLicense(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+
+
+com.htmake.reader.api.controller.RssSourceController
+----------------------------
+
+getRssSources(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+  Could not resolve type clashes
+saveRssSource(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+saveRssSources(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+deleteRssSource(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+getRssArticles(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+getRssContent(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+  Could not resolve type clashes
+
+
+com.htmake.reader.api.controller.UserController
+----------------------------
+
+login(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+  Could not resolve type clashes
+logout(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+  Could not resolve type clashes
+getUserList(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+  Could not resolve type clashes
+addUser(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+  Could not resolve type clashes
+resetPassword(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+  Could not resolve type clashes
+deleteUsers(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+  Could not resolve type clashes
+clearInactiveUsers(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+updateUser(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+  Could not resolve type clashes
+getUserInfo(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+saveUserConfig(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+getUserConfig(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+  Could not resolve type clashes
+uploadFile(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+deleteFile(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+downloadBackupFile(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+forEachUser(kotlin.jvm.functions.Function3<? super kotlinx.coroutines.CoroutineScope, ? super com.htmake.reader.entity.User, ? super kotlin.coroutines.Continuation<? super java.lang.Boolean>, ? extends java.lang.Object> kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+  Could not resolve type clashes
+
+
+com.htmake.reader.api.controller.WebdavController
+----------------------------
+
+webdavUpload(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+  Could not resolve type clashes
+backupToWebdav(io.vertx.ext.web.RoutingContext kotlin.coroutines.Continuation<? super com.htmake.reader.api.ReturnData> )
+  Unable to fully structure code
+
+
+com.htmake.reader.utils.ExtKt
+----------------------------
+
+getWorkDir(java.lang.String )
+  Unable to fully structure code
+
+
+com.htmake.reader.utils.RemoteWebview
+----------------------------
+
+getStrResponse(java.lang.String java.lang.String java.lang.String java.lang.String java.util.Map<java.lang.String, java.lang.String> java.lang.String java.lang.String java.lang.String boolean java.lang.String java.lang.String io.legado.app.model.DebugLog kotlin.coroutines.Continuation<? super io.legado.app.help.http.StrResponse> )
+  Unable to fully structure code
+
+
+com.htmake.reader.utils.UserMutex
+----------------------------
+
+getLocker(java.lang.String kotlin.coroutines.Continuation<? super kotlinx.coroutines.sync.Mutex> )
+  Unable to fully structure code
+
+
+com.htmake.reader.verticle.RestVerticle
+----------------------------
+
+start$suspendImpl(com.htmake.reader.verticle.RestVerticle kotlin.coroutines.Continuation )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+
+
+io.legado.app.adapters.DefaultAdpater
+----------------------------
+
+getWorkDir(java.lang.String )
+  Unable to fully structure code
+
+
+io.legado.app.help.BookHelp
+----------------------------
+
+saveImages(kotlinx.coroutines.CoroutineScope io.legado.app.data.entities.BookSource io.legado.app.data.entities.Book io.legado.app.data.entities.BookChapter java.lang.String kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+  Could not resolve type clashes
+saveImage(io.legado.app.data.entities.BookSource io.legado.app.data.entities.Book java.lang.String kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+
+
+io.legado.app.help.JsExtensions
+----------------------------
+
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+
+
+io.legado.app.help.SourceAnalyzer
+----------------------------
+
+jsonToBookSource-IoAF18A(java.lang.String )
+  Unable to fully structure code
+
+
+io.legado.app.help.coroutine.Coroutine
+----------------------------
+
+invokeSuspend(java.lang.Object )
+  Exception : org.benf.cfr.reader.util.ConfusedCFRException: Tried to end blocks [11[SWITCH], 13[CASE]], but top level block is 1[TRYBLOCK]
+
+
+io.legado.app.help.http.OkHttpUtilsKt
+----------------------------
+
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+newCallResponseBody(okhttp3.OkHttpClient int kotlin.jvm.functions.Function1<? super okhttp3.Request$Builder, kotlin.Unit> kotlin.coroutines.Continuation<? super okhttp3.ResponseBody> )
+  Unable to fully structure code
+newCall(okhttp3.OkHttpClient int kotlin.jvm.functions.Function1<? super okhttp3.Request$Builder, kotlin.Unit> kotlin.coroutines.Continuation<? super okhttp3.ResponseBody> )
+  Unable to fully structure code
+newCallStrResponse(okhttp3.OkHttpClient int kotlin.jvm.functions.Function1<? super okhttp3.Request$Builder, kotlin.Unit> kotlin.coroutines.Continuation<? super io.legado.app.help.http.StrResponse> )
+  Unable to fully structure code
+
+
+io.legado.app.model.Debugger
+----------------------------
+
+exploreDebug(io.legado.app.model.webBook.WebBook java.lang.String kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+searchDebug(io.legado.app.model.webBook.WebBook java.lang.String kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+infoDebug(io.legado.app.model.webBook.WebBook io.legado.app.data.entities.Book kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+tocDebug(io.legado.app.model.webBook.WebBook io.legado.app.data.entities.Book kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+contentDebug(io.legado.app.model.webBook.WebBook io.legado.app.data.entities.Book io.legado.app.data.entities.BookChapter java.lang.String kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+
+
+io.legado.app.model.analyzeRule.AnalyzeRule
+----------------------------
+
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+
+
+io.legado.app.model.analyzeRule.AnalyzeUrl
+----------------------------
+
+getStrResponseAwait(java.lang.String java.lang.String boolean kotlin.coroutines.Continuation<? super io.legado.app.help.http.StrResponse> )
+  Unable to fully structure code
+getResponseAwait(kotlin.coroutines.Continuation<? super okhttp3.Response> )
+  Unable to fully structure code
+getByteArrayAwait(kotlin.coroutines.Continuation<? super byte[]> )
+  Unable to fully structure code
+
+
+io.legado.app.model.localBook.EpubFile
+----------------------------
+
+getChapterListBySpine()
+  Unable to fully structure code
+getChapterList()
+  Unable to fully structure code
+
+
+io.legado.app.model.rss.Rss
+----------------------------
+
+getArticles(java.lang.String java.lang.String io.legado.app.data.entities.RssSource int io.legado.app.model.DebugLog kotlin.coroutines.Continuation<? super kotlin.Pair<? extends java.util.List<io.legado.app.data.entities.RssArticle>, java.lang.String>> )
+  Unable to fully structure code
+getContent(io.legado.app.data.entities.RssArticle java.lang.String io.legado.app.data.entities.RssSource io.legado.app.model.DebugLog kotlin.coroutines.Continuation<? super java.lang.String> )
+  Unable to fully structure code
+
+
+io.legado.app.model.webBook.BookChapterList
+----------------------------
+
+analyzeChapterList(io.legado.app.data.entities.Book java.lang.String io.legado.app.data.entities.BookSource java.lang.String java.lang.String io.legado.app.model.DebugLog kotlin.coroutines.Continuation<? super java.util.List<io.legado.app.data.entities.BookChapter>> )
+  Exception : org.benf.cfr.reader.util.ConfusedCFRException: Tried to end blocks [2[CASE]], but top level block is 7[SWITCH]
+
+
+io.legado.app.model.webBook.BookContent
+----------------------------
+
+analyzeContent(java.lang.String io.legado.app.data.entities.Book io.legado.app.data.entities.BookChapter io.legado.app.data.entities.BookSource java.lang.String java.lang.String java.lang.String io.legado.app.model.DebugLog kotlin.coroutines.Continuation<? super java.lang.String> )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+invokeSuspend(java.lang.Object )
+  Unable to fully structure code
+
+
+io.legado.app.model.webBook.BookInfo
+----------------------------
+
+analyzeBookInfo(io.legado.app.data.entities.Book java.lang.String io.legado.app.model.analyzeRule.AnalyzeRule io.legado.app.data.entities.BookSource java.lang.String java.lang.String boolean io.legado.app.model.DebugLog kotlin.coroutines.Continuation<? super kotlin.Unit> )
+  Unable to fully structure code
+
+
+io.legado.app.model.webBook.BookList
+----------------------------
+
+analyzeBookList(java.lang.String io.legado.app.data.entities.BookSource io.legado.app.model.analyzeRule.AnalyzeUrl java.lang.String io.legado.app.data.entities.SearchBook boolean io.legado.app.model.DebugLog kotlin.coroutines.Continuation<? super java.util.ArrayList<io.legado.app.data.entities.SearchBook>> )
+  Unable to fully structure code
+getInfoItem(java.lang.String io.legado.app.model.analyzeRule.AnalyzeRule io.legado.app.data.entities.BookSource io.legado.app.model.analyzeRule.AnalyzeUrl java.lang.String java.lang.String io.legado.app.model.DebugLog kotlin.coroutines.Continuation<? super io.legado.app.data.entities.SearchBook> )
+  Unable to fully structure code
+
+
+io.legado.app.model.webBook.WebBook
+----------------------------
+
+searchBook(java.lang.String java.lang.Integer kotlin.coroutines.Continuation<? super java.util.List<io.legado.app.data.entities.SearchBook>> )
+  Unable to fully structure code
+exploreBook(java.lang.String java.lang.Integer kotlin.coroutines.Continuation<? super java.util.List<io.legado.app.data.entities.SearchBook>> )
+  Unable to fully structure code
+getBookInfo(io.legado.app.data.entities.Book boolean kotlin.coroutines.Continuation<? super io.legado.app.data.entities.Book> )
+  Unable to fully structure code
+getChapterList(io.legado.app.data.entities.Book kotlin.coroutines.Continuation<? super java.util.List<io.legado.app.data.entities.BookChapter>> )
+  Unable to fully structure code
+getBookContent(io.legado.app.data.entities.Book io.legado.app.data.entities.BookChapter java.lang.String kotlin.coroutines.Continuation<? super java.lang.String> )
+  Unable to fully structure code
+preciseSearch-0E7RQCE(java.lang.String java.lang.String kotlin.coroutines.Continuation<? super kotlin.Result<io.legado.app.data.entities.Book>> )
+  Unable to fully structure code
+
+
+io.legado.app.utils.ACache
+----------------------------
+
+getAsObject(java.lang.String )
+  Unable to fully structure code
+
+
+io.legado.app.utils.EncoderUtils
+----------------------------
+
+symmetricTemplate(byte[] byte[] java.lang.String java.lang.String byte[] boolean )
+  Unable to fully structure code
