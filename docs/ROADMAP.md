@@ -25,9 +25,11 @@
 
 ## 跨批次工作
 
-- **ABI 矩阵。** 一次性生成制品的公开方法、字段与路由清单，之后每批都与它做差集。这是让验收标准 2 可落地的手段。
+- **ABI 矩阵。** `scripts/verify-abi.ps1` 把已恢复的类与制品字节码逐类比对（声明、描述符、
+  泛型签名）。这是让验收标准 2 可落地的手段，每批迁入都要跑。
 - **运行时对比。** 让恢复版服务与制品并排运行（各自隔离的数据目录），逐路由比对响应。
-- **核验任务接入。** 等 `verifyDependencyParity` 报告完全一致后，把它接进 `check`，让 `build` 强制执行。
+- **核验任务接入。** `verifyDependencyParity` 已接进 `check`；ABI 比对需要在有制品的前提下运行，
+  因此保留为独立脚本，不进入默认构建。
 
 ## 当前明确不做
 
@@ -36,4 +38,6 @@
 
 ## 当前进度
 
-第 1 批尚未开始。本仓库目前只构建出工程骨架；除包结构外 `src/main/java` 为空。
+- 第 1 批（`org.kxml2`、`me.ag2s.epublib`、`me.ag2s.umdlib`、`io.legado.app.lib.icu4j`，共 86 个类）
+  已完成，ABI 与制品逐类一致。记录见 [BATCHES.md](BATCHES.md)。
+- 下一批：第 2 批 `io.legado.app.{constant,exception,data.entities,utils,help}`。

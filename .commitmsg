@@ -1,0 +1,11 @@
+迁入第 1 批源码：内嵌格式库与解析器
+
+范围：me.ag2s.epublib(58)、me.ag2s.umdlib(9)、org.kxml2(11)、io.legado.app.lib.icu4j(8)，共 86 个类。
+
+- 从 reference/decompiled 还原，去掉 CFR 横幅与说明性注释块，清理同包自引用 import
+- 修正 2 处 CFR 推断错误：TableOfContents 的局部变量类型、WbxmlParser 的未初始化变量
+- 新增 scripts/verify-abi.ps1，对着制品字节码做 javap ABI 比对
+- 核验结果：86 个类 ABI 全一致；gradlew clean build 通过，依赖 85/85 一致
+- 文档：新增 docs/BATCHES.md，更新 ROADMAP/BUILD/README
+
+注意：ABI 一致不等于行为一致，行为尚未核验。

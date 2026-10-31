@@ -63,6 +63,19 @@ Gradle wrapper 首次使用时会下载 Gradle 6.1.1。
 
 另有一处**已记录的命名差异**：Gradle 的 okio 模块元数据把 JVM 制品声明为 `okio-jvm-2.8.0.jar`，实际下载的文件名却是 `okio-2.8.0.jar`（字节相同）。校验任务按制品声明的名字归一，代码里有注释说明。
 
+### ABI 一致性
+
+`scripts/verify-abi.ps1` 把 `src/main/java` 里的每个类，与参考制品字节码用 `javap -p -s` 逐类比对：
+类声明、成员声明、JVM 描述符、泛型签名。它需要在有制品的机器上运行，所以不进默认构建。
+
+```powershell
+./scripts/verify-abi.ps1 -Artifact C:\path\to\reader-pro-3.2.14.jar -JavaHome D:\Tools\java\jdk-11.0.8+10
+```
+
+`-Artifact` 也可以直接给已解包的 `BOOT-INF/classes` 目录。有任何差异时退出码为 1，并打印 diff。
+
+注意：ABI 一致**不等于**行为一致。它只保证接口没跑偏。
+
 ### 确定性打包
 
 `bootJar` 关闭了文件时间戳并固定归档顺序，因此相同输入的重新构建会产生相同归档。它同时会断言入口类。

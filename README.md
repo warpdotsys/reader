@@ -11,10 +11,10 @@
 | 工具链（JDK 11、Gradle 6.1.1、Kotlin 1.5.21、Java 8 目标） | 已可复现 |
 | 依赖集合对齐制品 `BOOT-INF/lib` | 85/85 完全一致，由 `build` 强制校验 |
 | 应用资源（从制品提取） | 已在 `src/main/resources` |
-| 应用源码 | **尚未迁入** —— 见 [docs/ROADMAP.md](docs/ROADMAP.md) |
+| 应用源码 | 第 1 批已迁入（86 个类，ABI 已核验）—— [docs/BATCHES.md](docs/BATCHES.md) |
 | fat jar 打包 | `bootJar` 已配置入口 `com.htmake.reader.ReaderApplicationKt` |
 
-目前 `gradlew build` 可以通过。它打包的是一个空应用，这在源码迁移期间是预期状态 —— **它还不是可运行的服务**。
+目前 `gradlew build` 可以通过。已迁入的 86 个类是内嵌的格式库与解析器（EPUB/UMD/XML/字符集探测）；应用主流程尚未迁入，所以**它还不是可运行的服务**。
 
 ## 构建
 
@@ -47,7 +47,8 @@ src/main/java/             应用源码（Kotlin 与 Java 共用此根目录）
 src/main/resources/        从制品提取的应用资源
 src/lib/                   制品自带、无法从仓库解析的 jar（rhino、xmlpull）
 src/test/java/             测试
-docs/                      溯源、构建、架构、路线图、依赖记录
+scripts/                   核验脚本（ABI 比对）
+docs/                      溯源、构建、架构、路线图、批次记录、依赖记录
 reference/decompiled/      CFR 反编译产物，仅作迁移证据，不参与构建
 ```
 
@@ -64,6 +65,7 @@ reference/decompiled/      CFR 反编译产物，仅作迁移证据，不参与�
 - [docs/BUILD.md](docs/BUILD.md) —— 工具链、构建与核验
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) —— 参考应用的模块地图
 - [docs/ROADMAP.md](docs/ROADMAP.md) —— 源码迁移批次与验收标准
+- [docs/BATCHES.md](docs/BATCHES.md) —— 已迁入批次的记录与未覆盖项
 - [docs/dependencies.txt](docs/dependencies.txt) —— 85 个内嵌依赖，逐项原样记录
 
 ## 许可
