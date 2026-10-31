@@ -12,16 +12,30 @@
 4. 不存在空壳方法。要么恢复它，要么不写它。
 5. 未被 1–3 覆盖的内容，在该批笔记中记录为**未核验**。
 
+## 还原规则
+
+- **带 `@Metadata` 的类还原为 Kotlin**，放在 `src/main/kotlin`；**纯 Java 来源的保持 `.java`**，
+  放在 `src/main/java`。制品是 Kotlin 写的，内联类（`Result`）、内联函数、协程状态机、委托属性
+  这些构造在 Java 里根本无法表达——CFR 为它们生成的方法名带连字符（如 `constructor-impl`），
+  不是"难改"，而是非法。
+- 共同源码骨架只作参考，不直接采用：每个类都要过 `scripts/verify-abi.ps1`。
+- 常量内容不在 ABI 范围内，因此涉及字面量（正则、模板字符串）的类要额外比对字节码里的字符串常量。
+
 ## 批次
 
-| # | 范围 | 理由 |
+| # | 范围 | 状态 |
 | --- | --- | --- |
-| 1 | `org.kxml2`、`me.ag2s.epublib`、`me.ag2s.umdlib`、`io.legado.app.lib.icu4j` | 纯 Java，无协程、无 Kotlin 元数据。置信度最高，且能跑通整条构建链路。 |
-| 2 | `io.legado.app.{constant,exception,data.entities,utils,help}` | 其他一切所依赖的数据模型。以声明和纯函数为主。 |
-| 3 | `io.legado.app.model.*` | 规则引擎与格式读取。协程密集，预期需要手工重建而非誊写。 |
-| 4 | `com.htmake.reader.{db,config,entity,utils}` | 存储与配置。 |
-| 5 | `com.htmake.reader.{api,verticle,init,lib.tts}` | HTTP 界面与启动流程。依赖上述全部。 |
-| 6 | `web` / `simple-web` 的前端源码 | 服务端能跑起来之后再动；今天它们只是制品的构建产物。 |
+| 1 | `org.kxml2`、`me.ag2s.epublib`、`me.ag2s.umdlib`、`io.legado.app.lib.icu4j`（86 个类，纯 Java） | 已完成 |
+| 2a | `io.legado.app.exception`、`io.legado.app.constant`（13 个类） | 已完成 |
+| 2b | `io.legado.app.data.entities`（含 `rule`，24 个类） | 待做 |
+| 2c | `io.legado.app.utils`（28 个类） | 待做 |
+| 2d | `io.legado.app.help`（含 `coroutine`、`http`，22 个类） | 待做 |
+| 3 | `io.legado.app.model.*` | 待做 |
+| 4 | `com.htmake.reader.{db,config,entity,utils}` | 待做 |
+| 5 | `com.htmake.reader.{api,verticle,init,lib.tts}` | 待做 |
+| 6 | `web` / `simple-web` 的前端源码 | 待做 |
+
+第 2 批按包拆成 2a–2d，每片都能独立编译、独立核验、独立提交，保证主干始终可构建。
 
 ## 跨批次工作
 
@@ -38,6 +52,8 @@
 
 ## 当前进度
 
-- 第 1 批（`org.kxml2`、`me.ag2s.epublib`、`me.ag2s.umdlib`、`io.legado.app.lib.icu4j`，共 86 个类）
-  已完成，ABI 与制品逐类一致。记录见 [BATCHES.md](BATCHES.md)。
-- 下一批：第 2 批 `io.legado.app.{constant,exception,data.entities,utils,help}`。
+- 第 1 批（86 个类，纯 Java）已完成。
+- 第 2a 批（`io.legado.app.exception`、`io.legado.app.constant`，13 个类，按 Kotlin 还原）已完成。
+- 进行中：第 2b 批 `io.legado.app.data.entities`。
+
+逐批记录见 [BATCHES.md](BATCHES.md)。

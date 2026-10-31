@@ -34,10 +34,15 @@ if (-not (Test-Path -LiteralPath $javap)) {
     throw "找不到 javap：$javap"
 }
 
-$newCp = Join-Path $ProjectRoot 'build\classes\java\main'
-if (-not (Test-Path -LiteralPath $newCp)) {
-    throw "还没编译过：$newCp。先跑 ./gradlew classes。"
+# Kotlin 与 Java 的编译产物在不同目录，两者都要在核验 classpath 上。
+$newCp = @(
+    (Join-Path $ProjectRoot 'build\classes\kotlin\main'),
+    (Join-Path $ProjectRoot 'build\classes\java\main')
+) | Where-Object { Test-Path -LiteralPath $_ }
+if (-not $newCp) {
+    throw "还没编译过：$ProjectRoot\build\classes。先跑 ./gradlew classes。"
 }
+$newCp = $newCp -join ';'
 
 # 制品是 fat jar 时，把 BOOT-INF/classes 解到临时目录作为参考 classpath。
 $staging = $null
@@ -73,9 +78,16 @@ function Get-AbiDump([string]$ClassPath, [string]$ClassName) {
 }
 
 try {
-    $srcRoot = Join-Path $ProjectRoot 'src\main\java'
-    $classes = Get-ChildItem -Path $srcRoot -Recurse -Filter *.java | ForEach-Object {
-        $_.FullName.Substring($srcRoot.Length + 1) -replace '\\', '.' -replace '\.java$', ''
+    $roots = @(
+        @{ Path = (Join-Path $ProjectRoot 'src\main\java'); Extension = '.java' },
+        @{ Path = (Join-Path $ProjectRoot 'src\main\kotlin'); Extension = '.kt' }
+    )
+    $classes = foreach ($root in $roots) {
+        if (-not (Test-Path -LiteralPath $root.Path)) { continue }
+        Get-ChildItem -Path $root.Path -Recurse -Filter "*$($root.Extension)" | ForEach-Object {
+            $relative = $_.FullName.Substring($root.Path.Length + 1) -replace '\\', '.'
+            $relative.Substring(0, $relative.Length - $root.Extension.Length)
+        }
     }
 
     $identical = 0

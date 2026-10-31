@@ -1,6 +1,65 @@
 # 批次记录
 
-每个已迁入批次的可核验记录。计划见 [ROADMAP.md](ROADMAP.md)。
+每个已迁入批次的可核验记录。计划与还原规则见 [ROADMAP.md](ROADMAP.md)。
+
+## 第 2a 批 —— 常量与异常
+
+**状态：已完成（ABI 与字符串常量均已核验）**
+
+### 范围
+
+| 包 | 文件数 | 语言 |
+| --- | --- | --- |
+| `io.legado.app.exception` | 5 | Kotlin |
+| `io.legado.app.constant` | 8 | Kotlin |
+| **合计** | **13** | |
+
+### 为什么第 2 批要拆
+
+原批次是 `io.legado.app.{constant,exception,data.entities,utils,help}` 共 87 个文件。用 CFR 产物直接编译时，
+34 个文件报的不是"语义错误"而是**语法错误**，根因是 Java 表达不了源语言构造：
+
+| 根因 | 出现次数 | 说明 |
+| --- | --- | --- |
+| Kotlin 内联类 `Result` | 94 | 调用点的方法名是 `Result.constructor-impl(...)`，带连字符，Java 标识符不允许 |
+| 内联函数接收者 | 若干 | CFR 把它写成 `void $this$fromJsonObject$iv;` 这种非法局部变量 |
+| 缺失的 lambda 内部类 | 18 | CFR 没有输出 `AppConst$userAgent$2` 之类，只留下非法的 `userAgent.2.INSTANCE` |
+| 协程状态机 | 若干 | `orphaned case`、`'catch' without 'try'` 等结构性错位 |
+
+结论：这些类**只能按 Kotlin 还原**。因此第 2 批按包拆成 2a–2d，每片独立完成、独立核验、独立提交。
+
+### 做法
+
+1. 从 `reference/decompiled/` 取对应类的 CFR 产物作为结构参考。
+2. 从制品字节码取事实：`javap -p -c` 读方法体与字符串常量，`@Metadata` 的 `d1`/`d2` 读属性名与签名。
+3. 按 Kotlin 写出 `src/main/kotlin/...`。
+4. `./gradlew build` + `./scripts/verify-abi.ps1` 核验。
+
+### 核验
+
+```
+./scripts/verify-abi.ps1 -Artifact <reader-pro-3.2.14.jar>
+
+已比对类数 : 99
+ABI 一致   : 99
+ABI 不一致 : 0
+```
+
+ABI 之外，字符串常量另做逐字比对（ABI 不覆盖常量池）：
+
+| 类 | 字面量数 | 结果 |
+| --- | --- | --- |
+| `AppConst$userAgent$2` / `$TIME_FORMAT$2` / `$timeFormat$2` / `$dateFormat$2` / `$fileNameFormat$2` | 各 1 | 一致 |
+| `AppConst$keyboardToolChars$2` | 26 | 一致 |
+| `AppPattern` | 16 | 一致 |
+| `DeepinkBookSource` | 15 | 一致 |
+
+### 仍未覆盖
+
+- **行为未核验。** 没有跑过任何实际调用对比。
+- **`AppConst` 的委托体是从字节码读出来重写的**（`lazy { }` 的 lambda），
+  语义一致但书写形式未必与原始源码相同。
+- 第 2 批其余 74 个文件（含 `Book`、`BookSource` 等核心实体）尚未迁入。
 
 ## 第 1 批 —— 内嵌格式库与解析器
 

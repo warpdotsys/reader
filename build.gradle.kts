@@ -113,6 +113,11 @@ tasks.withType<Test> {
     useJUnitPlatform()
 }
 
+tasks.withType<JavaCompile> {
+    // Restoration surfaces many errors at once; javac's default cap of 100 hides the rest.
+    options.compilerArgs.addAll(listOf("-Xmaxerrs", "2000"))
+}
+
 application {
     mainClassName = "com.htmake.reader.ReaderApplicationKt"
 }

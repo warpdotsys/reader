@@ -1,11 +1,17 @@
-迁入第 1 批源码：内嵌格式库与解析器
+迁入第 2a 批源码：常量与异常（按 Kotlin 还原）
 
-范围：me.ag2s.epublib(58)、me.ag2s.umdlib(9)、org.kxml2(11)、io.legado.app.lib.icu4j(8)，共 86 个类。
+- 确立还原规则：带 @Metadata 的类写成 .kt（src/main/kotlin），纯 Java 来源保持 .java
+- 范围：io.legado.app.exception(5) + io.legado.app.constant(8)，共 13 个类
+- 第 2 批按包拆成 2a-2d，每片独立编译、独立核验、独立提交，主干始终可构建
 
-- 从 reference/decompiled 还原，去掉 CFR 横幅与说明性注释块，清理同包自引用 import
-- 修正 2 处 CFR 推断错误：TableOfContents 的局部变量类型、WbxmlParser 的未初始化变量
-- 新增 scripts/verify-abi.ps1，对着制品字节码做 javap ABI 比对
-- 核验结果：86 个类 ABI 全一致；gradlew clean build 通过，依赖 85/85 一致
-- 文档：新增 docs/BATCHES.md，更新 ROADMAP/BUILD/README
+为什么必须按 Kotlin 还原：用 CFR 产物直接编译时，第 2 批 87 个文件中有 34 个报语法错误，
+根因是 Java 表达不了 Kotlin 构造——内联类 Result 生成带连字符的方法名 constructor-impl（94 处）、
+内联函数的 void \\$...\ 局部变量、CFR 未输出的 lambda 内部类、协程状态机错位。
 
-注意：ABI 一致不等于行为一致，行为尚未核验。
+核验：
+- gradlew clean build 通过，依赖 85/85 一致
+- scripts/verify-abi.ps1：99 个类 ABI 全一致
+- 额外逐字比对字节码字符串常量：AppPattern(16)、DeepinkBookSource(15)、
+  AppConst 各委托(1+26) 全部一致
+
+注意：行为仍未核验。

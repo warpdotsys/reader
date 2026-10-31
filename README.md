@@ -11,10 +11,10 @@
 | 工具链（JDK 11、Gradle 6.1.1、Kotlin 1.5.21、Java 8 目标） | 已可复现 |
 | 依赖集合对齐制品 `BOOT-INF/lib` | 85/85 完全一致，由 `build` 强制校验 |
 | 应用资源（从制品提取） | 已在 `src/main/resources` |
-| 应用源码 | 第 1 批已迁入（86 个类，ABI 已核验）—— [docs/BATCHES.md](docs/BATCHES.md) |
+| 应用源码 | 第 1 批（86 个 Java 类）+ 第 2a 批（13 个 Kotlin 类）已迁入，ABI 已核验 — [docs/BATCHES.md](docs/BATCHES.md) |
 | fat jar 打包 | `bootJar` 已配置入口 `com.htmake.reader.ReaderApplicationKt` |
 
-目前 `gradlew build` 可以通过。已迁入的 86 个类是内嵌的格式库与解析器（EPUB/UMD/XML/字符集探测）；应用主流程尚未迁入，所以**它还不是可运行的服务**。
+目前 `gradlew build` 可以通过。已迁入的是内嵌格式库与解析器、常量与异常类；应用主流程尚未迁入，所以**它还不是可运行的服务**。
 
 ## 构建
 
@@ -43,7 +43,8 @@ $env:JAVA_HOME = "D:\Tools\java\jdk-11.0.8+10"
 build.gradle.kts           Spring Boot / Kotlin / Java 构建脚本
 settings.gradle.kts
 gradle/wrapper/            Gradle 6.1.1 wrapper
-src/main/java/             应用源码（Kotlin 与 Java 共用此根目录）
+src/main/java/             应用源码 —— 纯 Java 来源的类
+src/main/kotlin/           应用源码 —— 带 @Metadata 的 Kotlin 来源类（见 docs/ROADMAP.md 还原规则）
 src/main/resources/        从制品提取的应用资源
 src/lib/                   制品自带、无法从仓库解析的 jar（rhino、xmlpull）
 src/test/java/             测试
