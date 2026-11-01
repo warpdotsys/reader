@@ -62,11 +62,12 @@ reference/decompiled/      CFR 反编译产物，仅作迁移证据，不参与�
 
 ## 文档
 
+- [docs/GOAL.md](docs/GOAL.md) —— **目标、验收分档、判据与书写纪律**（先读这份）
+- [docs/ROADMAP.md](docs/ROADMAP.md) —— 批次与当前进度
+- [docs/BATCHES.md](docs/BATCHES.md) —— 已迁入批次的记录与未覆盖项
 - [docs/PROVENANCE.md](docs/PROVENANCE.md) —— 制品是什么，每条结论如何得出
 - [docs/BUILD.md](docs/BUILD.md) —— 工具链、构建与核验
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) —— 参考应用的模块地图
-- [docs/ROADMAP.md](docs/ROADMAP.md) —— 源码迁移批次与验收标准
-- [docs/BATCHES.md](docs/BATCHES.md) —— 已迁入批次的记录与未覆盖项
 - [docs/dependencies.txt](docs/dependencies.txt) —— 85 个内嵌依赖，逐项原样记录
 
 ## 许可
