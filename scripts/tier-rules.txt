@@ -44,6 +44,9 @@ strict ^io\.legado\.app\.utils\.HtmlFormatter
 strict ^io\.legado\.app\.utils\.TextUtils
 strict ^io\.legado\.app\.utils\.MD5Utils
 
+# 内嵌的 ICU 字符集探测：编码判定错了不会报错，只会让正文变成另一种解读
+strict ^io\.legado\.app\.lib\.icu4j\.
+
 # ---- 划出档 ----
 # 许可证：密钥将重置，激活语义另行定义。类仍需存在，但只验路由接线。
 excluded ^com\.htmake\.reader\.api\.controller\.LicenseController

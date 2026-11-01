@@ -61,6 +61,27 @@
 严格档 58 个顶层类里有 5 个属于这种情况：`help.BytesEncodingDetect`、`help.Encoding`、
 `help.EncodingDetectHelp`、`model.analyzeRule.QueryTTF`、`utils.TextUtils`。
 
+### 已有实测，不是推测
+
+`scripts/verify-bytecode.ps1` 在本仓库全部 171 个已编译类上跑过一次：
+
+| 来源 | 类数（近似） | 方法体有差异 |
+| --- | --- | --- |
+| Kotlin（同一条 1.5 线重建） | 约 30 | **0** |
+| Java（第 1 批，转写 CFR 产物） | 约 141 | **48** |
+| 合计 | 171 | 48 |
+
+结论有两条，都影响验收标准：
+
+1. **从源码层重建 Kotlin 能压到零差异。** 这条路是成立的。
+2. **转写 CFR 的 Java 压不到零差异。** CFR 会把 `x = y = expr` 一类写法拆成两条语句
+   （参考侧是 `dup_x1`，我们这边变成 `aload_1`），结构不同、语义多半相同但未经证明。
+   所以第 1 批的"完成"只是 ABI 完成，不是等价完成。
+
+48 个有差异的类分布在：`me.ag2s.epublib` 24、`io.legado.app.lib.icu4j` 15、
+`org.kxml2` 6、`me.ag2s.umdlib` 3。逐类逐方法清单用
+`./scripts/verify-bytecode.ps1 -Artifact <制品>` 可随时重新得到。
+
 ## 三个阶段
 
 顺序不能换。
