@@ -9,7 +9,7 @@
 
 ## 第 2d 批 —— help（进行中）
 
-**状态：19/22 文件已还原；ABI 270/275 一致；指令完全一致 179 个类**
+**状态：20/22 文件已还原；ABI 271/276 一致；指令完全一致 179 个类**
 
 已完成：
 
@@ -34,6 +34,7 @@
 | `BookHelp` | Kotlin | 正文/图片缓存，含两个 suspend 函数 |
 | `http/OkHttpUtils` | Kotlin | 顶层扩展：重试请求、Call.await、编码探测、表单 |
 | `coroutine/Coroutine` | Kotlin | 任务封装：超时/回调/取消，含 3 个 inline 辅助函数 |
+| `BytesEncodingDetect` | Java | 字符集探测（3982 行），沿用 CFR 产物 |
 
 ### 本轮方法学收获（重要）
 
@@ -267,13 +268,12 @@ CFR 对这两处也只给出「Unable to fully structure code」。
 另：`class-coverage` 会把多出的 2 个类**逐个点名**（不是只报数字），见脚本输出末尾的
 「多出的类」段落。
 
-剩余 3 个文件（按行数）：
+剩余 2 个文件（按行数）：
 
 | 文件 | 行数 |
 | --- | --- |
 | `SourceAnalyzer` | 1730 |
 | `JsExtensions` | 1912 |
-| `BytesEncodingDetect` | 3982 |
 
 ## 第 2c 批 —— utils（已完成）
 
