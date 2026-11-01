@@ -10,11 +10,13 @@ class CacheManager(private val userNameSpace: String) {
 
     private val queryTTFMap = hashMapOf<String, Pair<Long, QueryTTF>>()
 
-    val cacheInstance: ACache = ACache.get(
-        File(ReaderAdapterHelper.getAdapter().getWorkDir("storage", "cache", "runtimeCache", userNameSpace)),
-        50000000L,
-        1000000
-    )
+    val cacheInstance: ACache
+
+    init {
+        val cacheDir =
+            File(ReaderAdapterHelper.getAdapter().getWorkDir("storage", "cache", "runtimeCache", userNameSpace))
+        cacheInstance = ACache.get(cacheDir, 50000000L, 1000000)
+    }
 
     fun getUserNameSpace(): String {
         return userNameSpace

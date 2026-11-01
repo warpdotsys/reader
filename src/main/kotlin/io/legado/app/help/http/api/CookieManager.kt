@@ -6,6 +6,6 @@ interface CookieManager {
     fun replaceCookie(url: String, cookie: String)
     fun getCookie(url: String): String
     fun removeCookie(url: String)
-    fun cookieToMap(cookie: String): Map<String, String>
+    fun cookieToMap(cookie: String): MutableMap<String, String>
     fun mapToCookie(cookieMap: Map<String, String>?): String?
 }

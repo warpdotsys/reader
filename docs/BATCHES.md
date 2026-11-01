@@ -9,7 +9,7 @@
 
 ## 第 2d 批 —— help（进行中）
 
-**状态：15/22 文件已还原；ABI 250/250 一致；指令完全一致 165 个类**
+**状态：16/22 文件已还原；ABI 251/251 一致；指令完全一致 166 个类**
 
 已完成：
 
@@ -30,6 +30,7 @@
 | `coroutine/CompositeCoroutine` | Kotlin | 协程集合，`synchronized` 块 |
 | `http/CoroutinesCallAdapterFactory` | Kotlin | Deferred 适配器，**4 个类全部指令一致** |
 | `http/SSLHelper` | Kotlin | TLS/证书工具，**全部指令一致** |
+| `http/CookieStore` | Kotlin | Cookie 存取，`init` 块里建缓存目录 |
 
 ### 本轮方法学收获（重要）
 
@@ -96,7 +97,43 @@ okhttp 4.9.1 的 `OkHttpClient.Builder.addInterceptor` 是 `inline`。
 方法体指令数会差几个（`process` 的分支相对位移 `+253` vs `+259`）。
 这正是 [BATCHES 第 1 批] 记录的那批既存债（Java 来源类的方法体差异），不是新问题。
 
-### 已知差异（已分类，不阻塞）
+**8. 构造器里多出来的临时槽位，说明原文用的是 `init {}` + 局部变量，不是属性初始化器。**
+
+`CacheManager` / `CookieStore` 的构造函数里，制品是
+`new File(...) → astore <槽位> → aload <槽位> → ACache.Companion.get(...)`，
+而按属性初始化器写会变成「先取 `ACache.Companion` 再建 `File`」。
+
+`javap -l` 给出该槽位的名字是 `cacheDir`，且它是**局部变量**（不是字段），
+行号也显示 `val cacheDir =` 与 `ACache.get(...)` 是两条独立语句。所以原文是
+
+```kotlin
+val cacheInstance: ACache
+
+init {
+    val cacheDir =
+        File(ReaderAdapterHelper.getAdapter().getWorkDir("storage", "cache", "runtimeCache", userNameSpace))
+    cacheInstance = ACache.get(cacheDir, 50000000L, 1000000)
+}
+```
+
+照此改写后，两个类的构造函数都完全一致。
+
+**9. `if (x.length == 0)` 与 `if (x.isEmpty())` 编出来不一样。**
+
+`isEmpty()` / `isNotEmpty()` 是 `CharSequence` 上的 **inline 扩展**，展开后带
+`checkcast java/lang/CharSequence` + `invokeinterface CharSequence.length()` + 标记；
+`length == 0` 则是 `invokevirtual String.length()`。制品里
+`getCookie` / `removeCookie` 用 `isEmpty()`，`setCookie` 用 `isNotEmpty()`，
+三者逐个对上后这 3 个方法的差异全部消失。同类的还有
+`value.isNullOrBlank()` 与 `value == null || value.isBlank()`。
+
+**10. 返回类型写成 `Map` 还是 `MutableMap`，ABI 检查看不出来。**
+
+`CookieStore.replaceCookie` 里调了 `cookieMap.putAll(...)`，按 `Map` 声明根本编译不过。
+说明 `CookieManager.cookieToMap` 返回的是 `MutableMap`——两者擦除后描述符都是 `java/util/Map`，
+泛型签名也一样，所以 ABI 比对无法区分。只能靠「这行代码能不能编译」反推。
+
+
 
 **A. Retrofit/OkHttp 覆写里的可空参数。**
 `ByteConverter`、`EncodeConverter` 覆写 `Converter.Factory.responseBodyConverter` 时，
@@ -118,11 +155,15 @@ okhttp 4.9.1 的 `OkHttpClient.Builder.addInterceptor` 是 `inline`。
 制品把 `if (add) continue` 编成 `ifne <循环头>`（真分支是回边，假分支落到 `return false`），
 本仓库编成 `ifeq <return false>; goto <循环头>`。两条路径去向完全相同，仅编译器安排顺序不同。
 
-剩余 7 个文件（按行数）：
+**E. `CookieStore` 的 `mapToCookie` / `cookieToMap` 两处局部装配。**
+调用的方法、常量、分支去向都一致，差异在于制品把布尔结果落到临时槽位（`&&` 的正向形式）
+并多一层 inline 标记。`mapToCookie` 已按 `value != null && !value.isBlank()` 改写，
+仍差一个布尔临时；`cookieToMap` 差一个方法开头的标记槽位。两者均无语义影响。
+
+剩余 6 个文件（按行数）：
 
 | 文件 | 行数 |
 | --- | --- |
-| `http/CookieStore` | 317 |
 | `BookHelp` | 554 |
 | `http/OkHttpUtilsKt` | 647 |
 | `coroutine/Coroutine` | 799 |
