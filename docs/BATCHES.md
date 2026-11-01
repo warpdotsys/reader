@@ -9,7 +9,7 @@
 
 ## 第 2c 批 —— utils（进行中）
 
-**状态：5/50 类已还原；其中 3 个字节码一致，2 个待调**
+**状态：11/50 类已还原；ABI 全部一致，其中 9 个字节码也一致**
 
 ### 清单基准
 
@@ -32,6 +32,16 @@ utils 包在制品里是 **50 个类 = 28 个顶层 + 22 个合成**。两种形
 | `AnkoHelpsKt` | loose | 一致 | 一致 |
 | `AttemptResult` | loose | 一致 | 3 个方法有差异（记录，不算失败） |
 | `ThrowableExtensionsKt` | loose | 一致 | 1 个方法有差异（记录，不算失败） |
+| `ParameterizedTypeImpl` | loose | 一致 | 一致 |
+| `JsonExtensionsKt` | loose | 一致 | 3 个方法有差异 |
+| `GsonExtensionsKt` | loose | 一致 | 5 个方法有差异 |
+| `IntJsonDeserializer` | loose | 一致 | 1 个方法有差异 |
+| `MapDeserializerDoubleAsIntFix` | loose | 一致 | 3 个方法有差异 |
+| `JsoupExtensionsKt` | loose | 一致 | 3 个方法有差异 |
+
+其中 `MapDeserializerDoubleAsIntFix` 曾被 ABI 抓出真问题：`deserialize` 缺少
+`@Throws(JsonParseException::class)`，参考侧的签名带 `throws`，补上后 189/189 全一致。
+这是本轮 ABI 闸门唯一一次真正拦住东西。
 
 ### 两处字节码差异（宽松档，已记录不阻塞）
 
