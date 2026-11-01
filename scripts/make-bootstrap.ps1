@@ -26,16 +26,34 @@ if (Test-Path $dst) { Remove-Item $dst -Recurse -Force }
 robocopy $src $dst /E /NFL /NDL /NJH /NJS | Out-Null
 if (-not (Test-Path $dst -PathType Container)) { throw "复制失败：$dst" }
 
-# 从本仓库源码推导「已迁入」的类前缀：X.kt 可能产出 X 与 XKt（文件门面）
+# 已迁入的类以**编译产物**为准，而不是源码文件名。
+# 反例：Book.kt 里只放了顶层 logger（产出 BookKt），并没有 Book 类；
+# 若按文件名推导，会把制品里的 Book.class 一并删掉，导致 Unresolved reference。
 $prefixes = New-Object System.Collections.Generic.HashSet[string]
-foreach ($root in @((Join-Path $ProjectRoot 'src\main\kotlin'), (Join-Path $ProjectRoot 'src\main\java'))) {
-    if (-not (Test-Path $root)) { continue }
-    Get-ChildItem $root -Recurse -File -Include *.kt, *.java | ForEach-Object {
+$compiledRoots = @(
+    (Join-Path $ProjectRoot 'build\classes\kotlin\main'),
+    (Join-Path $ProjectRoot 'build\classes\java\main')
+) | Where-Object { Test-Path $_ }
+
+foreach ($root in $compiledRoots) {
+    Get-ChildItem $root -Recurse -File -Filter *.class | ForEach-Object {
         $rel = $_.FullName.Substring($root.Length + 1).Replace('\', '/')
-        $dir = if ($rel.Contains('/')) { $rel.Substring(0, $rel.LastIndexOf('/') + 1) } else { '' }
-        $base = [IO.Path]::GetFileNameWithoutExtension($rel)
-        [void]$prefixes.Add("$dir$base")
-        [void]$prefixes.Add("$dir${base}Kt")
+        $outer = $rel.Substring(0, $rel.Length - 6).Split('$')[0]
+        [void]$prefixes.Add($outer)
+    }
+}
+
+if ($prefixes.Count -eq 0) {
+    Write-Warning '没有找到编译产物，回退到按源码文件名推导（可能过度排除）'
+    foreach ($root in @((Join-Path $ProjectRoot 'src\main\kotlin'), (Join-Path $ProjectRoot 'src\main\java'))) {
+        if (-not (Test-Path $root)) { continue }
+        Get-ChildItem $root -Recurse -File -Include *.kt, *.java | ForEach-Object {
+            $rel = $_.FullName.Substring($root.Length + 1).Replace('\', '/')
+            $dir = if ($rel.Contains('/')) { $rel.Substring(0, $rel.LastIndexOf('/') + 1) } else { '' }
+            $base = [IO.Path]::GetFileNameWithoutExtension($rel)
+            [void]$prefixes.Add("$dir$base")
+            [void]$prefixes.Add("$dir${base}Kt")
+        }
     }
 }
 
