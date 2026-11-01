@@ -270,6 +270,26 @@ public final class ClassDiffCheck {
         check(refLoader, ourLoader, "io.legado.app.utils.Utf8BomUtils", "hasBom", withBom.clone());
         check(refLoader, ourLoader, "io.legado.app.utils.Utf8BomUtils", "hasBom", withoutBom.clone());
 
+        String net = "io.legado.app.utils.NetworkUtils";
+        for (String s : new String[]{"192.168.1.1", "256.1.1.1", "1.2.3", "abc", "0.0.0.0"}) {
+            check(refLoader, ourLoader, net, "isIPv4Address", s);
+        }
+        for (String s : new String[]{"http://a.b.com/x/y", "https://a.com", "ftp://x", "http//bad"}) {
+            check(refLoader, ourLoader, net, "getBaseUrl", s);
+        }
+        check(refLoader, ourLoader, net, "getBaseUrl", (Object) null);
+        for (String s : new String[]{"http://a.b.com/x", "http://a.com/x", "http://a.com"}) {
+            check(refLoader, ourLoader, net, "getSubDomain", s);
+        }
+        check(refLoader, ourLoader, net, "getSubDomain", (Object) null);
+        for (String s : new String[]{"abc", "a b", "a%20b", "a%2Gb", "a+b", "中文", ""}) {
+            check(refLoader, ourLoader, net, "hasUrlEncoded", s);
+        }
+        check(refLoader, ourLoader, net, "getAbsoluteURL", "http://a.com/x/", "y.png");
+        check(refLoader, ourLoader, net, "getAbsoluteURL", (Object) null, "y.png");
+        check(refLoader, ourLoader, net, "getAbsoluteURL", "http://a.com/x/", "");
+        check(refLoader, ourLoader, net, "getAbsoluteURL", "http://a.com/x?a=1,2", "../y.png");
+
         System.out.println();
         System.out.println("通过 " + passed + " / 失败 " + failed);
         if (failed > 0) {

@@ -9,7 +9,24 @@
 
 ## 第 2c 批 —— utils（进行中）
 
-**状态：19/50 类已还原；ABI 全部一致（200/200）。方法体等价性见下方三级分类。**
+**状态：20/50 类已还原；ABI 全部一致。行为差分覆盖 7 个类、53 个用例，全通过。**
+
+### 行为差分结果（本轮新增，比静态判据更强）
+
+`scripts/diffcheck/ClassDiffCheck.java` 用制品当 oracle，两个隔离类加载器比对同一批输入：
+
+| 类 | 用例数 | 结果 |
+| --- | --- | --- |
+| `MD5Utils` | 9 | 全通过 |
+| `TextUtils` | 7 | 全通过 |
+| `XmlUtils` | 2 | 全通过（`InputStream` 输入） |
+| `Utf8BomUtils` | 5 | 全通过 |
+| `UTF8BOMFighter` | 4 | 全通过 |
+| `NetworkUtils` | 25 | 全通过（`isIPv4Address` / `getBaseUrl` / `getSubDomain` / `hasUrlEncoded` / `getAbsoluteURL`） |
+| **合计** | **53** | **53 通过 / 0 失败** |
+
+覆盖的是「输入输出都是 JDK 类型」的纯函数。这 7 个类现在有行为证据，
+不再只是 ABI 正确——这是本仓库第一次有行为层面的证据。
 
 ### 三级分类结果（200 个已编译类）
 
@@ -82,6 +99,7 @@ utils 包在制品里是 **50 个类 = 28 个顶层 + 22 个合成**。两种形
 | `MD5Utils` | **strict** | 一致 | 仅局部装配不同（调用/常量/分支一致） |
 | `EncodingDetect` | **strict** | 一致 | 结构与调用不同（未判定语义） |
 | `HtmlFormatter` | **strict** | 一致 | 结构与调用不同（未判定语义） |
+| `NetworkUtils` | loose | 一致 | 见行为差分（25 例全通过） |
 
 其中 `MapDeserializerDoubleAsIntFix` 曾被 ABI 抓出真问题：`deserialize` 缺少
 `@Throws(JsonParseException::class)`，参考侧的签名带 `throws`，补上后全一致。
