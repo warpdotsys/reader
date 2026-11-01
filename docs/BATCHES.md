@@ -9,7 +9,7 @@
 
 ## 第 2d 批 —— help（进行中）
 
-**状态：16/22 文件已还原；ABI 251/251 一致；指令完全一致 166 个类**
+**状态：17/22 文件已还原；ABI 255/255 一致；指令完全一致 169 个类**
 
 已完成：
 
@@ -31,6 +31,7 @@
 | `http/CoroutinesCallAdapterFactory` | Kotlin | Deferred 适配器，**4 个类全部指令一致** |
 | `http/SSLHelper` | Kotlin | TLS/证书工具，**全部指令一致** |
 | `http/CookieStore` | Kotlin | Cookie 存取，`init` 块里建缓存目录 |
+| `BookHelp` | Kotlin | 正文/图片缓存，含两个 suspend 函数 |
 
 ### 本轮方法学收获（重要）
 
@@ -133,7 +134,22 @@ init {
 说明 `CookieManager.cookieToMap` 返回的是 `MutableMap`——两者擦除后描述符都是 `java/util/Map`，
 泛型签名也一样，所以 ABI 比对无法区分。只能靠「这行代码能不能编译」反推。
 
+**11. 扩展函数与被调用方方法，编出来的顺序不一样。**
 
+`regex.replace(input, "")` 是「先建 Regex 再传参」；而 `input.replace(regex, "")`
+（`CharSequence.replace` 扩展）是「先物化接收者，再建 Regex」。
+`AppPattern.nameRegex.replace(name, "")` 与 `name.replace(AppPattern.nameRegex, "")` 同理。
+同样，`fileSuffixRegex.matches(suffix)` 与 `suffix.matches(fileSuffixRegex)` 差一个
+`checkcast java/lang/CharSequence`。`BookHelp.getImageSuffix` 按扩展写法调整后即完全一致。
+
+**12. 调用 Java 平台方法时的临时槽位。**
+
+`"%d.txt".format(index)` 编译后会多出 `StringCompanionObject.INSTANCE` 的取用与
+`checkNotNullExpressionValue(..., "java.lang.String.format(format, *args)")`；
+`StringsKt.readText$default` / `writeText$default` 对应 `file.readText()` / `file.writeText(text)`。
+这些调用在制品与重建里一致，差的只是临时槽位摆放。
+
+### 已知差异（已分类，不阻塞）
 
 **A. Retrofit/OkHttp 覆写里的可空参数。**
 `ByteConverter`、`EncodeConverter` 覆写 `Converter.Factory.responseBodyConverter` 时，
@@ -160,11 +176,18 @@ init {
 并多一层 inline 标记。`mapToCookie` 已按 `value != null && !value.isBlank()` 改写，
 仍差一个布尔临时；`cookieToMap` 差一个方法开头的标记槽位。两者均无语义影响。
 
-剩余 6 个文件（按行数）：
+**F. `BookHelp` 的 9 个方法：临时槽位与求值顺序。**
+`formatFolderName` / `formatBookName` / `formatBookAuthor` / `formatAuthor`、
+`getBookCacheDir` / `getContent` / `delContent` / `saveText` 的调用目标、常量、
+分支结构都一致，差异在于 `String.format` 与非捕获量物化的先后、以及局部槽位编号。
+两个 suspend 函数（`saveImages` / `saveImage`）差在状态机的槽位分配 ——
+CFR 对这两处也只给出「Unable to fully structure code」。
+这些按 `docs/GOAL.md` 的降级规则处理：ABI + 调用/常量一致即为通过，逐条记录在此。
+
+剩余 5 个文件（按行数）：
 
 | 文件 | 行数 |
 | --- | --- |
-| `BookHelp` | 554 |
 | `http/OkHttpUtilsKt` | 647 |
 | `coroutine/Coroutine` | 799 |
 | `SourceAnalyzer` | 1730 |
