@@ -9,7 +9,7 @@
 
 ## 第 2c 批 —— utils（进行中）
 
-**状态：11/50 类已还原；ABI 全部一致，其中 9 个字节码也一致**
+**状态：16/50 类已还原；ABI 全部一致，其中 12 个字节码也一致**
 
 ### 清单基准
 
@@ -38,10 +38,29 @@ utils 包在制品里是 **50 个类 = 28 个顶层 + 22 个合成**。两种形
 | `IntJsonDeserializer` | loose | 一致 | 1 个方法有差异 |
 | `MapDeserializerDoubleAsIntFix` | loose | 一致 | 3 个方法有差异 |
 | `JsoupExtensionsKt` | loose | 一致 | 3 个方法有差异 |
+| `XmlUtils` | loose | 一致 | 2 个方法有差异 |
+| `UTF8BOMFighter` | loose | 一致 | 2 个方法有差异 |
+| `Utf8BomUtils` | loose | 一致 | 2 个方法有差异 |
+| `Base64` | loose | 一致 | 一致 |
+| `TextUtils` | **strict** | 一致 | **一致（严格档通过）** |
 
 其中 `MapDeserializerDoubleAsIntFix` 曾被 ABI 抓出真问题：`deserialize` 缺少
-`@Throws(JsonParseException::class)`，参考侧的签名带 `throws`，补上后 189/189 全一致。
-这是本轮 ABI 闸门唯一一次真正拦住东西。
+`@Throws(JsonParseException::class)`，参考侧的签名带 `throws`，补上后全一致。
+这是到目前为止 ABI 闸门唯一一次发现实质问题。
+
+### 一个反直觉的结果
+
+`Base64` 与 `TextUtils` 是 **Java 来源**，直接沿用 CFR 的 Java 后**字节码完全一致**；
+而我按 Kotlin 重写的 `XmlUtils` / `UTF8BOMFighter` / `Utf8BomUtils` 各有 2 个方法形态不同。
+
+也就是说"Java 来源压不到零差异"这条不是绝对的——**简单的 Java 类转写后可以完全一致**，
+前提是原文结构简单、没有 CFR 会拆解的写法（如 `x = y = expr`）。
+
+严格档的 `TextUtils` 因此通过了严格判据。
+
+### 严格档在 utils 里剩下的
+
+`EncodingDetect`、`StringExtensions`、`EncoderUtils`、`HtmlFormatter`、`MD5Utils`（5 个文件）。
 
 ### 两处字节码差异（宽松档，已记录不阻塞）
 
