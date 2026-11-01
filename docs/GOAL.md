@@ -49,6 +49,18 @@
 
 前三个是静态闸门，**每一片必跑**；行为差分是动态兜底。
 
+### 字节码等价有个工具链前提
+
+"方法级字节码等价"能成立，是因为制品与重建都在同一条 Kotlin 1.5 线上编译。这只对
+**Kotlin 来源**的类成立。
+
+**Java 来源**的类（反编译产物里没有 `@Metadata` 的那些）由另一套 javac 编译过，
+指令序列会因编译器版本产生合法噪声，压不到零差异。这一小部分降级为
+**ABI + 字符串常量 + 行为差分**，并在索引里标出。
+
+严格档 58 个顶层类里有 5 个属于这种情况：`help.BytesEncodingDetect`、`help.Encoding`、
+`help.EncodingDetectHelp`、`model.analyzeRule.QueryTTF`、`utils.TextUtils`。
+
 ## 三个阶段
 
 顺序不能换。

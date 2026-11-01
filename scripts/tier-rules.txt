@@ -1,0 +1,54 @@
+# 档位判定表
+#
+# 用于 scripts/class-coverage.ps1。规则按顺序匹配 FQCN（完全限定类名），先匹配者胜，
+# 都没匹配到就是 loose。
+#
+# 判据只有一条（见 docs/GOAL.md）：
+#   strict   —— 这里出错不会报错，只是悄悄给出错误结果，且输入空间不可枚举
+#   loose    —— 这里出错会大声坏：抛异常、起不来、数据明显不对、没有输出
+#   excluded —— 行为另行定义，只验接线存在
+#
+# 分界不看包，看它是否处在一条会静默出错的数据通路上。所以 StringExtensionsKt 在 strict，
+# ZipUtils 不在。改这张表就是改验收标准，应当在提交信息里说明理由。
+
+# ---- 严格档 ----
+
+# 书源规则引擎：纯函数，输入是「任意规则 × 任意网页」，坏了只会让某些书源悄悄失效
+strict ^io\.legado\.app\.model\.analyzeRule\.
+# 书籍信息/目录/正文的解析流水线
+strict ^io\.legado\.app\.model\.webBook\.
+# RSS 规则解析
+strict ^io\.legado\.app\.model\.rss\.
+# 本地书解析与分章：分章边界错了只会表现为「章节不对」，不会报错
+strict ^io\.legado\.app\.model\.localBook\.
+# 引擎的调试记录：DebugLog 贯穿解析流水线，内容错了会误导排查而不是报错
+strict ^io\.legado\.app\.model\.Debug
+
+# 书源可用性分析
+strict ^io\.legado\.app\.help\.SourceAnalyzer
+# JS 桥：绑定名、java.*/source.*/book.* API 的名字错了只会让规则里的 JS 默默失效
+strict ^io\.legado\.app\.help\.JsExtensions
+# HTTP 与编码：reader-dev 正是在这里出过「原 JAR 乱码、恢复版正常中文」这类静默差异
+strict ^io\.legado\.app\.help\.http\.
+strict ^io\.legado\.app\.help\.BytesEncodingDetect
+strict ^io\.legado\.app\.help\.Encoding
+# 缓存与正文存取：缓存键错了只会读到旧内容
+strict ^io\.legado\.app\.help\.CacheManager
+strict ^io\.legado\.app\.help\.BookHelp
+
+# 编码探测与字符串扩展：同样在静默数据通路上
+strict ^io\.legado\.app\.utils\.EncodingDetect
+strict ^io\.legado\.app\.utils\.StringExtensions
+strict ^io\.legado\.app\.utils\.EncoderUtils
+strict ^io\.legado\.app\.utils\.HtmlFormatter
+strict ^io\.legado\.app\.utils\.TextUtils
+strict ^io\.legado\.app\.utils\.MD5Utils
+
+# ---- 划出档 ----
+# 许可证：密钥将重置，激活语义另行定义。类仍需存在，但只验路由接线。
+excluded ^com\.htmake\.reader\.api\.controller\.LicenseController
+excluded ^com\.htmake\.reader\.entity\.License
+excluded ^com\.htmake\.reader\.entity\.ActiveLicense
+excluded ^com\.htmake\.reader\.utils\.LicenseUtils
+
+# ---- 其余一律 loose ----
