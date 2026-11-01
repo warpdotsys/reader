@@ -9,7 +9,7 @@
 
 ## 第 2d 批 —— help（进行中）
 
-**状态：11/22 文件已还原；ABI 236/236 一致；指令完全一致 156 个类**
+**状态：13/22 文件已还原；ABI 238/238 一致；指令完全一致 156 个类**
 
 已完成：
 
@@ -26,6 +26,8 @@
 | `http/Res` | Kotlin | data class |
 | `http/StrResponse` | Kotlin | **指令完全一致** |
 | `http/HttpHelper` | Kotlin | okHttpClient / getProxyClient |
+| `CacheManager` | Kotlin | 缓存门面 + QueryTTF 内存缓存 |
+| `coroutine/CompositeCoroutine` | Kotlin | 协程集合，`synchronized` 块 |
 
 ### 本轮方法学收获（重要）
 
@@ -55,6 +57,22 @@ okhttp 4.9.1 的 `OkHttpClient.Builder.addInterceptor` 是 `inline`。
 制品里没有这个类，只有 `okHttpClient$2.invoke$lambda-0` + `invokedynamic`。
 写成 `.addInterceptor(Interceptor { chain -> ... })`（显式 SAM 构造）即与制品完全一致。
 
+**4. inline 工厂函数与 `synchronized` 都会留下标记。**
+
+- `HashMap()` 写成 `new HashMap` 没有标记；`hashMapOf()` 是 inline，会在字段初始化器里多出
+  `iconst_0; istore` 标记。`HashSet()` / `hashSetOf()` 同理。制品的构造器里带标记，
+  所以原文用的是 `hashMapOf()` / `hashSetOf()`。改用后构造器即对齐。
+- `synchronized(this) { }` 会生成 `$i$a$-synchronized-<类>$<方法>$1` 这个 LVT 项，
+  可用来确认用的是语言级 `synchronized` 块而不是 `@Synchronized` 注解。
+
+**5. 被判空/短路写法，LVT 依然能定位。**
+
+`CompositeCoroutine.add` 里制品是 `aload_0; getfield resources; ifnonnull` —— 判空打在**字段**上而不是
+局部变量上，说明原文是 `var set = resources; if (resources == null) { set = hashSetOf(); resources = set }`，
+随后 `return set!!.add(coroutine)`（那一处 `dup; checkNotNull`）。
+`addAll` 的 LVT 直接给出 `add: Z`，说明原文是 `val add = set!!.add(coroutine); if (add) continue`。
+`delete` 的 LVT 给出 `set: HashSet`，对应 `val set = resources; if (set == null || !set.remove(...)) return false`。
+
 ### 已知差异（已分类，不阻塞）
 
 **A. Retrofit/OkHttp 覆写里的可空参数。**
@@ -73,12 +91,14 @@ okhttp 4.9.1 的 `OkHttpClient.Builder.addInterceptor` 是 `inline`。
 **C. 覆写 `Authenticator.authenticate` 需要显式 `@Throws(IOException::class)`。**
 制品该匿名类带 `throws java.io.IOException`，本仓库不写 `@Throws` 就没有，ABI 会不一致。
 
-剩余 11 个文件（按行数）：
+**D. `CompositeCoroutine.addAll` 的分支极性。**
+制品把 `if (add) continue` 编成 `ifne <循环头>`（真分支是回边，假分支落到 `return false`），
+本仓库编成 `ifeq <return false>; goto <循环头>`。两条路径去向完全相同，仅编译器安排顺序不同。
+
+剩余 9 个文件（按行数）：
 
 | 文件 | 行数 |
 | --- | --- |
-| `coroutine/CompositeCoroutine` | 171 |
-| `CacheManager` | 190 |
 | `http/CoroutinesCallAdapterFactory` | 217 |
 | `http/SSLHelper` | 244 |
 | `http/CookieStore` | 317 |
