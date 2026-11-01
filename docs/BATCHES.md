@@ -275,6 +275,27 @@ CFR 对这两处也只给出「Unable to fully structure code」。
 | `SourceAnalyzer` | 1730 |
 | `JsExtensions` | 1912 |
 
+### 阻塞点：bootstrap 与已还原包重名
+
+`SourceAnalyzer` 需要构造 `data.entities.rule.SearchRule` / `ExploreRule` / `BookInfoRule` /
+`TocRule` / `ContentRule`——而**这几个类本仓库已经还原**（在 `src/main/kotlin/io/legado/app/data/entities/rule/`）。
+`-PrestoreBootstrap` 又把整份 `BOOT-INF/classes` 挂在 compileOnly 上，于是同一 FQN 出现两份；
+这些类还都继承已还原的 `BookListRule`，编译器解析父类时给出：
+
+```
+e: ... Cannot access class 'io.legado.app.data.entities.rule.SearchRule'.
+   Check your module classpath for missing or conflicting dependencies
+```
+
+（`ACache` 这类**没有已还原父类**的重名类不受影响，所以此前没暴露。）
+
+尝试过把 bootstrap 复制一份、用 `robocopy /XD` 排除已还原的包，但 `-PrestoreBootstrap`
+在 build 脚本里被 `require(isDirectory)` 拦下（副本路径未通过校验），未继续。
+
+**修复方向**：让 bootstrap 只包含「尚未迁入」的类——在 `build.gradle.kts` 里按
+`src/main` 下已存在的包路径生成过滤副本，或把 bootstrap 打成 jar 时排除同名条目。
+修好后 `SourceAnalyzer` 即可继续；本轮已把该文件回退，`restore/core` 保持可构建。
+
 ## 第 2c 批 —— utils（已完成）
 
 **状态：utils 包已完成 —— 28/28 顶层类、50/50 类，类集合与制品逐项一致。
