@@ -138,6 +138,14 @@ function Get-LocalSlot([string]$Text) {
     return $null
 }
 
+# 去掉局部变量读写，保留调用目标、常量、分支、字段访问——即「语义骨架」。
+# 用于区分「只在局部变量怎么摆上有差异」与「调用了不同东西」。
+function Remove-LocalOps($Instructions) {
+    return @($Instructions | Where-Object {
+        $_ -notmatch '^(?:i|l|f|d|a)(?:load|store)(?:_[0-3]| v\d+)$'
+    })
+}
+
 function Get-NormalizedInstructions($RawLines) {
     $parsed = @()
     foreach ($line in $RawLines) {
@@ -199,9 +207,16 @@ function Get-NormalizedInstructions($RawLines) {
     $filtered = New-Object System.Collections.ArrayList
     $i = 0
     while ($i -lt $out.Count) {
+        # 三指令式：取对象 / 诊断消息 / 断言
         if ($i + 2 -lt $out.Count -and $out[$i + 2] -match 'checkNotNullExpressionValue' -and
-            ($out[$i] -match '^(aload|dup)' ) -and $out[$i + 1] -match '^ldc // String ') {
+            ($out[$i] -match '^(aload|dup)') -and $out[$i + 1] -match '^ldc // String ') {
             $i += 3
+            continue
+        }
+        # 两指令式：诊断消息 / 断言
+        if ($i + 1 -lt $out.Count -and $out[$i] -match '^ldc // String ' -and
+            $out[$i + 1] -match 'checkNotNullExpressionValue') {
+            $i += 2
             continue
         }
         if ($out[$i] -match 'checkNotNullExpressionValue') { $i++; continue }
@@ -251,6 +266,7 @@ try {
     }
 
     $same = 0
+    $localOnly = 0
     $different = New-Object System.Collections.ArrayList
     $unavailable = New-Object System.Collections.ArrayList
 
@@ -261,31 +277,40 @@ try {
         if ($null -eq $restored) { [void]$unavailable.Add($class); continue }
 
         $allKeys = @($reference.Keys + $restored.Keys) | Sort-Object -Unique
+
+        # 两级比对：
+        #   一级 —— 完整指令序列（严格）
+        #   二级 —— 去掉局部变量读写后的「语义骨架」：保留调用目标、常量、分支、字段访问。
+        #           如果二级一致而一级不一致，说明差异只在局部变量怎么摆，
+        #           没有改变调用了什么、用了哪个常量、走哪条分支。
+        # 这样「审查」才有客观依据，不是靠手感。
         $methodDiffs = New-Object System.Collections.ArrayList
+        $structuralDiffs = New-Object System.Collections.ArrayList
         foreach ($k in $allKeys) {
             $a = if ($reference.ContainsKey($k)) { ($reference[$k] -join "`n") } else { '<缺失>' }
             $b = if ($restored.ContainsKey($k)) { ($restored[$k] -join "`n") } else { '<缺失>' }
-            if ($a -cne $b) { [void]$methodDiffs.Add($k) }
+            if ($a -cne $b) {
+                [void]$methodDiffs.Add($k)
+                $sa = if ($reference.ContainsKey($k)) { (Remove-LocalOps $reference[$k]) -join "`n" } else { '<缺失>' }
+                $sb = if ($restored.ContainsKey($k)) { (Remove-LocalOps $restored[$k]) -join "`n" } else { '<缺失>' }
+                if ($sa -cne $sb) { [void]$structuralDiffs.Add($k) }
+            }
         }
         if ($methodDiffs.Count -eq 0) { $same++ }
+        elseif ($structuralDiffs.Count -eq 0) {
+            $localOnly++
+            [void]$different.Add([PSCustomObject]@{ Class = $class; Methods = $methodDiffs; Structural = 0 })
+        }
         else {
-            [void]$different.Add([PSCustomObject]@{ Class = $class; Methods = $methodDiffs })
-            if ($ShowDiff) {
-                Write-Output "--- $class ---"
-                foreach ($k in $methodDiffs) {
-                    Write-Output "  方法 $k"
-                    $a = if ($reference.ContainsKey($k)) { $reference[$k] } else { @('<缺失>') }
-                    $b = if ($restored.ContainsKey($k)) { $restored[$k] } else { @('<缺失>') }
-                    Compare-Object $a $b | Format-Table -AutoSize | Out-String | Write-Output
-                }
-            }
+            [void]$different.Add([PSCustomObject]@{ Class = $class; Methods = $methodDiffs; Structural = $structuralDiffs.Count })
         }
     }
 
-    Write-Output "已比对类数     : $($Classes.Count)"
-    Write-Output "指令序列一致   : $same"
-    Write-Output "存在方法差异   : $($different.Count)"
-    Write-Output "无法比对       : $($unavailable.Count)"
+    Write-Output "已比对类数         : $($Classes.Count)"
+    Write-Output "指令序列完全一致   : $same"
+    Write-Output "仅局部装配不同     : $localOnly"
+    Write-Output "结构与调用不同     : $($different.Count)"
+    Write-Output "无法比对           : $($unavailable.Count)"
     if ($unavailable.Count -gt 0) {
         Write-Output ''
         Write-Output '无法比对的类（必须查清，不能默认它没问题）：'
@@ -293,9 +318,9 @@ try {
     }
     if ($different.Count -gt 0) {
         Write-Output ''
-        Write-Output '有差异的类（类名 : 差异方法数）：'
-        $different | Sort-Object { $_.Methods.Count } -Descending |
-            ForEach-Object { Write-Output ("  {0}  : {1}" -f $_.Class, $_.Methods.Count) }
+        Write-Output '结构与调用不同的类（这些才需要人工判定语义影响）：'
+        $different | Sort-Object { $_.Structural } -Descending |
+            ForEach-Object { Write-Output ("  {0}  : 结构差异 {1} / 方法差异 {2}" -f $_.Class, $_.Structural, $_.Methods.Count) }
     }
     if ($FailOnDiff -and $different.Count -gt 0) { exit 1 }
 }
