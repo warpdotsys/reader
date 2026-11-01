@@ -438,6 +438,33 @@ public final class ClassDiffCheck {
         check(refLoader, ourLoader, su, "dateConvert", 0L, "yyyy-MM-dd HH:mm:ss");
         check(refLoader, ourLoader, su, "dateConvert", 1700000000000L, "yyyy/MM/dd");
 
+        // FileUtils：只测不碰文件系统的纯函数（写入类会因两个类加载器共用目录而互相干扰）
+        String fu = "io.legado.app.utils.FileUtils";
+        for (String s : new String[]{"a/b/c.txt", "/x/y", "noext", "a.b.c/d.e", ""}) {
+            check(refLoader, ourLoader, fu, "getExtension", s);
+            check(refLoader, ourLoader, fu, "getNameExcludeExtension", s);
+        }
+        for (String s : new String[]{"/a/b/c.txt", "http://x/y/z.png", "plain", ""}) {
+            check(refLoader, ourLoader, fu, "getName", s);
+        }
+        check(refLoader, ourLoader, fu, "getName", (Object) null);
+        for (String s : new String[]{"a", "a/", "a\\b", "", "x/y/"}) {
+            check(refLoader, ourLoader, fu, "separator", s);
+        }
+        for (long n : new long[]{-1, 0, 1, 1023, 1024, 1025, 1048575, 1048576, 1073741824L, 5000000000L}) {
+            check(refLoader, ourLoader, fu, "toFileSizeString", n);
+        }
+        for (String s : new String[]{"http://a/b.png", "http://a/b.png?x=1", "noext/path"}) {
+            check(refLoader, ourLoader, fu, "getFileExtetion", s, "zzz");
+        }
+        File probeRoot = new File("D:/Projects");
+        check(refLoader, ourLoader, fu, "getPath", probeRoot, (Object) new String[]{"a", "", "b"});
+        check(refLoader, ourLoader, fu, "getFile", probeRoot, (Object) new String[]{"a", "b"});
+        check(refLoader, ourLoader, fu, "exists", probeRoot, (Object) new String[]{"reader-repo"});
+        check(refLoader, ourLoader, fu, "exist", "D:/Projects");
+        check(refLoader, ourLoader, fu, "exist", "D:/__nope__");
+        check(refLoader, ourLoader, fu, "getLength", "D:/__nope__");
+
         System.out.println();
         System.out.println("通过 " + passed + " / 失败 " + failed);
         if (failed > 0) {

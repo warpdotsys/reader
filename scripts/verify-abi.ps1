@@ -69,9 +69,13 @@ else {
 }
 
 function Get-AbiDump([string]$ClassPath, [string]$ClassName) {
+    # 合成 lambda 方法（`xxx$lambda-3`）的编号取自源码里 lambda 的声明顺序，不是 API。
+    # 调用方无法引用它们，其行为由 verify-bytecode 覆盖；把它们算进 ABI 只会让
+    # "源码顺序不同"伪装成"接口不同"。
     $raw = & $javap -p -s -classpath $ClassPath $ClassName 2>&1
     $raw |
         Where-Object { $_ -notmatch '^Compiled from' -and $_ -notmatch '^Warning' -and $_ -notmatch '^Error' } |
+        Where-Object { $_ -notmatch '\$\$?lambda-\d+\(' } |
         ForEach-Object { ($_ -replace '\s+', ' ').Trim() } |
         Where-Object { $_ -ne '' } |
         Sort-Object
