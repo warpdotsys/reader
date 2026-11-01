@@ -9,7 +9,7 @@
 
 ## 第 2d 批 —— help（进行中）
 
-**状态：9/22 文件已还原；ABI 231/231 一致**
+**状态：11/22 文件已还原；ABI 236/236 一致；指令完全一致 156 个类**
 
 已完成：
 
@@ -24,17 +24,59 @@
 | `EncodingDetectHelp` | Java | 同上 |
 | `http/EncodeConverter` | Kotlin | 按 charset/Content-Type 选编码 |
 | `http/Res` | Kotlin | data class |
+| `http/StrResponse` | Kotlin | **指令完全一致** |
+| `http/HttpHelper` | Kotlin | okHttpClient / getProxyClient |
 
-**踩到的坑**：`ByteConverter` 覆写 `Retrofit Converter.Factory.responseBodyConverter` 时，
-CFR 显示的 `@Nullable` 参数是误导——必须写成非空 `Type` / `Array<Annotation>` / `Retrofit`，
-写成可空会报 `overrides nothing`。
+### 本轮方法学收获（重要）
 
-剩余 13 个文件（按行数）：
+**1. `javap -l` 的局部变量名直接暴露原文构造。**
+
+不信 CFR 的 `bl`/`result2`，看 LVT。实例：
+
+- `StrResponse.url()` 的 LVT 里有 `$i$a$-let-StrResponse$url$1` 和 `it`（类型 `Lokhttp3/Response;`）
+  → 原文是 `raw.networkResponse?.let { return it.request.url.toString() }; return raw.request.url.toString()`，
+  而不是 `?.let{} ?: fallback`。按前者写，该类**指令序列一字不差**。
+- `HttpHelperKt$okHttpClient$2` 的 LVT 给出 `specs: ArrayList`、`builder: OkHttpClient$Builder`，
+  且 `builder` 的槽位只覆盖最后 5 字节 → 原文是 `val builder = ...` 承接整条链，再单独一句 `builder.build()`。
+- `DefaultData$txtTocRules$2` 的 LVT 给出 `json: String` 和 `$i$a$-runCatching-GsonExtensionsKt$fromJsonArray$1$iv`。
+
+**2. 常量字符串也会暴露源码写法。**
+
+`Intrinsics.checkNotNullExpressionValue` 的消息是**源码文本**。制品里是
+`DefaultData::class.java.getResource("/defaultData/${txtTocRuleFileName}")`——带花括号，
+说明原文写的是 `${txtTocRuleFileName}` 而不是 `$txtTocRuleFileName`。改用带花括号后该常量即一致。
+同一条也说明原文**没有用 `!!`**（用 `!!` 会生成 `checkNotNull` 而不是带消息的 `checkNotNullExpressionValue`）。
+
+**3. 内联函数会改变 lambda 的落地形态。**
+
+okhttp 4.9.1 的 `OkHttpClient.Builder.addInterceptor` 是 `inline`。
+写 `.addInterceptor { chain -> ... }`（尾随 lambda）时，Kotlin 无法把 lambda 内联进 inline 函数，
+于是生成实体类 `HttpHelperKt$okHttpClient$2$invoke$$inlined$-addInterceptor$1`（`Compiled from "OkHttpClient.kt"`）；
+制品里没有这个类，只有 `okHttpClient$2.invoke$lambda-0` + `invokedynamic`。
+写成 `.addInterceptor(Interceptor { chain -> ... })`（显式 SAM 构造）即与制品完全一致。
+
+### 已知差异（已分类，不阻塞）
+
+**A. Retrofit/OkHttp 覆写里的可空参数。**
+`ByteConverter`、`EncodeConverter` 覆写 `Converter.Factory.responseBodyConverter` 时，
+制品参数带 `@Nullable`×3 且**没有** `checkNotNullParameter`；本仓库写成可空参数会报
+`'responseBodyConverter' overrides nothing`（Kotlin 1.5.21 不允许把 Java 平台类型参数在覆写中改成可空），
+只能写非空，于是多出 3 条 `checkNotNullParameter`。
+
+- 常量、调用、分支序列均一致，仅方法开头多 3 条参数判空；
+- 语义影响：仅在调用方传 null 时提前抛异常，正常路径无差异；
+- 结论：**编译器版本差异**，按 `docs/GOAL.md` 记录在案，不改写。
+
+**B. `DefaultData$txtTocRules$2` 的局部槽位装配。**
+常量已一致，仅差 inline 标记（`iconst_0; istore`）与 `new String` 的先后 —— 「仅局部装配不同」。
+
+**C. 覆写 `Authenticator.authenticate` 需要显式 `@Throws(IOException::class)`。**
+制品该匿名类带 `throws java.io.IOException`，本仓库不写 `@Throws` 就没有，ABI 会不一致。
+
+剩余 11 个文件（按行数）：
 
 | 文件 | 行数 |
 | --- | --- |
-| `http/StrResponse` | 115 |
-| `http/HttpHelperKt` | 147 |
 | `coroutine/CompositeCoroutine` | 171 |
 | `CacheManager` | 190 |
 | `http/CoroutinesCallAdapterFactory` | 217 |
