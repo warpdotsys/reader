@@ -91,6 +91,28 @@ Gradle wrapper 首次使用时会下载 Gradle 6.1.1。
 
 **不传该参数时制品完全不参与构建。** 正式构建与发布一律不带它。
 
+### 类级行为差分
+
+静态判据（ABI、常量、字节码）都只是代理。制品本身是可运行的，所以最接近事实的判据是
+**同一批输入，两边输出相同**。
+
+`scripts/diffcheck/ClassDiffCheck.java` 把制品的类与本仓库的同名类装进两个互相隔离的
+类加载器（各自带一份依赖 jar，父加载器为 platform），反射调用同一方法并比对结果。
+
+```powershell
+javac -encoding UTF-8 -d scripts\diffcheck\out scripts\diffcheck\ClassDiffCheck.java
+java -Dfile.encoding=UTF-8 -cp scripts\diffcheck\out ClassDiffCheck `
+  D:\path\to\BOOT-INF\classes `
+  "build\classes\kotlin\main;build\classes\java\main" `
+  D:\path\to\BOOT-INF\lib
+```
+
+覆盖范围：输入输出都是 JDK 类型的纯函数。需要外部状态、网络、文件系统的方法不在覆盖内。
+
+**注意一个易犯的 harness 错误**：`InputStream` 这类可变输入必须每次调用都新建。
+复用同一个对象时，先跑的一侧会把它读空，后跑的必然失败——那是 harness 的 bug，
+不是被测代码的 bug。第一次跑就踩了这个坑，XML 两条被误报为 FAIL。
+
 ### 确定性打包
 
 `bootJar` 关闭了文件时间戳并固定归档顺序，因此相同输入的重新构建会产生相同归档。它同时会断言入口类。
