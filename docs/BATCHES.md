@@ -9,7 +9,7 @@
 
 ## 第 2d 批 —— help（进行中）
 
-**状态：13/22 文件已还原；ABI 238/238 一致；指令完全一致 156 个类**
+**状态：15/22 文件已还原；ABI 250/250 一致；指令完全一致 165 个类**
 
 已完成：
 
@@ -28,6 +28,8 @@
 | `http/HttpHelper` | Kotlin | okHttpClient / getProxyClient |
 | `CacheManager` | Kotlin | 缓存门面 + QueryTTF 内存缓存 |
 | `coroutine/CompositeCoroutine` | Kotlin | 协程集合，`synchronized` 块 |
+| `http/CoroutinesCallAdapterFactory` | Kotlin | Deferred 适配器，**4 个类全部指令一致** |
+| `http/SSLHelper` | Kotlin | TLS/证书工具，**全部指令一致** |
 
 ### 本轮方法学收获（重要）
 
@@ -73,6 +75,27 @@ okhttp 4.9.1 的 `OkHttpClient.Builder.addInterceptor` 是 `inline`。
 `addAll` 的 LVT 直接给出 `add: Z`，说明原文是 `val add = set!!.add(coroutine); if (add) continue`。
 `delete` 的 LVT 给出 `set: HashSet`，对应 `val set = resources; if (set == null || !set.remove(...)) return false`。
 
+**6. `verify-bytecode.ps1` 的 `-ShowDiff` 之前只声明、从未实现。**
+
+`.PARAMETER ShowDiff` 写着「对不一致的方法打印归一化后的指令序列差异」，但脚本里除了参数声明
+没有任何使用点。于是每次排查只能看到一张「结构差异 N / 方法差异 M」的表，
+既不知道是哪个方法，也不知道差在哪——排查全靠另写临时脚本，而那些临时脚本本身又有 bug。
+
+已补上实现：在比对循环里逐行 diff 归一化后的指令序列，汇总到末尾统一打印。
+修完之后立刻有了收益——直接看出
+
+- `SSLHelper$unsafeSSLSocketFactory$2` 的差异是 `anewarray X509TrustManager` + 事后 `checkcast`，
+  也就是原文写的是 `arrayOf(unsafeTrustManager)` 而不是 `arrayOf<TrustManager>(unsafeTrustManager)`；
+- `SSLHelper.getSslSocketFactoryBase` 的差异是一个临时槽位，原文用的是 `?:` 而不是 `if/else`。
+
+两处改完，`SSLHelper` 三个类全部指令一致。
+
+**7. 之前对「Java 来源类字节相同」的判断是错的。**
+
+`Base64` / `Base64$Decoder` 并非逐字节相同：CFR 反编译出的 Java 源码重编译后，
+方法体指令数会差几个（`process` 的分支相对位移 `+253` vs `+259`）。
+这正是 [BATCHES 第 1 批] 记录的那批既存债（Java 来源类的方法体差异），不是新问题。
+
 ### 已知差异（已分类，不阻塞）
 
 **A. Retrofit/OkHttp 覆写里的可空参数。**
@@ -95,12 +118,10 @@ okhttp 4.9.1 的 `OkHttpClient.Builder.addInterceptor` 是 `inline`。
 制品把 `if (add) continue` 编成 `ifne <循环头>`（真分支是回边，假分支落到 `return false`），
 本仓库编成 `ifeq <return false>; goto <循环头>`。两条路径去向完全相同，仅编译器安排顺序不同。
 
-剩余 9 个文件（按行数）：
+剩余 7 个文件（按行数）：
 
 | 文件 | 行数 |
 | --- | --- |
-| `http/CoroutinesCallAdapterFactory` | 217 |
-| `http/SSLHelper` | 244 |
 | `http/CookieStore` | 317 |
 | `BookHelp` | 554 |
 | `http/OkHttpUtilsKt` | 647 |

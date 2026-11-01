@@ -286,6 +286,7 @@ try {
         # 这样「审查」才有客观依据，不是靠手感。
         $methodDiffs = New-Object System.Collections.ArrayList
         $structuralDiffs = New-Object System.Collections.ArrayList
+        $detail = New-Object System.Collections.ArrayList
         foreach ($k in $allKeys) {
             $a = if ($reference.ContainsKey($k)) { ($reference[$k] -join "`n") } else { '<缺失>' }
             $b = if ($restored.ContainsKey($k)) { ($restored[$k] -join "`n") } else { '<缺失>' }
@@ -294,15 +295,29 @@ try {
                 $sa = if ($reference.ContainsKey($k)) { (Remove-LocalOps $reference[$k]) -join "`n" } else { '<缺失>' }
                 $sb = if ($restored.ContainsKey($k)) { (Remove-LocalOps $restored[$k]) -join "`n" } else { '<缺失>' }
                 if ($sa -cne $sb) { [void]$structuralDiffs.Add($k) }
+                if ($ShowDiff) {
+                    [void]$detail.Add("  方法: $k")
+                    $la = if ($reference.ContainsKey($k)) { @($reference[$k]) } else { @('<缺失>') }
+                    $lb = if ($restored.ContainsKey($k)) { @($restored[$k]) } else { @('<缺失>') }
+                    $ln = [Math]::Max($la.Count, $lb.Count)
+                    for ($j = 0; $j -lt $ln; $j++) {
+                        $x = if ($j -lt $la.Count) { $la[$j] } else { '' }
+                        $y = if ($j -lt $lb.Count) { $lb[$j] } else { '' }
+                        if ($x -cne $y) {
+                            [void]$detail.Add("    制品: $x")
+                            [void]$detail.Add("    我们: $y")
+                        }
+                    }
+                }
             }
         }
         if ($methodDiffs.Count -eq 0) { $same++ }
         elseif ($structuralDiffs.Count -eq 0) {
             $localOnly++
-            [void]$different.Add([PSCustomObject]@{ Class = $class; Methods = $methodDiffs; Structural = 0 })
+            [void]$different.Add([PSCustomObject]@{ Class = $class; Methods = $methodDiffs; Structural = 0; Detail = $detail })
         }
         else {
-            [void]$different.Add([PSCustomObject]@{ Class = $class; Methods = $methodDiffs; Structural = $structuralDiffs.Count })
+            [void]$different.Add([PSCustomObject]@{ Class = $class; Methods = $methodDiffs; Structural = $structuralDiffs.Count; Detail = $detail })
         }
     }
 
@@ -321,6 +336,15 @@ try {
         Write-Output '结构与调用不同的类（这些才需要人工判定语义影响）：'
         $different | Sort-Object { $_.Structural } -Descending |
             ForEach-Object { Write-Output ("  {0}  : 结构差异 {1} / 方法差异 {2}" -f $_.Class, $_.Structural, $_.Methods.Count) }
+    }
+
+    if ($ShowDiff -and $different.Count -gt 0) {
+        Write-Output ''
+        Write-Output '归一化后的指令差异明细：'
+        foreach ($entry in $different) {
+            Write-Output "--- $($entry.Class) ---"
+            foreach ($line in $entry.Detail) { Write-Output $line }
+        }
     }
     if ($FailOnDiff -and $different.Count -gt 0) { exit 1 }
 }
