@@ -290,6 +290,40 @@ public final class ClassDiffCheck {
         check(refLoader, ourLoader, net, "getAbsoluteURL", "http://a.com/x/", "");
         check(refLoader, ourLoader, net, "getAbsoluteURL", "http://a.com/x?a=1,2", "../y.png");
 
+        String strExt = "io.legado.app.utils.StringExtensionsKt";
+        for (String s : new String[]{null, "", "   ", " abc ", "\u3000x\u3000", "\t\n y \r"}) {
+            check(refLoader, ourLoader, strExt, "safeTrim", (Object) s);
+        }
+        for (String s : new String[]{null, "", "  ", "http://a", "HTTPS://a/b", "ftp://x", "//a"}) {
+            check(refLoader, ourLoader, strExt, "isAbsUrl", (Object) s);
+        }
+        for (String s : new String[]{null, "", "data:image/png;base64,AAA", "dat:x"}) {
+            check(refLoader, ourLoader, strExt, "isDataUrl", (Object) s);
+        }
+        for (String s : new String[]{null, "", " {}", " [1,2] ", "{}x", "x{}", "[}", "<a/>", " <a/> "}) {
+            check(refLoader, ourLoader, strExt, "isJson", (Object) s);
+            check(refLoader, ourLoader, strExt, "isJsonObject", (Object) s);
+            check(refLoader, ourLoader, strExt, "isJsonArray", (Object) s);
+            check(refLoader, ourLoader, strExt, "isXml", (Object) s);
+        }
+        for (String s : new String[]{null, "", "  ", "null", "1", "0", "false", "FALSE ", "no", "not", "yes", "true", "真"}) {
+            check(refLoader, ourLoader, strExt, "isTrue", (Object) s, false);
+            check(refLoader, ourLoader, strExt, "isTrue", (Object) s, true);
+        }
+        for (String s : new String[]{null, "", "  ", "a<br>b", "<p>x</p><div>y</div>", "<script>z</script>&nbsp;q", "<a href=\"x\">t</a>", "  中文  \n\n 段落 "}) {
+            check(refLoader, ourLoader, strExt, "htmlFormat", (Object) s);
+        }
+        check(refLoader, ourLoader, strExt, "splitNotBlank", "a,b, c ,,", (Object) new String[]{","});
+        check(refLoader, ourLoader, strExt, "splitNotBlank", " a \n b \n", (Object) new String[]{"\n"});
+        check(refLoader, ourLoader, strExt, "splitNotBlank", "", (Object) new String[]{","});
+        for (String s : new String[]{null, "", "  ", "HTTP://x", "http://x", "htx"}) {
+            check(refLoader, ourLoader, strExt, "startWithIgnoreCase", (Object) s, "http://");
+        }
+        for (String s : new String[]{"", "abc", "中文😀x", "   多 空格 "}) {
+            check(refLoader, ourLoader, strExt, "toStringArray", s);
+            check(refLoader, ourLoader, strExt, "cnCompare", s, "bbb");
+        }
+
         System.out.println();
         System.out.println("通过 " + passed + " / 失败 " + failed);
         if (failed > 0) {

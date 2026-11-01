@@ -9,7 +9,7 @@
 
 ## 第 2c 批 —— utils（进行中）
 
-**状态：20/50 类已还原；ABI 全部一致。行为差分覆盖 7 个类、53 个用例，全通过。**
+**状态：21/50 类已还原；ABI 全部一致。行为差分覆盖 8 个类、157 个用例，全通过。**
 
 ### 行为差分结果（本轮新增，比静态判据更强）
 
@@ -22,11 +22,17 @@
 | `XmlUtils` | 2 | 全通过（`InputStream` 输入） |
 | `Utf8BomUtils` | 5 | 全通过 |
 | `UTF8BOMFighter` | 4 | 全通过 |
-| `NetworkUtils` | 25 | 全通过（`isIPv4Address` / `getBaseUrl` / `getSubDomain` / `hasUrlEncoded` / `getAbsoluteURL`） |
-| **合计** | **53** | **53 通过 / 0 失败** |
+| `NetworkUtils` | 25 | 全通过 |
+| `StringExtensionsKt` | 104 | 全通过 |
+| `Base64` | 0 | 未覆盖（API 待接） |
+| **合计** | **157** | **157 通过 / 0 失败** |
 
-覆盖的是「输入输出都是 JDK 类型」的纯函数。这 7 个类现在有行为证据，
-不再只是 ABI 正确——这是本仓库第一次有行为层面的证据。
+`StringExtensionsKt` 是严格档且被解析引擎广泛依赖，104 个用例覆盖了
+`safeTrim` / `isAbsUrl` / `isDataUrl` / `isJson*` / `isXml` / `isTrue` / `htmlFormat` /
+`splitNotBlank` / `startWithIgnoreCase` / `toStringArray` / `cnCompare`，
+包括 null、空串、全角空格、emoji、空分隔符等边界。
+
+这 8 个类现在有行为证据，不再只是 ABI 正确。
 
 ### 三级分类结果（200 个已编译类）
 
@@ -100,6 +106,7 @@ utils 包在制品里是 **50 个类 = 28 个顶层 + 22 个合成**。两种形
 | `EncodingDetect` | **strict** | 一致 | 结构与调用不同（未判定语义） |
 | `HtmlFormatter` | **strict** | 一致 | 结构与调用不同（未判定语义） |
 | `NetworkUtils` | loose | 一致 | 见行为差分（25 例全通过） |
+| `StringExtensionsKt` | **strict** | 一致 | 见行为差分（104 例全通过） |
 
 其中 `MapDeserializerDoubleAsIntFix` 曾被 ABI 抓出真问题：`deserialize` 缺少
 `@Throws(JsonParseException::class)`，参考侧的签名带 `throws`，补上后全一致。
