@@ -7,7 +7,47 @@
 > 该分支上的每片源码通过 `-PrestoreBootstrap` 引导编译后立即做 ABI 核验，见 [BUILD.md](BUILD.md)。
 > `main` 保持绿色。
 
-## 第 2c 批 —— utils（进行中）
+## 第 2d 批 —— help（进行中）
+
+**状态：9/22 文件已还原；ABI 231/231 一致**
+
+已完成：
+
+| 文件 | 语言 | 备注 |
+| --- | --- | --- |
+| `coroutine/CoroutineContainer` | Kotlin | 接口，5 个方法 |
+| `http/RequestMethod` | Kotlin | 枚举 GET/POST |
+| `http/api/CookieManager` | Kotlin | 接口，6 个方法 |
+| `http/ByteConverter` | Kotlin | Retrofit Converter.Factory |
+| `DefaultData` | Kotlin | 资源读取 + GSON |
+| `Encoding` | Java | 编码名表，沿用 CFR 产物 |
+| `EncodingDetectHelp` | Java | 同上 |
+| `http/EncodeConverter` | Kotlin | 按 charset/Content-Type 选编码 |
+| `http/Res` | Kotlin | data class |
+
+**踩到的坑**：`ByteConverter` 覆写 `Retrofit Converter.Factory.responseBodyConverter` 时，
+CFR 显示的 `@Nullable` 参数是误导——必须写成非空 `Type` / `Array<Annotation>` / `Retrofit`，
+写成可空会报 `overrides nothing`。
+
+剩余 13 个文件（按行数）：
+
+| 文件 | 行数 |
+| --- | --- |
+| `http/StrResponse` | 115 |
+| `http/HttpHelperKt` | 147 |
+| `coroutine/CompositeCoroutine` | 171 |
+| `CacheManager` | 190 |
+| `http/CoroutinesCallAdapterFactory` | 217 |
+| `http/SSLHelper` | 244 |
+| `http/CookieStore` | 317 |
+| `BookHelp` | 554 |
+| `http/OkHttpUtilsKt` | 647 |
+| `coroutine/Coroutine` | 799 |
+| `SourceAnalyzer` | 1730 |
+| `JsExtensions` | 1912 |
+| `BytesEncodingDetect` | 3982 |
+
+## 第 2c 批 —— utils（已完成）
 
 **状态：utils 包已完成 —— 28/28 顶层类、50/50 类，类集合与制品逐项一致。
 ABI 全部一致（221/221）。行为差分 11 个类、304 个用例全通过。**
