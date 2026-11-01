@@ -175,6 +175,17 @@ public final class ClassDiffCheck {
         }
     }
 
+    /** 直接断言一个是非判断，用于跨加载器协作这类单次 check 表达不了的检查。 */
+    private static void report(String label, boolean ok) {
+        if (ok) {
+            passed++;
+            System.out.println("PASS " + label);
+        } else {
+            failed++;
+            System.out.println("FAIL " + label);
+        }
+    }
+
     private static void check(URLClassLoader refLoader, URLClassLoader ourLoader,
                               String className, String methodName, Object... args) {
         String label = className + "." + methodName + "(" + describe(args) + ")";
@@ -322,6 +333,66 @@ public final class ClassDiffCheck {
         for (String s : new String[]{"", "abc", "中文😀x", "   多 空格 "}) {
             check(refLoader, ourLoader, strExt, "toStringArray", s);
             check(refLoader, ourLoader, strExt, "cnCompare", s, "bbb");
+        }
+
+        // EncoderUtils：escape/base64 是确定性的；对称加密在固定 key/iv 下也是确定性的
+        String enc = "io.legado.app.utils.EncoderUtils";
+        for (String s : new String[]{"", "abc", "a b", "中文", "~!@#$%^&*()_+", "\u0001\u007f\u0080\u0100"}) {
+            check(refLoader, ourLoader, enc, "escape", s);
+            check(refLoader, ourLoader, enc, "base64Encode", s);
+            check(refLoader, ourLoader, enc, "base64Decode", s);
+        }
+        byte[] aesKey = "0123456789abcdef".getBytes("UTF-8");
+        byte[] aesIv = "abcdef0123456789".getBytes("UTF-8");
+        byte[] plain = "hello 加密 world".getBytes("UTF-8");
+        check(refLoader, ourLoader, enc, "encryptAES2Base64", plain, aesKey, "AES/ECB/PKCS5Padding", null);
+        check(refLoader, ourLoader, enc, "encryptAES2Base64", plain, aesKey, "AES/CBC/PKCS5Padding", aesIv);
+        byte[] desKey = "12345678".getBytes("UTF-8");
+        byte[] desIv = "87654321".getBytes("UTF-8");
+        check(refLoader, ourLoader, enc, "encryptDES2Base64", plain, desKey, "DES/ECB/PKCS5Padding", null);
+        check(refLoader, ourLoader, enc, "encryptDES2Base64", plain, desKey, "DES/CBC/PKCS5Padding", desIv);
+        byte[] des3Key = "123456781234567812345678".getBytes("UTF-8");
+        check(refLoader, ourLoader, enc, "encryptDESede2Base64", plain, des3Key, "DESede/ECB/PKCS5Padding", null);
+
+        // RSA 分段：用同一对密钥，一侧加密另一侧解密，两个方向都要能还原原文
+        try {
+            Class<?> refEnc = Class.forName(enc, true, refLoader);
+            Object refInst = instanceOf(refEnc);
+            Object keyPair = refEnc.getMethod("generateKeys").invoke(refInst);
+            java.security.PublicKey pub = (java.security.PublicKey)
+                    keyPair.getClass().getMethod("getPublic").invoke(keyPair);
+            java.security.PrivateKey priv = (java.security.PrivateKey)
+                    keyPair.getClass().getMethod("getPrivate").invoke(keyPair);
+
+            String payload = repeat("RSA segment payload 中文 ", 60); // 超过单块上限，逼出分段
+
+            String cipherRef = (String) invoke(refLoader, enc, "encryptSegmentByPublicKey",
+                    payload, pub, 2048);
+            String cipherOur = (String) invoke(ourLoader, enc, "encryptSegmentByPublicKey",
+                    payload, pub, 2048);
+            // 注意：RSA 用 PKCS#1 v1.5 填充，填充字节是随机的，所以**不能**断言密文相等。
+            // 能断言的是「解出来还是原文」，以及两个实现能互相解开对方的密文。
+            report("RSA 密文长度一致", cipherRef.length() == cipherOur.length());
+
+            String backByOurs = (String) invoke(ourLoader, enc, "decryptSegmentByPrivateKey",
+                    cipherRef, priv, 2048);
+            report("制品加密 -> 本仓库解密 还原原文", payload.equals(backByOurs));
+
+            String backByRef = (String) invoke(refLoader, enc, "decryptSegmentByPrivateKey",
+                    cipherOur, priv, 2048);
+            report("本仓库加密 -> 制品解密 还原原文", payload.equals(backByRef));
+
+            String cipherPrivRef = (String) invoke(refLoader, enc, "encryptSegmentByPrivateKey",
+                    payload, priv, 2048);
+            String cipherPrivOur = (String) invoke(ourLoader, enc, "encryptSegmentByPrivateKey",
+                    payload, priv, 2048);
+            report("RSA 私钥密文长度一致", cipherPrivRef.length() == cipherPrivOur.length());
+
+            String pubBack = (String) invoke(ourLoader, enc, "decryptSegmentByPublicKey",
+                    cipherPrivRef, pub, 2048);
+            report("私钥加密 -> 公钥解密 还原原文", payload.equals(pubBack));
+        } catch (Throwable t) {
+            report("RSA 分段检查执行失败: " + t, false);
         }
 
         System.out.println();

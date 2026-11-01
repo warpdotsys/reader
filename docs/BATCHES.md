@@ -9,7 +9,16 @@
 
 ## 第 2c 批 —— utils（进行中）
 
-**状态：21/50 类已还原；ABI 全部一致。行为差分覆盖 8 个类、157 个用例，全通过。**
+**状态：22/50 类已还原；ABI 全部一致（204/204）。行为差分 9 个类、185 个用例全通过。严格档的 utils 类已全部还原。**
+
+### 严格档里程碑
+
+严格档在 utils 里的 6 个类全部还原：`TextUtils`、`MD5Utils`、`EncodingDetect`、
+`HtmlFormatter`、`StringExtensionsKt`、`EncoderUtils`。
+
+其中 `TextUtils` 做到字节码完全一致，`MD5Utils` 仅局部装配不同，
+`StringExtensionsKt` / `EncoderUtils` 有 ABI + 行为证据，`EncodingDetect` / `HtmlFormatter`
+仍是「ABI 正确、行为未覆盖」（`HtmlFormatter.format` 需要 `Regex` 参数，跨类加载器不好传）。
 
 ### 行为差分结果（本轮新增，比静态判据更强）
 
@@ -107,6 +116,7 @@ utils 包在制品里是 **50 个类 = 28 个顶层 + 22 个合成**。两种形
 | `HtmlFormatter` | **strict** | 一致 | 结构与调用不同（未判定语义） |
 | `NetworkUtils` | loose | 一致 | 见行为差分（25 例全通过） |
 | `StringExtensionsKt` | **strict** | 一致 | 见行为差分（104 例全通过） |
+| `EncoderUtils` | **strict** | 一致 | 见行为差分（28 例全通过，含 AES/DES/DESede/RSA 分段） |
 
 其中 `MapDeserializerDoubleAsIntFix` 曾被 ABI 抓出真问题：`deserialize` 缺少
 `@Throws(JsonParseException::class)`，参考侧的签名带 `throws`，补上后全一致。
