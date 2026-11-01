@@ -9,7 +9,7 @@
 
 ## 第 2d 批 —— help（进行中）
 
-**状态：18/22 文件已还原；ABI 262/262 一致；指令完全一致 173 个类**
+**状态：19/22 文件已还原；ABI 270/275 一致；指令完全一致 179 个类**
 
 已完成：
 
@@ -33,6 +33,7 @@
 | `http/CookieStore` | Kotlin | Cookie 存取，`init` 块里建缓存目录 |
 | `BookHelp` | Kotlin | 正文/图片缓存，含两个 suspend 函数 |
 | `http/OkHttpUtils` | Kotlin | 顶层扩展：重试请求、Call.await、编码探测、表单 |
+| `coroutine/Coroutine` | Kotlin | 任务封装：超时/回调/取消，含 3 个 inline 辅助函数 |
 
 ### 本轮方法学收获（重要）
 
@@ -169,6 +170,44 @@ suspend fun Call.await(): Response
 `it.body()` / `response.message()` 直接编译失败（提示 `moved to val`），
 必须写 `it.body` / `response.message`。
 
+**15. 私有辅助函数是不是 inline，从「有没有 `access$` 桥接」能反推。**
+
+`Coroutine` 里 `dispatchVoidCallback` / `dispatchCallback` / `executeBlock` 被
+`executeInternal` 的 lambda（另一个类）调用。若它们是普通 `private suspend fun`，
+编译器必须生成 `access$dispatchCallback` 这样的合成桥接；制品里**没有**这些桥接，
+且它们的 lambda 类是包私有 `final class`（而不是 `public final class`）
+——两条都指向「它们是 `inline`」。改成 `inline` 后这两处差异消失。
+
+`executeBlock` 的 `block` 参数还需要 `crossinline`：它在体内被传进 `withContext{}` /
+`withTimeout{}` 这两个非 inline 的挂起函数，不加 `crossinline` 编译不过。
+
+**16. CFR 反编译失败的方法，可以直接读字节码还原。**
+
+`Coroutine$executeInternal$1.invokeSuspend` 在 CFR 输出里只有一段异常栈
+（`ConfusedCFRException: Tried to end blocks`），没有源码。用 `javap -c` 读它的
+`tableswitch`（16 个状态）+ 调用序列 + 异常表，照样能还原出 try/catch/finally 的形状：
+
+```kotlin
+try {
+    start?.let { dispatchVoidCallback(this, it) }
+    val result = executeBlock(this, context, timeMillis ?: 0L, block)
+    if (isActive) success?.let { dispatchCallback(this, result, it) }
+} catch (e: Throwable) {
+    e.printStackTrace()
+    errorReturn?.value?.let { if (isActive) success?.let { ... } }
+    if (isActive) error?.let { dispatchCallback(this, e, it) }
+} finally {
+    if (isActive) finally?.let { dispatchVoidCallback(this, it) }
+}
+```
+
+**17. inline 函数会把 lambda 内联进调用方，类名约定随编译器版本变。**
+
+制品把 `executeBlock` / `dispatchVoidCallback` 内联进了 `executeInternal` 与 `cancel`，
+内联出来的 lambda 类名是 `Coroutine$cancel$1$1$1`（按位置编号）；
+本仓库 Kotlin 1.5.21 生成的是 `Coroutine$executeInternal$1$invokeSuspend$$inlined$executeBlock$1`。
+语义相同、名字不同，**这类差异无法用源码写法抹平**。
+
 ### 已知差异（已分类，不阻塞）
 
 **A. Retrofit/OkHttp 覆写里的可空参数。**
@@ -211,11 +250,27 @@ CFR 对这两处也只给出「Unable to fully structure code」。
 `text` / `addHeaders` / `get` / `postForm` / `postMultipart` / `postJson` 六个非挂起函数
 与制品一致（`getImageSuffix` 之外的全部扩展写法都已按第 11 条核对过）。
 
-剩余 4 个文件（按行数）：
+**H. `Coroutine` 的 3 处 ABI 差异 + 2 个多出的合成类。**
+
+全部落在 inline 展开出来的 lambda 上：
+
+| 项 | 制品 | 本仓库 |
+| --- | --- | --- |
+| `$cancel$1$1` 构造器 | `(VoidCallback, Coroutine, Continuation)` | `(Coroutine, VoidCallback, Continuation)` |
+| `$executeBlock$2` | 无 `invokeSuspend$$forInline` | 有（inline 生成的副本） |
+| `$executeBlock$2$1` | 同上 | 同上 |
+| 内联 lambda 类名 | `Coroutine$cancel$1$1$1` | `Coroutine$executeInternal$1$invokeSuspend$$inlined$executeBlock$1` |
+
+捕获顺序与类名约定都由编译器决定，源码层面无法指定。已确认制品的 `Coroutine`
+本身（含全部 11 个内部类）与重建的**别名字段命名/结构一致**，只有上述合成产物的命名不同。
+
+另：`class-coverage` 会把多出的 2 个类**逐个点名**（不是只报数字），见脚本输出末尾的
+「多出的类」段落。
+
+剩余 3 个文件（按行数）：
 
 | 文件 | 行数 |
 | --- | --- |
-| `coroutine/Coroutine` | 799 |
 | `SourceAnalyzer` | 1730 |
 | `JsExtensions` | 1912 |
 | `BytesEncodingDetect` | 3982 |
