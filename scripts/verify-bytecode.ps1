@@ -127,11 +127,14 @@ function Get-MethodInstructions([string[]]$Dump) {
 }
 
 # 取一条指令访问的局部变量槽位号，没有则返回 $null。
+# 注意用 \s+ 而不是单个空格：javap 会把操作数按列对齐（`astore        5`），
+# 只写一个空格会让槽位登记不全，后面查不到就塌成裸 "v"，把槽位信息整个抹掉。
 function Get-LocalSlot([string]$Text) {
-    if ($Text -match '^(?:i|l|f|d|a)(?:load|store)_([0-3])$') { return [int]$Matches[1] }
-    if ($Text -match '^(?:i|l|f|d|a)(?:load|store) (\d+)$') { return [int]$Matches[1] }
-    if ($Text -match '^ret (\d+)$') { return [int]$Matches[1] }
-    if ($Text -match '^iinc (\d+),') { return [int]$Matches[1] }
+    $t = ($Text -replace '\s+', ' ').Trim()
+    if ($t -match '^(?:i|l|f|d|a)(?:load|store)_([0-3])$') { return [int]$Matches[1] }
+    if ($t -match '^(?:i|l|f|d|a)(?:load|store) (\d+)$') { return [int]$Matches[1] }
+    if ($t -match '^ret (\d+)$') { return [int]$Matches[1] }
+    if ($t -match '^iinc (\d+),') { return [int]$Matches[1] }
     return $null
 }
 
