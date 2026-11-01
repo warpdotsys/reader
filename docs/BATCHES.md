@@ -132,9 +132,16 @@ utils 包在制品里是 **50 个类 = 28 个顶层 + 22 个合成**。两种形
 
 严格档的 `TextUtils` 因此通过了严格判据。
 
-### 严格档在 utils 里剩下的
+### utils 剩余（6 个文件 / 约 3,700 行反编译）
 
-`StringExtensions`、`EncoderUtils`（2 个文件）。
+| 文件 | 行数 | 备注 |
+| --- | --- | --- |
+| `FileUtils` | 1144 | 含 `SortType`/`SortBy*` 等内部类 |
+| `ACache` + `ACacheKt` | 881 + 21 | CRU 缓存；门面只放顶层 logger |
+| `StringUtils` | 614 | |
+| `ZipUtils` + `ZipUtilsKt` | 530 + 21 | 门面同上 |
+
+都已登记，不会漏。
 
 ### 两处字节码差异（宽松档，已记录不阻塞）
 
