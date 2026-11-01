@@ -9,7 +9,7 @@
 
 ## 第 2c 批 —— utils（进行中）
 
-**状态：23/50 类已还原；ABI 全部一致（205/205）。行为差分 10 个类、265 个用例全通过。严格档的 utils 类已全部还原。**
+**状态：24/50 类已还原；ABI 全部一致（211/211）。行为差分 10 个类、265 个用例全通过。严格档的 utils 类已全部还原。**
 
 ### 严格档里程碑
 
@@ -118,6 +118,7 @@ utils 包在制品里是 **50 个类 = 28 个顶层 + 22 个合成**。两种形
 | `StringExtensionsKt` | **strict** | 一致 | 见行为差分（104 例全通过） |
 | `EncoderUtils` | **strict** | 一致 | 见行为差分（28 例全通过，含 AES/DES/DESede/RSA 分段） |
 | `StringUtils` | loose | 一致 | 见行为差分（80 例全通过） |
+| `ACache` + `ACacheKt` | loose | 一致 | 结构差异 5 / 6 / 2（未判定语义）；行为未覆盖 |
 
 其中 `MapDeserializerDoubleAsIntFix` 曾被 ABI 抓出真问题：`deserialize` 缺少
 `@Throws(JsonParseException::class)`，参考侧的签名带 `throws`，补上后全一致。
@@ -133,16 +134,17 @@ utils 包在制品里是 **50 个类 = 28 个顶层 + 22 个合成**。两种形
 
 严格档的 `TextUtils` 因此通过了严格判据。
 
-### utils 剩余（6 个文件 / 约 3,700 行反编译）
+### utils 剩余（3 个文件 / 约 1,700 行反编译）
 
 | 文件 | 行数 | 备注 |
 | --- | --- | --- |
 | `FileUtils` | 1144 | 含 `SortType`/`SortBy*` 等内部类 |
-| `ACache` + `ACacheKt` | 881 + 21 | CRU 缓存；门面只放顶层 logger |
-| `StringUtils` | 614 | |
-| `ZipUtils` + `ZipUtilsKt` | 530 + 21 | 门面同上 |
+| `ZipUtils` + `ZipUtilsKt` | 530 + 21 | 含两个 `suspend` 重载，CFR 输出是状态机；门面同上 |
 
 都已登记，不会漏。
+
+**行为差分的一处已知缺口**：`ACache` 依赖文件系统，两个类加载器会写同一个目录而互相干扰，
+需要给 harness 加「每侧各自构造参数」的能力才能覆盖。已登记，未做。
 
 ### 两处字节码差异（宽松档，已记录不阻塞）
 
