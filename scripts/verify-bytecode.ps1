@@ -186,7 +186,34 @@ function Get-NormalizedInstructions($RawLines) {
         }
         [void]$out.Add($text)
     }
-    return $out.ToArray()
+
+    # Kotlin 编译器在调用 Intrinsics.checkNotNullExpressionValue(obj, "…") 时，
+    # 第二参数是从源码表达式字面形式生成的诊断消息，只在编译器自身假设被破坏时才会出现在异常里。
+    # 但这段「取对象 + 诊断消息 + 断言」的三指令惯用法是否出现，取决于源码里平台类型
+    # 恰好被写成了什么形式——换一种等价写法，字节码就多/少三条，语义完全一样。
+    # 整段抹掉，否则严格档会被这类误报淹没。
+    # 参数名那一类（checkNotNullParameter）保留：那是真实的 API 信息，不是编译器自证。
+    $filtered = New-Object System.Collections.ArrayList
+    $i = 0
+    while ($i -lt $out.Count) {
+        if ($i + 2 -lt $out.Count -and $out[$i + 2] -match 'checkNotNullExpressionValue' -and
+            ($out[$i] -match '^(aload|dup)' ) -and $out[$i + 1] -match '^ldc // String ') {
+            $i += 3
+            continue
+        }
+        if ($out[$i] -match 'checkNotNullExpressionValue') { $i++; continue }
+        # 「存回同一槽位、紧接着又读回来」是栈上往返，语义上什么都没做。
+        # 它是否出现取决于源码怎么拆局部变量，属于噪声。
+        if ($i + 1 -lt $out.Count -and
+            $out[$i] -match '^\w+store (v\d+)$' -and
+            $out[$i + 1] -eq ("$($out[$i] -replace 'store ', 'load ')") ) {
+            $i += 2
+            continue
+        }
+        [void]$filtered.Add($out[$i])
+        $i++
+    }
+    return $filtered.ToArray()
 }
 
 # 判断某个类是否在 classpath 上。不能靠 javap 的报错文本——方法体里的字符串常量
