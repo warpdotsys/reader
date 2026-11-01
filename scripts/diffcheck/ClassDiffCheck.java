@@ -395,6 +395,49 @@ public final class ClassDiffCheck {
             report("RSA 分段检查执行失败: " + t, false);
         }
 
+        // StringUtils：纯函数为主，另有格式化/中文数字转换
+        String su = "io.legado.app.utils.StringUtils";
+        for (long n : new long[]{-1, 0, 1, 1023, 1024, 1536, 1048576, 1099511627776L}) {
+            check(refLoader, ourLoader, su, "toSize", n);
+        }
+        for (String s : new String[]{"", "abc", "中文", " hello", "1abc"}) {
+            check(refLoader, ourLoader, su, "toFirstCapital", s);
+        }
+        for (String s : new String[]{"", "abc", "ａｂｃ", "中文 全角", "\uff01\uff5e", "!~"}) {
+            check(refLoader, ourLoader, su, "halfToFull", s);
+            check(refLoader, ourLoader, su, "fullToHalf", s);
+        }
+        for (String s : new String[]{"一", "十", "二十三", "一百零五", "壹仟贰佰", "一万", "一亿", "两", "九十九", "bad"}) {
+            check(refLoader, ourLoader, su, "chineseNumToInt", s);
+        }
+        for (String s : new String[]{null, "", " 42 ", "abc", "二十三", "1 2 3"}) {
+            check(refLoader, ourLoader, su, "stringToInt", (Object) s);
+        }
+        for (String s : new String[]{"", "abc", "a1b", "no digits"}) {
+            check(refLoader, ourLoader, su, "isContainNumber", s);
+            check(refLoader, ourLoader, su, "isNumeric", s);
+        }
+        for (String s : new String[]{null, "", "0", "999", "12345", "123456", "未知"}) {
+            check(refLoader, ourLoader, su, "wordCountFormat", (Object) s);
+        }
+        for (String s : new String[]{"", "  ", " abc ", "\u3000中文\u3000", "a  b", "\t x \n"}) {
+            check(refLoader, ourLoader, su, "trim", s);
+        }
+        check(refLoader, ourLoader, su, "repeat", "ab", 3);
+        check(refLoader, ourLoader, su, "repeat", "x", 0);
+        for (String s : new String[]{null, "", "\\u4e2d\\u6587", "no escape", "\\u0041\\u0042"}) {
+            check(refLoader, ourLoader, su, "removeUTFCharacters", (Object) s);
+        }
+        for (String s : new String[]{"", "a<br>b", "<p>x</p>", "<script>z</script>&nbsp;q", "  多行\n\n文本 "}) {
+            check(refLoader, ourLoader, su, "formatHtml", s);
+        }
+        check(refLoader, ourLoader, su, "byteToHexString", (Object) new byte[]{0, 1, 15, 16, -1, 127});
+        check(refLoader, ourLoader, su, "byteToHexString", (Object) null);
+        check(refLoader, ourLoader, su, "hexStringToByte", "4142");
+        check(refLoader, ourLoader, su, "hexStringToByte", "4142 43");
+        check(refLoader, ourLoader, su, "dateConvert", 0L, "yyyy-MM-dd HH:mm:ss");
+        check(refLoader, ourLoader, su, "dateConvert", 1700000000000L, "yyyy/MM/dd");
+
         System.out.println();
         System.out.println("通过 " + passed + " / 失败 " + failed);
         if (failed > 0) {

@@ -9,7 +9,7 @@
 
 ## 第 2c 批 —— utils（进行中）
 
-**状态：22/50 类已还原；ABI 全部一致（204/204）。行为差分 9 个类、185 个用例全通过。严格档的 utils 类已全部还原。**
+**状态：23/50 类已还原；ABI 全部一致（205/205）。行为差分 10 个类、265 个用例全通过。严格档的 utils 类已全部还原。**
 
 ### 严格档里程碑
 
@@ -117,6 +117,7 @@ utils 包在制品里是 **50 个类 = 28 个顶层 + 22 个合成**。两种形
 | `NetworkUtils` | loose | 一致 | 见行为差分（25 例全通过） |
 | `StringExtensionsKt` | **strict** | 一致 | 见行为差分（104 例全通过） |
 | `EncoderUtils` | **strict** | 一致 | 见行为差分（28 例全通过，含 AES/DES/DESede/RSA 分段） |
+| `StringUtils` | loose | 一致 | 见行为差分（80 例全通过） |
 
 其中 `MapDeserializerDoubleAsIntFix` 曾被 ABI 抓出真问题：`deserialize` 缺少
 `@Throws(JsonParseException::class)`，参考侧的签名带 `throws`，补上后全一致。
