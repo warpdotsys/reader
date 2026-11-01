@@ -9,7 +9,7 @@
 
 ## 第 2d 批 —— help（进行中）
 
-**状态：17/22 文件已还原；ABI 255/255 一致；指令完全一致 169 个类**
+**状态：18/22 文件已还原；ABI 262/262 一致；指令完全一致 173 个类**
 
 已完成：
 
@@ -32,6 +32,7 @@
 | `http/SSLHelper` | Kotlin | TLS/证书工具，**全部指令一致** |
 | `http/CookieStore` | Kotlin | Cookie 存取，`init` 块里建缓存目录 |
 | `BookHelp` | Kotlin | 正文/图片缓存，含两个 suspend 函数 |
+| `http/OkHttpUtils` | Kotlin | 顶层扩展：重试请求、Call.await、编码探测、表单 |
 
 ### 本轮方法学收获（重要）
 
@@ -149,6 +150,25 @@ init {
 `StringsKt.readText$default` / `writeText$default` 对应 `file.readText()` / `file.writeText(text)`。
 这些调用在制品与重建里一致，差的只是临时槽位摆放。
 
+**13. suspend 扩展只能点调用，普通调用形式会解析失败。**
+
+```kotlin
+suspend fun Call.await(): Response
+```
+
+在 Kotlin 1.5.21 里，`await(call)`（把接收者当普通参数传）会报
+`Unresolved reference. None of the following candidates is applicable because of receiver type mismatch`，
+候选里明明列着这个函数。改成 `call.await()` 即可编译。
+
+排查时先用改名验证（`awaitCall`）排除了重名遮蔽，再用完全限定类型排除了 import 冲突，
+最后发现是调用形式的问题。**这类失败会连锁到整个方法体**——`response` 推断成 `Response?`，
+后面所有 `response.isSuccessful` 都跟着报错，容易误判成空安全写错。
+
+**14. okhttp 4.x 的 `body()` / `message()` 是 error 级弃用。**
+
+`it.body()` / `response.message()` 直接编译失败（提示 `moved to val`），
+必须写 `it.body` / `response.message`。
+
 ### 已知差异（已分类，不阻塞）
 
 **A. Retrofit/OkHttp 覆写里的可空参数。**
@@ -184,11 +204,17 @@ init {
 CFR 对这两处也只给出「Unable to fully structure code」。
 这些按 `docs/GOAL.md` 的降级规则处理：ABI + 调用/常量一致即为通过，逐条记录在此。
 
-剩余 5 个文件（按行数）：
+**G. `OkHttpUtilsKt` 的 3 个类：协程状态机。**
+`$newCall$1` / `$newCallStrResponse$1` 的 `invokeSuspend` 差在续体字段
+（`L$0`/`I$0..I$2`/`label`）的存取次序；`$newCallResponse$2` 与 `$await$2$2`
+差在状态机槽位分配。调用目标、常量、分支去向一致。
+`text` / `addHeaders` / `get` / `postForm` / `postMultipart` / `postJson` 六个非挂起函数
+与制品一致（`getImageSuffix` 之外的全部扩展写法都已按第 11 条核对过）。
+
+剩余 4 个文件（按行数）：
 
 | 文件 | 行数 |
 | --- | --- |
-| `http/OkHttpUtilsKt` | 647 |
 | `coroutine/Coroutine` | 799 |
 | `SourceAnalyzer` | 1730 |
 | `JsExtensions` | 1912 |
