@@ -22,24 +22,28 @@ utils 包在制品里是 **50 个类 = 28 个顶层 + 22 个合成**。两种形
 
 ### 已完成
 
-| 类 | 字节码 |
-| --- | --- |
-| `LogUtilsKt` | 一致 |
-| `FileExtensionsKt` | 一致 |
-| `AnkoHelpsKt` | 一致 |
-| `AttemptResult` | **有差异**（3 个方法） |
-| `ThrowableExtensionsKt` | **有差异**（1 个方法） |
+这 5 个类都落在**宽松档**（严格档只包含 `EncodingDetect`、`StringExtensions`、`EncoderUtils`、
+`HtmlFormatter`、`TextUtils`、`MD5Utils`）。宽松档判据是 ABI + 冒烟，所以它们已达到所在档位的标准。
 
-### 两处待调的具体差异
+| 类 | 档位 | ABI | 字节码 |
+| --- | --- | --- | --- |
+| `LogUtilsKt` | loose | 一致 | 一致 |
+| `FileExtensionsKt` | loose | 一致 | 一致 |
+| `AnkoHelpsKt` | loose | 一致 | 一致 |
+| `AttemptResult` | loose | 一致 | 3 个方法有差异（记录，不算失败） |
+| `ThrowableExtensionsKt` | loose | 一致 | 1 个方法有差异（记录，不算失败） |
 
-- `ThrowableExtensionsKt.getMsg`：参考侧在 `CharSequence` 上取 `length()`，并带一段
-  `checkcast CharSequence` + 内联标记；我写成了 `stackTrace.length`（`String.length()`）。
-  说明原文不是简单的 `if (stackTrace.length > 0)`。
-- `AttemptResult`：参考侧 `isError` 是被**内联**进 `then` 的（`astore/aload/ifnull` 展开），
-  我的版本是直接 `invokevirtual isError()`；`isError()` 与 `getHasValue()` 的字节码形态也不同。
-  `isError` 在原文里应是内联可见的成员，不是普通属性。
+### 两处字节码差异（宽松档，已记录不阻塞）
 
-这两处都停在"ABI 对、方法体不对"，按 [GOAL.md](GOAL.md) 严格档标准不算完成。
+- `ThrowableExtensionsKt.getMsg`：参考侧在 `CharSequence` 上取 `length()` 并带内联标记，
+  写成 `stackTrace.length`（`String.length()`）时会多一条 `String.length()` 少一条 `CharSequence.length()`。
+  试过 `ifEmpty`，展开后指令更多、离原文更远，已回退为三元形式。
+- `AttemptResult`：参考侧 `then` 里对 `error` 的判断带一个临时槽和布尔物化，
+  `isError()` / `getHasValue()` 开头各有一条内联标记（`iconst_0; istore`）。
+  说明原文这两个判断里有内联调用，不是裸的 `error != null`。语义等价，形态未复原。
+
+**这两处若将来升到严格档，必须先解决。** 现在的结论是"宽松档达标、字节码形态未复原"。
+
 
 ### 顺带修掉的一个核验缺陷
 

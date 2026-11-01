@@ -8,7 +8,7 @@ data class AttemptResult<T> @PublishedApi internal constructor(
 
     @Suppress("UNCHECKED_CAST")
     inline fun <R> then(f: (T) -> R): AttemptResult<R> {
-        if (isError) return this as AttemptResult<R>
+        if (error != null) return this as AttemptResult<R>
         return attempt { f(value as T) }
     }
 
