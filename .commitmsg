@@ -1,9 +1,0 @@
-第 2b 批（进行中）：迁入 8 个数据实体类
-
-- rule/ 全部 6 个 data class + Cookie + SearchKeyword
-- 新增 -PrestoreBootstrap 编译引导：io.legado.app 依赖成环，无法按包切出始终可编译的增量；
-  传该参数时把制品应用类挂到 compileOnly，用于逐片编译与核验。不传则制品完全不参与构建
-- 每片编译后立即 ABI 核验：已比对 107 个类，全部一致
-- 分支 restore/core 上进行，main 保持绿色
-
-待做：Book/BookSource/RssSource/BaseSource/HttpTTS 等 16 个含业务方法的类。
