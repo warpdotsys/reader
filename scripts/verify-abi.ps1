@@ -78,26 +78,37 @@ function Get-AbiDump([string]$ClassPath, [string]$ClassName) {
 }
 
 try {
-    $roots = @(
-        @{ Path = (Join-Path $ProjectRoot 'src\main\java'); Extension = '.java' },
-        @{ Path = (Join-Path $ProjectRoot 'src\main\kotlin'); Extension = '.kt' }
-    )
-    $classes = foreach ($root in $roots) {
-        if (-not (Test-Path -LiteralPath $root.Path)) { continue }
-        Get-ChildItem -Path $root.Path -Recurse -Filter "*$($root.Extension)" | ForEach-Object {
-            $relative = $_.FullName.Substring($root.Path.Length + 1) -replace '\\', '.'
-            $relative.Substring(0, $relative.Length - $root.Extension.Length)
+    # 枚举「已编译出的类」，而不是从源文件名推类名。
+    # 源文件名推不出 Kotlin 文件门面（LogUtils.kt -> LogUtilsKt），也推不出同文件里的
+    # 多个顶层类（AnkoHelps.kt -> AnkoHelpsKt + AttemptResult）。
+    # 用文件名推导时，javap 两边都找不到该类，两边的输出都会是同一行报错，于是被判「一致」——
+    # 那正是静默遗漏。
+    $classDirs = @(
+        (Join-Path $ProjectRoot 'build\classes\kotlin\main'),
+        (Join-Path $ProjectRoot 'build\classes\java\main')
+    ) | Where-Object { Test-Path -LiteralPath $_ }
+
+    $classes = @(
+        foreach ($dir in $classDirs) {
+            Get-ChildItem -LiteralPath $dir -Recurse -File -Filter *.class | ForEach-Object {
+                $_.FullName.Substring($dir.Length + 1) -replace '\\', '.' -replace '\.class$', ''
+            }
         }
-    }
+    ) | Sort-Object -Unique
 
     $identical = 0
     $differences = New-Object System.Collections.ArrayList
+    $unavailable = New-Object System.Collections.ArrayList
     foreach ($class in $classes) {
+        # 制品里没有的类不能算「一致」——那只是两边都找不到。
+        $referenceClassFile = Join-Path $oldCp ($class.Replace('.', '\') + '.class')
+        if (-not (Test-Path -LiteralPath $referenceClassFile)) {
+            [void]$unavailable.Add($class)
+            continue
+        }
         $reference = Get-AbiDump $oldCp $class
         $restored = Get-AbiDump $newCp $class
-        if (($reference -join "`n") -ceq ($restored -join "`n")) {
-            $identical++
-        }
+        if (($reference -join "`n") -ceq ($restored -join "`n")) { $identical++ }
         else {
             [void]$differences.Add($class)
             Write-Output "--- $class ---"
@@ -108,6 +119,10 @@ try {
     Write-Output "已比对类数 : $($classes.Count)"
     Write-Output "ABI 一致   : $identical"
     Write-Output "ABI 不一致 : $($differences.Count)"
+    Write-Output "制品中无此类 : $($unavailable.Count)"
+    if ($unavailable.Count -gt 0) {
+        $unavailable | ForEach-Object { Write-Output "  ? $_" }
+    }
     if ($differences.Count -gt 0) { exit 1 }
 }
 finally {

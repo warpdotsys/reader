@@ -7,6 +7,47 @@
 > 该分支上的每片源码通过 `-PrestoreBootstrap` 引导编译后立即做 ABI 核验，见 [BUILD.md](BUILD.md)。
 > `main` 保持绿色。
 
+## 第 2c 批 —— utils（进行中）
+
+**状态：5/50 类已还原；其中 3 个字节码一致，2 个待调**
+
+### 清单基准
+
+utils 包在制品里是 **50 个类 = 28 个顶层 + 22 个合成**。两种形态容易漏：
+
+- **文件门面成对出现**：`ZipUtils.kt` 里既有 `object ZipUtils`，又有顶层 `private val logger`，
+  于是同时生成 `ZipUtils` 和 `ZipUtilsKt`（后者只放 logger）。同理 `ACache`/`ACacheKt`。
+- **一个文件多个顶层类**：`AnkoHelps.kt` 同时生成 `AnkoHelpsKt`（`attempt`）和 `AttemptResult`。
+  归属只能看字节码的 `Compiled from`，不能看文件名。
+
+### 已完成
+
+| 类 | 字节码 |
+| --- | --- |
+| `LogUtilsKt` | 一致 |
+| `FileExtensionsKt` | 一致 |
+| `AnkoHelpsKt` | 一致 |
+| `AttemptResult` | **有差异**（3 个方法） |
+| `ThrowableExtensionsKt` | **有差异**（1 个方法） |
+
+### 两处待调的具体差异
+
+- `ThrowableExtensionsKt.getMsg`：参考侧在 `CharSequence` 上取 `length()`，并带一段
+  `checkcast CharSequence` + 内联标记；我写成了 `stackTrace.length`（`String.length()`）。
+  说明原文不是简单的 `if (stackTrace.length > 0)`。
+- `AttemptResult`：参考侧 `isError` 是被**内联**进 `then` 的（`astore/aload/ifnull` 展开），
+  我的版本是直接 `invokevirtual isError()`；`isError()` 与 `getHasValue()` 的字节码形态也不同。
+  `isError` 在原文里应是内联可见的成员，不是普通属性。
+
+这两处都停在"ABI 对、方法体不对"，按 [GOAL.md](GOAL.md) 严格档标准不算完成。
+
+### 顺带修掉的一个核验缺陷
+
+`verify-abi.ps1` 原来从**源文件名**推类名。`LogUtils.kt` 生成的类是 `LogUtilsKt`，
+两边都找不到 → 两边输出同一行报错 → 被判"一致"。于是 ABI 报 111/111 全对，实际漏了 5 个类。
+已改为枚举**编译产物**里的类，并对"制品中无此类"单独计数。修复后是 176 个类全部实际比对过。
+
+
 ## 第 2b 批 —— 数据实体（进行中）
 
 **状态：8/24 已完成并核验**
