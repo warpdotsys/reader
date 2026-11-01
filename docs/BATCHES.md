@@ -296,6 +296,34 @@ e: ... Cannot access class 'io.legado.app.data.entities.rule.SearchRule'.
 `src/main` 下已存在的包路径生成过滤副本，或把 bootstrap 打成 jar 时排除同名条目。
 修好后 `SourceAnalyzer` 即可继续；本轮已把该文件回退，`restore/core` 保持可构建。
 
+#### 2026-11 复查：真正的约束是什么
+
+做过两轮实验，结论比「重名」更根本：
+
+1. **classpath 条目只能是目录或 jar。** 第一次尝试把过滤后的类做成 `files(List<File>)`
+   （一堆裸 `.class` 文件）挂 compileOnly——Gradle 接受了，但类路径上等于什么都没挂，
+   于是 `Book`/`BookChapter` 全部 unresolved。这是个我自己制造的假象，不是真问题。
+2. 改成「全量复制一份 `BOOT-INF/classes-filtered`，再把已迁入的类删掉」后，
+   过滤是**准确**的（实测：`Book.class` 在、`JsExtensions.class` 在、`SearchRule.class` 不在），
+   项目也能正常构建。
+3. 但 `SourceAnalyzer` 仍然编译不过，错误位置是 `BookSource()` 那一行，
+   抱怨的却是 `rule.SearchRule` 等 5 个类：
+
+   ```
+   e: SourceAnalyzer.kt: (62, 22): Cannot access class 'io.legado.app.data.entities.rule.SearchRule'.
+   ```
+
+   **根因**：`BookSource` 仍是**二进制类**（在 bootstrap 里），它的字段签名引用 `rule.*`；
+   而我们已经把 `rule.*` 换成了**源码类**。编译器无法把一个二进制类的签名桥接到源码类上。
+
+**真正的约束**：恢复顺序必须沿「引用方向」自底向上——只要还有二进制类引用某个类，
+就不能把这个类提前改成源码类。`rule.*` 的引用者 `BookSource` / `BaseSource` 等还在
+`data.entities` 里没恢复，所以 `SourceAnalyzer` 必须排在它们之后。
+
+**修正后的计划**：先恢复 `data.entities`（`BookSource` 1565 行、`BaseSource` 1008 行等），
+再回来做 `SourceAnalyzer`。`SourceAnalyzer` 的源码已成形（含 500 行的迁移函数与
+25 字段的 `BookSourceAny`），届时可直接落盘。
+
 ## 第 2c 批 —— utils（已完成）
 
 **状态：utils 包已完成 —— 28/28 顶层类、50/50 类，类集合与制品逐项一致。
