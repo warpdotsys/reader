@@ -48,6 +48,12 @@ data class BookSource(
     var ruleContent: ContentRule? = null
 ) : BaseSource {
 
+    private var searchRuleV: SearchRule? = null
+    private var exploreRuleV: ExploreRule? = null
+    private var bookInfoRuleV: BookInfoRule? = null
+    private var tocRuleV: TocRule? = null
+    private var contentRuleV: ContentRule? = null
+
     @Transient
     private var _userNameSpace: String = ""
 
@@ -133,7 +139,7 @@ data class BookSource(
         return "BookSource(bookSourceUrl=$bookSourceUrl, bookSourceName=$bookSourceName)"
     }
 
-    class ExploreKind(
+    data class ExploreKind(
         var title: String,
         var url: String? = null
     )
