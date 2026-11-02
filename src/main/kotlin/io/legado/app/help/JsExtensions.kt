@@ -5,6 +5,7 @@ import io.legado.app.constant.AppConst
 import io.legado.app.data.entities.BaseSource
 import io.legado.app.help.http.CookieStore
 import io.legado.app.help.http.StrResponse
+import io.legado.app.help.http.newCall as newCallExt
 import io.legado.app.help.http.okHttpClient
 import io.legado.app.help.http.text
 import io.legado.app.model.Debug
@@ -205,7 +206,7 @@ interface JsExtensions {
 
     fun base64DecodeToByteArray(str: String?, flags: Int): ByteArray? {
         if (str == null) return null
-        return EncoderUtils.base64DecodeToByteArray(str, flags)
+        return io.legado.app.utils.Base64.decode(str, flags)
     }
 
     fun base64Encode(str: String): String {
@@ -349,8 +350,8 @@ interface JsExtensions {
     fun getZipByteArrayContent(url: String, path: String): ByteArray? {
         val bytes = if (url.startsWith("http://") || url.startsWith("https://")) {
             runBlocking {
-                okHttpClient.newCall {
-                    it.url(url)
+                okHttpClient.newCallExt {
+                    url(url)
                 }.bytes()
             }
         } else {
@@ -386,8 +387,8 @@ interface JsExtensions {
             runBlocking {
                 var x = cacheInstance.getByteArray(key)
                 if (x == null) {
-                    x = okHttpClient.newCall {
-                        it.url(str)
+                    x = okHttpClient.newCallExt {
+                        url(str)
                     }.bytes()
                     cacheInstance.put(key, x)
                 }
@@ -415,7 +416,7 @@ interface JsExtensions {
         val contentArray = text.toCharArray()
         contentArray.forEachIndexed { index, c ->
             if (font1.inLimit(c)) {
-                val code = font2.getCodeByGlyf(font1.getGlyfByCode(c))
+                val code = font2.getCodeByGlyf(font1.getGlyfByCode(c.code))
                 if (code != 0) {
                     contentArray[index] = code.toChar()
                 }
@@ -557,9 +558,9 @@ interface JsExtensions {
     ): String {
         return EncoderUtils.decryptAES(
             data.encodeToByteArray(),
-            EncoderUtils.base64DecodeToByteArray(key, 2)!!,
+            io.legado.app.utils.Base64.decode(key, 2),
             "${mode}/${padding}",
-            EncoderUtils.base64DecodeToByteArray(iv, 2)!!
+            io.legado.app.utils.Base64.decode(iv, 2)
         )?.toString(Charsets.UTF_8) ?: ""
     }
 
@@ -587,9 +588,9 @@ interface JsExtensions {
     ): String {
         return EncoderUtils.decryptBase64DES(
             data.encodeToByteArray(),
-            EncoderUtils.base64DecodeToByteArray(key, 2)!!,
+            io.legado.app.utils.Base64.decode(key, 2),
             "${mode}/${padding}",
-            EncoderUtils.base64DecodeToByteArray(iv, 2)!!
+            io.legado.app.utils.Base64.decode(iv, 2)
         )?.toString(Charsets.UTF_8) ?: ""
     }
 
@@ -602,9 +603,9 @@ interface JsExtensions {
     ): String {
         return EncoderUtils.encryptAES2Base64(
             data.encodeToByteArray(),
-            EncoderUtils.base64DecodeToByteArray(key, 2)!!,
+            io.legado.app.utils.Base64.decode(key, 2),
             "${mode}/${padding}",
-            EncoderUtils.base64DecodeToByteArray(iv, 2)!!
+            io.legado.app.utils.Base64.decode(iv, 2)
         )?.toString(Charsets.UTF_8) ?: ""
     }
 
@@ -688,17 +689,17 @@ interface JsExtensions {
     ): String {
         return EncoderUtils.encryptDES2Base64(
             data.encodeToByteArray(),
-            EncoderUtils.base64DecodeToByteArray(key, 2)!!,
+            io.legado.app.utils.Base64.decode(key, 2),
             "${mode}/${padding}",
-            EncoderUtils.base64DecodeToByteArray(iv, 2)!!
+            io.legado.app.utils.Base64.decode(iv, 2)
         )?.toString(Charsets.UTF_8) ?: ""
     }
 
     fun digestHex(data: String, algorithm: String): String {
-        return EncoderUtils.digestHex(data, algorithm)
+        return io.legado.app.utils.DigestUtil.digester(algorithm).digestHex(data)
     }
 
     fun digestBase64Str(data: String, algorithm: String): String {
-        return EncoderUtils.digestBase64Str(data, algorithm)
+        return io.legado.app.utils.Base64.encodeToString(io.legado.app.utils.DigestUtil.digester(algorithm).digest(data), 2)
     }
 }
