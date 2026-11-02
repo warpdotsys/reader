@@ -156,12 +156,12 @@ class WebdavController(
         if (!appConfig.secure) {
             return true
         }
-        val authorization = context.request().getHeader("Authorization")
+        val authorization: String? = context.request().getHeader("Authorization")
         logger.info("authorization: ***", authorization)
         if (authorization == null || authorization.isEmpty()) {
             return false
         }
-        val auth = EncoderUtils.base64Decode(authorization.replace("Basic ", "", true)).split(":")
+        val auth = EncoderUtils.base64Decode(authorization.replace("Basic ", "", true)).split(":", limit = 2)
         if (auth.size < 2) {
             return false
         }

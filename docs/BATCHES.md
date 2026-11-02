@@ -957,7 +957,7 @@ copy/lock/unLock）都返回 `Unit` 且以 `context.response()...end()` 收尾�
 
 | 方法 | 差异性质 |
 | --- | --- |
-| `checkAuthorization` | 内联 `isEmpty` 的稳定化往返（制品 211 条 / 我们 191 条），分支条件与调用一致 |
+| `checkAuthorization` | 内联 `isEmpty` 的稳定化往返（制品 211 条 / 我们 191 条）：制品在 `checkcast CharSequence` **之前**多一对 `astore/aload`，且该槽在 LVT 里没有条目——是编译器自动插的临时，1.5.21 已优化掉。`split` 那处已按制品补成 `split(":", limit = 2)`（`iconst_0; iconst_2; iconst_2` 逐条相同），但整体仍是 loose。 |
 | `_init_$lambda-1` | switch 表项数值整体差 4（前置指令数不同），分支目标同比位移 |
 | `webdavList` | 同上的目标位移；`formatter` 调用点语义一致 |
 | `webdavUpload` / `webdavMove` / `webdavCopy` | 同上：分支目标位移 2~4，指令语义一致 |
