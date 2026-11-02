@@ -1127,8 +1127,9 @@ Caused by: java.lang.IllegalStateException: No mapping for symbol:
   VALUE_PARAMETER INSTANCE_RECEIVER name:<this> type:io.legado.app.data.entities.Book
 ```
 
-试过无效：`@get:JsonProperty`、`@JsonProperty`（默认 target）、完全去掉注解——
-**与注解无关**，跟构造参数个数也无关。
+试过无效：`@get:JsonProperty`、`@JsonProperty`（默认 target）、完全去掉注解——**与注解无关**。
+（`BookChapter` 13 个参数带 `isVolume` 原样写不崩，`Book` 33 个参数带 `isInShelf` 崩，
+参数规模可能是相关因素之一，按实际编译结果判断，别一概而论。）
 
 **真正触发的是三件套同时成立**（对照实验逐条排出来的）：
 
@@ -1169,8 +1170,38 @@ Kotlin 内部按属性名 `inShelf` 走 codegen（不匹配 `is` 前缀规则）
 ABI 无新增差异（545 比对 / 515 一致 / 12 不一致，仍是 3a-10 的 1 处 + 2d 批 11 处）**
 
 与 `Book` 同构：data class + `variableMap` 惰性委托 + `Companion` 缓存表。
-`variableMap$2` 的差异是惰性初始化的 lambda 里集合装配顺序（1.5.21 稳定化往返），
-不影响语义。
+本体 `BookChapter` 全部方法指令级一致；只有 `BookChapter$variableMap$2` 的 `invoke()` 差 1 处。
+
+#### 规约
+
+1. **13 个参数的 data class 带 `isXxx` 布尔属性不会触发 3a-10 的 IR 崩溃**——
+   `var isVolume: Boolean = false` 原样写即可，**不要预先套 `@get:JvmName`**：那会把私有字段名
+   从 `isVolume` 变成 `volume`，反而造出一处 ABI 差异。（`Book` 是 33 个参数才崩，
+   两处的差别说明参数规模可能相关，别一概而论，按实际编译结果判断。）
+2. **属性还是函数，用 `@Metadata` 的 `d2` 判定，不要猜**：属性会在 d2 里**同时**出现属性名和
+   getter 名（`"variableMap"`, `"getVariableMap"`）；`getAbsoluteURL` / `getFileName`
+   只出现方法名 → 它们是 `fun getAbsoluteURL()`，不是 `val absoluteURL`。
+3. **`x.substring(0, n)` 不必绕**：Kotlin 走 `kotlin.text` 内联，自动生成
+   `(this as java.lang.String)` 的 NPE 分支 + `checkNotNullExpressionValue`，与制品逐条相同。
+   （与 3a-2 里 `length` 的陷阱方向相反——那里要绕，这里不要。）
+4. **内联扩展函数的差异源自被内联的函数体，与调用点无关**。`variableMap$2` 里多出的
+   `$this$fromJsonObject$lambda-0` 槽、少的 `as?` 转换，来自 `GsonExtensionsKt.fromJsonObject`
+   （该文件在册已是「结构差异 5」）；`Book`、`RssArticle`、
+   `AnalyzeUrl$UrlOption$getHeaderMap$$inlined$fromJsonObject$1`、
+   `SourceAnalyzer…$$inlined$fromJsonObject$1~11` 上都是同一形态。
+   **改调用点只会同时破坏其他类**，修要去修被内联的那个文件。
+
+#### 待验证：全仓库的 `@Metadata` 模块名
+
+`javap -v` 全文 diff 显示本类与制品只剩两类差异：`LineNumberTable`，以及
+常量池 `#378 = Utf8 reader-pro` vs `reader`（`@Metadata` 的 d2 末位）。
+根因是 `settings.gradle.kts:8 rootProject.name = "reader"`——**全仓库每个 Kotlin 类都带这条**。
+
+**已核实：不影响判据。** `verify-bytecode.ps1` 在 javap 反汇编层面比对，
+第 121 行显式跳过 `LineNumberTable` / `LocalVariableTable` / `StackMapTable` / `Exceptions`，
+不看 `@Metadata`；`verify-abi.ps1` 里零处提及 Metadata。所以**不要**为了这条去改
+`rootProject.name`——改了只会连带影响产物名，判据一分不涨。只在需要「`javap -v` 全文
+逐字节相等」这种超验收时才要动它。
 
 ### 3a-12 `SearchBook` + `Cookie` / `Cache` / `SearchKeyword`
 
