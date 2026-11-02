@@ -1374,3 +1374,38 @@ ABI 无变化（548 比对 / 518 一致 / 12 不一致）。
 analyzeRule 包里除 `AnalyzeRule` / `AnalyzeUrl` / `AnalyzeByJSoup` / `RuleAnalyzer` /
 `QueryTTF` 之外的分析器都已就位。这两个都能直接引用制品里的接口类型编译通过，
 不需要等 `AnalyzeRule` 本体还原。
+
+#### 规约（8 条，全部实测）
+
+1. **`internal` 函数的 JVM 名带模块名后缀——这是 ABI 级的差异**。本仓库
+   `rootProject.name = "reader"`，`internal fun getElements(...)` 会编成 `getElements$reader`；
+   制品模块名是 `reader-pro`，期望 `getElements$reader-pro`。子代理的解法是显式
+   `@JvmName("getElements\$reader_pro")`（`$` 必须转义成 `\$`，否则被当字符串模板），
+   代价是 Kotlin 层可见性变成 `public`。
+
+   > ⚠️ **这条修正了 3a-11 末段的判断**。那里说「`@Metadata` 模块名不影响判据」——
+   > 那部分是对的（两个脚本确实不看 d2），**但模块名还决定 `internal` 成员的 JVM 名**，
+   > 而 JVM 名是 verify-abi 直接比对的。所以 `rootProject.name` 到底该不该改，
+   > 取决于工程里还剩多少 `internal` 成员：改成 `reader-pro` 能让所有 internal 函数名
+   > 自动正确，代价只是产物名变化。**下次全量验证时应该试一次**，看 ABI 一致数是否上升。
+
+2. **`ctx.read(rule)` 直接推断 T 编不过**（`Not enough information to infer type variable T`）。
+   `ctx.read<Any>(rule)` 给的是非平台类型、不插断言；`return ctx.read(rule)`（由返回类型推断）
+   会插 `checkNotNullExpressionValue(t, "ctx.read(rule)")`。同一份文件里两种写法并存，
+   说明原文就不同——不要统一。
+3. **`arrayListOf()` 与 `ArrayList()` 在方法体内也不同**：前者多一条 inline 标记
+   `iconst_0; istore`。制品里 `jxNodes` / `result` / `results` 无标记、`textList` 有标记，
+   不能统一处理。
+4. **`for (i in 0..size - 1)` ≠ `for (i in list.indices)`**：前者 `iconst_1; isub` +
+   `if_icmpne`，后者 `iconst_m1; iadd` + `if_icmple`。制品用 `indices`
+   （`getList` 里则是 `0 until size`，`if_icmpge/if_icmplt`）。
+5. **`if (x == null) continue` / `?: continue` 编成 `ifnonnull +2; goto`**；
+   `if (x != null && x.isNotEmpty()) { … }` 才是单条 `ifnull → 循环头`。
+   同理 `if (cond) continue` 是 `ifeq +2; goto`，`if (!cond) { … }` 才是单条 `ifne`。
+6. **`Intrinsics.areEqual` 的参数顺序暴露源码次序**：同一方法里 `"%%" == elementsType`
+   （常量在左）与 `elementsType == "||"`（常量在右）并存，必须逐处对照。
+7. **`getResult(xPath)?.map { result.add(it.asString()) }`** 是原文写法——`add` 的 `Boolean`
+   被当成 map 结果再丢弃，不是 `mapTo` 也不是 `forEach`；
+   `ctx.let { try { return it.read(...) } catch … }` 同理（`let` 内 `it: ReadContext`）。
+8. **`let` 的展开在 1.5.21 里带 3 个 `iconst_0; istore` 标记**
+   （`arrayListOf` / `isEmpty` 各 1 个，`map` 是 `$i$f$map` + `$i$f$mapTo` + 1 个 lambda 标记）。
