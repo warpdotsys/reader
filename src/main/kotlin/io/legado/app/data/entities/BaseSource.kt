@@ -19,7 +19,7 @@ interface BaseSource : JsExtensions {
     var loginUi: String?
     var header: String?
     var enabledCookieJar: Boolean?
-    var tag: String
+    val tag: String
 
     val key: String
 
