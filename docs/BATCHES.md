@@ -1171,3 +1171,13 @@ ABI 无变化（548 比对 / 518 一致 / 12 不一致）。
 `RuleData` 是 `RuleDataInterface` 的唯一实现，`AnalyzeByRegex` 只依赖接口类型，
 所以这三个能一起切。剩下的 `AnalyzeRule`（2420 行）/ `AnalyzeUrl`（2842 行）/
 `AnalyzeByJSoup`（916）/ `RuleAnalyzer`（765）/ `QueryTTF`（601）每一个都是独立的大工程。
+
+### 3a-16 `Debug` / `DebugKt` / `DebugLog` / `DebugLogKt`
+
+**状态：15 个类全部指令级完全一致。**
+
+四个文件是一组不可拆的单元：`DebugKt` / `DebugLogKt` 是只有 logger 的门面，
+单独写不会生成 `access$getLogger$p`（skill 里已记的坑），必须跟本体一起做。
+
+`DebugLog` 是接口，`log(url, msg, isLog = false)` 带默认参数——analyzeRule / rss 包
+大量 `debugLog?.log(...)` 全都靠它。这一批通了，`rss` 包的前置条件就只剩 `AnalyzeRule`。
