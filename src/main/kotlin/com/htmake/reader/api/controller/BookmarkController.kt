@@ -20,13 +20,13 @@ class BookmarkController(coroutineContext: CoroutineContext) :
     }
 
     override fun checker(var1: JsonObject, var2: Bookmark): Boolean {
-        return var2.time == var1.getLong("time")
+        return var2.time.equals(var1.getLong("time"))
     }
 
     override fun beforeSave(var1: Bookmark, db: DB<Bookmark>): ReturnData? {
         val returnData = ReturnData()
-        if (var1.bookName.length == 0) {
-            if (var1.bookAuthor.length == 0) {
+        if (var1.bookName.isEmpty()) {
+            if (var1.bookAuthor.isEmpty()) {
                 return returnData.setErrorMsg("书签信息错误")
             }
         }

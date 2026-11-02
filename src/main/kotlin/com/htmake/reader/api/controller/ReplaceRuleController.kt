@@ -25,10 +25,10 @@ class ReplaceRuleController(coroutineContext: CoroutineContext) :
 
     override fun beforeSave(var1: ReplaceRule, db: DB<ReplaceRule>): ReturnData? {
         val returnData = ReturnData()
-        if (var1.name.length == 0) {
+        if (var1.name.isEmpty()) {
             return returnData.setErrorMsg("名称不能为空")
         }
-        if (var1.pattern.length == 0) {
+        if (var1.pattern.isEmpty()) {
             return returnData.setErrorMsg("规则不能为空")
         }
         return null
