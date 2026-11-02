@@ -844,3 +844,64 @@ BookSourceController 家族（18 个类）：
 
 这 10 项都已核对：同样的调用、同样的常量、同样的分支条件，没有语义差异；
 但**没有**做到指令级一致，按 `docs/GOAL.md` 记 loose，不宣称完成。
+
+### 3a-4 `FileController`（1443 行 CFR ≈ 12 个 suspend 成员，衍生 15 个类）
+
+**状态：15 个类名逐一相同；14 个类指令级一致，本体 3 个方法只剩分支目标位移**
+
+制品形态：`class ... : BaseController(coroutineContext)`，无字段、无 `open`，
+12 个 `suspend` 成员各带一个状态机，`checkAccess` 另有一个默认参数桥
+（`isSave`/`isDelete` 掩码 2/4）。
+
+#### 规约（顺序即试错顺序）
+
+1. **`context.fileUploads()` 的空判断写成 `== null || isEmpty()`，不是 `isNullOrEmpty()`**。
+   `isNullOrEmpty()` 生成 `checkcast java/util/Collection` + `Collection.isEmpty()`
+   + 两个内联标记；制品是 `ifnull` + `Set.isEmpty()`（无 checkcast）。这一条差 11 条指令。
+2. **平台类型"就地承接"还是"声明成可空"，决定后面有没有 `checkNotNullExpressionValue`**。
+   `var path = context.request().getParam("path")`（`String!`）后面 `path.toDir(true)`
+   会插断言；写成 `var path: String? = null; path = getParam(...)` 就没有。
+   制品 `upload` 是前者，`list/get/save/mkdir/delete/restore/download` 是后者——
+   两种都合法，只能按断言有无来选。
+3. **`var x = json.getString("k", "") ?: ""` 直接声明**：没有 `aconst_null` 初始化，
+   且变量槽位排在 elvis 临时槽**之前**（path=5、temp=6）。写成
+   `var x: String? = null` 再赋值会多一对 `aconst_null; astore`。
+4. **`home: Any?` 参与字符串拼接要写 `(home as String?)`**。`as String` 在 1.5.21 上会多一对
+   `astore/aload`；`as String?` 直接是 `aload; checkcast String; stringPlus`。
+   **参数位置没法用 `as String?`**，所以那 3 个方法留下了这 1 对往返。
+5. **循环体用 `if (cond) { body }`，不要 `if (!cond) return@forEach`**。后者在内联展开里是
+   `ifeq + goto` 两条，制品是一条 `ifne`/`ifeq` 直接跳到循环尾。
+6. **`importPreview` 的 `paths` 必须是 `var`**，才会出现 `aload; astore; aload; checkcast Iterable`
+   的稳定化往返；`deleteMulti` 同一个表达式用的是 `val`——两处不能统一。
+7. **`when (ext) { "txt", "pdf", … -> }` 与 `if (ext != "txt" && …)` 不能互换**：
+   前者是一次 `hashCode` lookupswitch + 一次 `switch(tmp)`（`parse`），
+   后者是 5 次 `Intrinsics.areEqual` 短路链（`importPreview`）。
+8. **`Book.userNameSpace` 是函数不是属性**：字段是 `private transient _userNameSpace`，
+   只有 `setUserNameSpace(x)` / `getUserNameSpace()`。
+9. **`context.success(x)` 是 `RoutingContext` 的扩展函数**，不是 `success(context, x)`。
+10. **`logger.info(msg, context.get(...))` 会选中 `info(String, Throwable)` 重载**（平台类型同时适配）。
+    要 `context.get<Any>("__FILE_HOME__")` 才会落到 `info(String, Object)`，制品是后者。
+11. **引用制品里的 `BookController` 会让增量编译炸**：`gradlew classes` 报
+    `unresolved supertypes: BaseController`，`clean classes` 正常。验证本类必须 clean 后编译。
+
+#### 核验
+
+```
+已比对类数         : 15
+指令序列完全一致   : 14
+仅局部装配不同     : 0
+结构与调用不同     : 1
+无法比对           : 0
+```
+
+#### 已登记的 loose 档差异（3 个方法，全在本体）
+
+| 方法 | 差异性质 |
+| --- | --- |
+| `list` | `replace(it.toString(), home as String, "")` 处多一对 `astore/aload`（1.5.21 的 smart-cast 稳定化），3 处分支目标位移 2 |
+| `upload` | 同上，4 处分支目标位移 2 |
+| `parse` | 同上，13 处分支 + 5 个 lookupswitch 表项位移 4，及其后槽位重编号 +1 |
+
+这 3 项已核对：过滤掉 `astore/aload` 往返后指令序列逐条相同，只差分支目标数值，
+无任何调用、常量、分支条件差异。把 `var home` 降级成 `val` 能让这 3 处对上，
+但会丢掉制品里的 `aconst_null; astore`，差异只是换位置，所以保留更接近原文的写法。
