@@ -37,22 +37,22 @@
 由 `scripts/class-coverage.ps1` 产出，不靠口报：
 
 ```
-制品应用类   : 936        （501 个已编译 + 453 个还缺，另有 18 个多出）
-本仓库已编译 : 501
-已适配       : 483
+制品应用类   : 936        （508 个已编译 + 446 个还缺，另有 18 个多出）
+本仓库已编译 : 508
+已适配       : 490
 多出         : 18         （已知：合成 lambda 命名与制品不同，逐个登记在案）
 
 还缺的类按档位（类 / 顶层类）：
   strict   : 113 类 / 33 顶层类
-  loose    : 328 类 / 17 顶层类
+  loose    : 321 类 / 16 顶层类
   excluded :  12 类 /  2 顶层类
 
 已完成的类按档位：
   strict   : 145
-  loose    : 354
+  loose    : 361
   excluded :   2
 
-ABI 闸门（501 个已编译类，其中 18 个制品无此类）：一致 472 / 不一致 11，
+ABI 闸门（508 个已编译类，其中 18 个制品无此类）：一致 479 / 不一致 11，
 11 处全部是第 2d 批登记的既有差异。
 ```
 **一个要记住的口径问题**：验证以**类**为单位（ABI 与字节码都是类级），但工作量以
@@ -65,8 +65,8 @@ ABI 闸门（501 个已编译类，其中 18 个制品无此类）：一致 472 
 ## 缺口
 
 - 严格档已落地 145 个类（utils 的 6 个严格文件、epublib/umdlib/kxml2、db、config 等）。
-- 还有 25 个方法只做到"行为等价"而非"指令一致"（`BaseController` 6 个、
-  `BookSourceController` 10 个、`FileController` 3 个、`WebdavController` 6 个），
-  逐条列在 `docs/BATCHES.md` 第 3a 批。
+- 还有 32 个方法只做到"行为等价"而非"指令一致"（`BaseController` 6、
+  `BookSourceController` 10、`FileController` 3、`WebdavController` 6、
+  `RssSourceController` 7），逐条列在 `docs/BATCHES.md` 第 3a 批。
 - 行为证据仍然为零——这是整个项目最大的缺口，也是阶段二存在的理由。
 

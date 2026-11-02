@@ -964,3 +964,43 @@ copy/lock/unLock）都返回 `Unit` 且以 `context.response()...end()` 收尾�
 
 这 6 项都已核对：调用目标、字符串常量、分支条件一致，差异只在局部槽位与目标偏移；
 按 `docs/GOAL.md` 记 loose。
+
+### 3a-6 `RssSourceController`（842 行 CFR ≈ 8 个成员，衍生 9 个类）
+
+**状态：9 个类名逐一相同；8 个类指令级一致，本体 7 个方法停在 loose（局部装配）**
+
+这一批是**替换占位**：原文件只有 `private val logger`（7 行），被差集脚本当成「已还原」。
+按 skill 的规矩整份重写，不保留占位。
+
+#### 规约
+
+1. **循环里被重新赋值的集合变量必须声明成非空类型**。`var list = asJsonArray(...)` +
+   `if (list == null) list = JsonArray()` 这种两段式，一旦在循环体内再赋值
+   （`list = JsonArray(newList)`），Kotlin 的 smart cast 在后续迭代里失效，
+   报 `Only safe calls are allowed`。改成
+   `var rssSourceList: JsonArray = asJsonArray(...) ?: JsonArray()`。
+2. **`RssSource.fromJson(str)` 返回 `Result<RssSource>`**，要 `.getOrNull()` 解包；
+   制品里是 `Result.isFailure-impl ? null : value` 的内联形态。平台类型传参不写 `!!`。
+3. **`Rss.getArticles(sortName, sortUrl, rssSource, page, Debug)` 与
+   `Rss.getContent(article, ruleContent, rssSource, Debug)` 都是 suspend**，在 suspend 方法里直接调用；
+   `Debug` 是 `io.legado.app.model.Debug` 这个 object（实现 `DebugLog` 接口），不是 `io.legado.app.model.rss.Debug`。
+4. **`_rssSource.sourceUrl != rssSource.sourceUrl` 用 `!=`**：两侧都是非空 String，
+   编译成 `String.equals`；写成 `.equals(...)` 反而要 import。
+5. **`context.bodyAsJson.getString("sortName", "")` 仍要 `!!`**：带默认值不等于返回非空，
+   Vert.x 的 `JsonObject.getString(String, String)` 在 Kotlin 侧仍是平台类型。
+
+#### 核验
+
+```
+已比对类数         : 9
+指令序列完全一致   : 8
+仅局部装配不同     : 0
+结构与调用不同     : 1
+无法比对           : 0
+```
+
+#### 已登记的 loose 档差异（7 个方法）
+
+`getRssSources` / `saveRssSource` / `saveRssSources` / `deleteRssSource` /
+`getRssSourceByURL` / `getRssArticles` / `getRssContent` 全是同一类：局部变量顺序不同
+（多一对 `astore/aload` 的稳定化往返），调用目标、字符串常量、分支条件一致。
