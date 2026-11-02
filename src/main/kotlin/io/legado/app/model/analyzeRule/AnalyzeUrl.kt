@@ -177,7 +177,7 @@ class AnalyzeUrl(
                 option.body?.let { body = it.toString() }
                 type = option.type
                 charset = option.charset
-                retry = option.retry?.toInt() ?: 0
+                retry = option.retry ?: 0
                 useWebView = option.useWebView()
                 webJs = option.webJs
                 option.js?.let { js ->
@@ -531,9 +531,9 @@ class AnalyzeUrl(
     data class UrlOption(
         var method: String? = null,
         var charset: String? = null,
-        var headers: String? = null,
-        var body: String? = null,
-        var retry: String? = null,
+        var headers: Any? = null,
+        var body: Any? = null,
+        var retry: Int? = null,
         var type: String? = null,
         var webView: Any? = null,
         var webJs: String? = null,
@@ -544,8 +544,11 @@ class AnalyzeUrl(
             webView = if (b) true else null
         }
         fun getHeaderMap(): Map<*, *>? {
-            val header = headers ?: return null
-            return GSON.fromJsonObject<Map<String, String>>(header).getOrNull()
+            return when (val header = headers) {
+                null -> null
+                is Map<*, *> -> header
+                else -> GSON.fromJsonObject<Map<*, *>>(header.toString()).getOrNull()
+            }
         }
 
         fun useWebView(): Boolean {
