@@ -1224,6 +1224,29 @@ data class SearchKeyword(
 `Cookie.key`/`Cache.key` 在制品里没有 setter（只有 getter），所以是 `val`——
 **判断 val/var 看 javap 里有没有 `setXxx`**，比猜字段的 ACC_FINAL 更直接。
 
+#### `SearchBook` 追加规约（5 条）
+
+1. **data class 里 override 了接口的属性走 getter**（`getBookUrl()`），非 override 走 `getfield`。
+   `equals` / `hashCode` / `toString` / `copy$default` / `toBook` 全按这条生成，写错即「调用不同」。
+2. **`equals` 用 `if (cond) { return true }; return false`**，不要 `return cond`——后者多一条 `goto`。
+3. **`addOrigin` 里是 `linkedSetOf(this.origin)`**：参数 `origin` 遮蔽同名属性，
+   制品取的是字段（`aload_0; getfield`），所以不能去掉 `this.`。
+4. `infoHtml` / `tocHtml` 是**类体** `override var … = null`（不是构造参数），
+   字段序在 `variableMap$delegate` 之前；`origins` 是 `var … private set`（有 getter 无 setter）。
+5. `_userNameSpace` 沿用 `Book` 的模式：`@Transient private var` +
+   `fun setUserNameSpace(...)` + `override fun getUserNameSpace()`。
+
+#### 顺带修掉的一处真行为差异：`GsonExtensions.GSON`
+
+`GsonExtensionsKt$GSON$2.invoke()` 的制品在 `create()` 之前有两条：
+偏移 43 `GsonBuilder.disableHtmlEscaping()`、偏移 46 `setPrettyPrinting()`。
+本仓库原来没有 → 所有 `putVariable` 写出的 `variable` JSON 会变成紧凑格式且 HTML 转义，
+与制品**不兼容**。这不是字节码 aesthetics，是实打实的行为差异，已补上（待编译验证后提交）。
+
+`SearchBook$variableMap$2` / `Book$variableMap$2` / `BookChapter$variableMap$2`
+那三处「多 4 条指令」是同一个根因——`GsonExtensionsKt.fromJsonObject` 内联展开时把
+`GSON` 接收者物化进 `$this$fromJsonObject$lambda-0$iv` 槽，属于被内联文件的问题（见 3a-11 第 4 条）。
+
 ### 3a-13 `BookGroup` / `TxtTocRule`（185 / 188 行 CFR）
 
 **状态：2 个类全部指令级完全一致。**
