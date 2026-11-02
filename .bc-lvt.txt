@@ -1,0 +1,485 @@
+Compiled from "BaseController.kt"
+public class com.htmake.reader.api.controller.BaseController implements kotlinx.coroutines.CoroutineScope {
+  private final kotlin.coroutines.CoroutineContext coroutineContext;
+
+  private int loginExpireDays;
+
+  private final com.htmake.reader.config.AppConfig appConfig;
+
+  private final org.springframework.core.env.Environment env;
+
+  private final kotlinx.coroutines.sync.Mutex userMutex;
+
+  public com.htmake.reader.api.controller.BaseController(kotlin.coroutines.CoroutineContext);
+    LineNumberTable:
+      line 24: 6
+      line 25: 15
+      line 27: 21
+      line 28: 43
+      line 29: 63
+      line 24: 73
+    LocalVariableTable:
+      Start  Length  Slot  Name   Signature
+          0      74     0  this   Lcom/htmake/reader/api/controller/BaseController;
+          0      74     1 coroutineContext   Lkotlin/coroutines/CoroutineContext;
+
+  public kotlin.coroutines.CoroutineContext getCoroutineContext();
+    LineNumberTable:
+      line 24: 0
+    LocalVariableTable:
+      Start  Length  Slot  Name   Signature
+          0       5     0  this   Lcom/htmake/reader/api/controller/BaseController;
+
+  public final com.htmake.reader.config.AppConfig getAppConfig();
+    LineNumberTable:
+      line 27: 0
+    LocalVariableTable:
+      Start  Length  Slot  Name   Signature
+          0       5     0  this   Lcom/htmake/reader/api/controller/BaseController;
+
+  public final org.springframework.core.env.Environment getEnv();
+    LineNumberTable:
+      line 28: 0
+    LocalVariableTable:
+      Start  Length  Slot  Name   Signature
+          0       5     0  this   Lcom/htmake/reader/api/controller/BaseController;
+
+  public final kotlinx.coroutines.sync.Mutex getUserMutex();
+    LineNumberTable:
+      line 29: 0
+    LocalVariableTable:
+      Start  Length  Slot  Name   Signature
+          0       5     0  this   Lcom/htmake/reader/api/controller/BaseController;
+
+  public final java.lang.Object saveUserSession(io.vertx.ext.web.RoutingContext, com.htmake.reader.entity.User, boolean, kotlin.coroutines.Continuation<? super java.util.Map<java.lang.String, ? extends java.lang.Object>>);
+    LineNumberTable:
+      line 31: 63
+      line 32: 97
+      line 33: 98
+      line 31: 146
+      line 34: 190
+      line 35: 198
+      line 36: 202
+      line 37: 219
+      line 38: 222
+      line 39: 240
+      line 40: 247
+      line 42: 269
+      line 43: 274
+      line 45: 306
+      line 48: 338
+      line 49: 363
+      line 51: 369
+      line 51: 382
+      line 52: 384
+      line 53: 415
+      line 54: 420
+      line 56: 449
+      line 57: 480
+      line 59: 525
+      line 61: 532
+      line 62: 551
+      line 64: 565
+      line 66: 569
+      line 64: 581
+      line 66: 584
+    LocalVariableTable:
+      Start  Length  Slot  Name   Signature
+         97     500     0  this   Lcom/htmake/reader/api/controller/BaseController;
+         97     500     1 context   Lio/vertx/ext/web/RoutingContext;
+         97     500     2  user   Lcom/htmake/reader/entity/User;
+         97     500     3 regenerateToken   Z
+        222     147     5 tokenMap   Ljava/util/Map;
+        384     185     5 userMap   Ljava/util/Map;
+        240     129     6 expire   J
+        415     154     6 userMapJson   Lio/vertx/core/json/JsonObject;
+        532      37     7 loginData   Ljava/util/Map;
+         53     544    13 $continuation   Lkotlin/coroutines/Continuation;
+         60     537    12 $result   Ljava/lang/Object;
+
+  public static java.lang.Object saveUserSession$default(com.htmake.reader.api.controller.BaseController, io.vertx.ext.web.RoutingContext, com.htmake.reader.entity.User, boolean, kotlin.coroutines.Continuation, int, java.lang.Object);
+    LineNumberTable:
+      line 31: 0
+
+  public final java.lang.Object checkAuth(io.vertx.ext.web.RoutingContext, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
+    LineNumberTable:
+      line 70: 60
+      line 71: 93
+      line 72: 103
+      line 74: 108
+      line 75: 141
+      line 76: 148
+      line 77: 153
+      line 78: 168
+      line 79: 180
+      line 82: 185
+      line 83: 229
+      line 83: 254
+      line 84: 257
+      line 84: 270
+      line 85: 272
+      line 86: 303
+      line 87: 308
+      line 87: 352
+      line 89: 356
+      line 90: 385
+      line 91: 396
+      line 92: 409
+      line 93: 422
+      line 93: 443
+      line 364: 464
+      line 369: 471
+      line 370: 479
+      line 372: 487
+      line 369: 495
+      line 374: 497
+      line 364: 515
+      line 93: 519
+      line 94: 521
+      line 94: 551
+      line 95: 554
+      line 96: 557
+      line 96: 585
+      line 97: 601
+      line 100: 604
+      line 101: 617
+      line 102: 640
+      line 103: 645
+      line 104: 657
+      line 105: 683
+      line 107: 686
+      line 110: 729
+      line 112: 739
+      line 115: 746
+      line 117: 751
+      line 70: 793
+      line 118: 829
+      line 119: 845
+      line 121: 857
+      line 126: 871
+    LocalVariableTable:
+      Start  Length  Slot  Name   Signature
+         93     694     0  this   Lcom/htmake/reader/api/controller/BaseController;
+         93     694     1 context   Lio/vertx/ext/web/RoutingContext;
+        141     646     3 username   Ljava/lang/String;
+        148     639     4 userInfo   Lcom/htmake/reader/entity/User;
+        229     558     5 accessToken   Ljava/lang/String;
+        272     515     6 userMap   Ljava/util/Map;
+        303     484     7 userMapJson   Lio/vertx/core/json/JsonObject;
+        385     402     8   tmp   Ljava/util/List;
+        409     378     9 _username   Ljava/lang/String;
+        422     365    10 token   Ljava/lang/String;
+        521     266    11 existedUser   Lcom/htmake/reader/entity/User;
+        557     230    12 isLogin   Z
+        461      55    13 $this$toDataClass$iv   Ljava/util/Map;
+        640     106    13 tokenMap   Ljava/util/Map;
+        468      47    15 $this$convert$iv$iv   Ljava/lang/Object;
+        497      18    17 json$iv$iv   Ljava/lang/String;
+        471      44    16 $i$f$convert   I
+        464      52    14 $i$f$toDataClass   I
+         50     826    19 $continuation   Lkotlin/coroutines/Continuation;
+         57     819    18 $result   Ljava/lang/Object;
+
+  public final boolean checkManagerAuth(io.vertx.ext.web.RoutingContext);
+    LineNumberTable:
+      line 130: 7
+      line 131: 17
+      line 133: 19
+      line 133: 46
+      line 134: 49
+      line 136: 51
+      line 137: 91
+      line 139: 105
+      line 140: 133
+      line 140: 165
+      line 141: 168
+      line 143: 182
+      line 145: 192
+      line 147: 194
+    LocalVariableTable:
+      Start  Length  Slot  Name   Signature
+        133      61     3 userNS   Ljava/lang/String;
+         91     105     2 secureKey   Ljava/lang/String;
+          0     196     0  this   Lcom/htmake/reader/api/controller/BaseController;
+          0     196     1 context   Lio/vertx/ext/web/RoutingContext;
+
+  public final java.lang.String getUserNameSpace(io.vertx.ext.web.RoutingContext);
+    LineNumberTable:
+      line 151: 7
+      line 152: 17
+      line 155: 21
+      line 156: 27
+      line 157: 40
+      line 157: 69
+      line 158: 72
+      line 160: 74
+      line 161: 87
+      line 162: 91
+      line 164: 93
+    LocalVariableTable:
+      Start  Length  Slot  Name   Signature
+         40      57     2 userNS   Ljava/lang/String;
+         87      10     3 username   Ljava/lang/String;
+          0      97     0  this   Lcom/htmake/reader/api/controller/BaseController;
+          0      97     1 context   Lio/vertx/ext/web/RoutingContext;
+
+  public final java.lang.String getUserStorage(java.lang.Object, java.lang.String...);
+    LineNumberTable:
+      line 168: 14
+      line 169: 18
+      line 170: 21
+      line 171: 41
+      line 173: 54
+      line 173: 78
+      line 174: 81
+      line 176: 127
+    LocalVariableTable:
+      Start  Length  Slot  Name   Signature
+         18     161     3 userNameSpace   Ljava/lang/String;
+          0     179     0  this   Lcom/htmake/reader/api/controller/BaseController;
+          0     179     1 context   Ljava/lang/Object;
+          0     179     2  path   [Ljava/lang/String;
+
+  public final void saveUserStorage(java.lang.Object, java.lang.String, java.lang.Object);
+    LineNumberTable:
+      line 180: 21
+      line 181: 26
+      line 182: 29
+      line 183: 50
+      line 185: 64
+      line 185: 89
+      line 186: 92
+      line 188: 121
+    LocalVariableTable:
+      Start  Length  Slot  Name   Signature
+         26     130     4 userNameSpace   Ljava/lang/String;
+          0     156     0  this   Lcom/htmake/reader/api/controller/BaseController;
+          0     156     1 context   Ljava/lang/Object;
+          0     156     2  path   Ljava/lang/String;
+          0     156     3 value   Ljava/lang/Object;
+
+  public final com.htmake.reader.entity.User getUserInfoClass(java.lang.String);
+    LineNumberTable:
+      line 192: 7
+      line 375: 27
+      line 380: 34
+      line 381: 42
+      line 383: 50
+      line 380: 58
+      line 385: 60
+      line 375: 78
+      line 192: 82
+      line 193: 83
+    LocalVariableTable:
+      Start  Length  Slot  Name   Signature
+         34      44     7 $i$f$convert   I
+         60      18     8 json$iv$iv   Ljava/lang/String;
+         31      47     6 $this$convert$iv$iv   Ljava/lang/Object;
+         27      52     5 $i$f$toDataClass   I
+         24      55     4 $this$toDataClass$iv   Ljava/util/Map;
+         83       2     2  user   Lcom/htmake/reader/entity/User;
+          0      85     0  this   Lcom/htmake/reader/api/controller/BaseController;
+          0      85     1 username   Ljava/lang/String;
+
+  public final java.util.Map<java.lang.String, java.lang.Object> getUserInfoMap(java.lang.String);
+    LineNumberTable:
+      line 197: 7
+      line 197: 28
+      line 198: 31
+      line 200: 33
+      line 200: 45
+      line 201: 46
+      line 202: 76
+      line 203: 80
+      line 205: 107
+      line 205: 144
+    LocalVariableTable:
+      Start  Length  Slot  Name   Signature
+         46      99     2 userMap   Ljava/util/Map;
+         76      69     3 userMapJson   Lio/vertx/core/json/JsonObject;
+          0     145     0  this   Lcom/htmake/reader/api/controller/BaseController;
+          0     145     1 username   Ljava/lang/String;
+
+  public final java.util.Map<java.lang.String, java.lang.Object> formatUser(java.lang.Object);
+    LineNumberTable:
+      line 209: 7
+      line 210: 9
+      line 211: 16
+      line 212: 32
+      line 213: 36
+      line 386: 42
+      line 391: 49
+      line 392: 57
+      line 394: 65
+      line 391: 73
+      line 396: 75
+      line 386: 93
+      line 213: 97
+      line 216: 101
+      line 218: 106
+      line 219: 110
+      line 219: 122
+      line 222: 123
+      line 223: 144
+      line 222: 158
+      line 224: 160
+      line 222: 196
+      line 225: 198
+      line 222: 212
+      line 226: 214
+      line 222: 228
+      line 227: 230
+      line 222: 244
+      line 228: 247
+      line 222: 261
+      line 229: 264
+      line 222: 278
+      line 230: 281
+      line 222: 295
+      line 231: 298
+      line 222: 312
+      line 221: 313
+    LocalVariableTable:
+      Start  Length  Slot  Name   Signature
+         49      44     7 $i$f$convert   I
+         75      18     8 json$iv$iv   Ljava/lang/String;
+         46      47     6 $this$convert$iv$iv   Ljava/lang/Object;
+         42      52     5 $i$f$toDataClass   I
+         39      55     4 $this$toDataClass$iv   Ljava/util/Map;
+         32      66     3 userMap   Ljava/util/Map;
+          9     308     2  user   Lcom/htmake/reader/entity/User;
+          0     317     0  this   Lcom/htmake/reader/api/controller/BaseController;
+          0     317     1 userInfo   Ljava/lang/Object;
+
+  public final java.lang.String getUserWebdavHome(java.lang.Object);
+    LineNumberTable:
+      line 236: 7
+      line 237: 28
+      line 238: 32
+      line 239: 35
+      line 240: 55
+      line 242: 68
+      line 242: 92
+      line 243: 95
+      line 245: 120
+      line 246: 147
+      line 247: 157
+      line 248: 165
+      line 250: 171
+    LocalVariableTable:
+      Start  Length  Slot  Name   Signature
+         28     145     2 prefix   Ljava/lang/String;
+         32     141     3 userNameSpace   Ljava/lang/String;
+        157      16     4  file   Ljava/io/File;
+          0     173     0  this   Lcom/htmake/reader/api/controller/BaseController;
+          0     173     1 context   Ljava/lang/Object;
+
+  public final java.lang.String getFileExt(java.lang.String, java.lang.String);
+    LineNumberTable:
+      line 254: 14
+    LocalVariableTable:
+      Start  Length  Slot  Name   Signature
+          0      23     0  this   Lcom/htmake/reader/api/controller/BaseController;
+          0      23     1   url   Ljava/lang/String;
+          0      23     2 defaultExt   Ljava/lang/String;
+
+  public static java.lang.String getFileExt$default(com.htmake.reader.api.controller.BaseController, java.lang.String, java.lang.String, int, java.lang.Object);
+    LineNumberTable:
+      line 253: 0
+
+  public final java.lang.Object limitConcurrent(int, int, int, kotlin.jvm.functions.Function3<? super kotlinx.coroutines.CoroutineScope, ? super java.lang.Integer, ? super kotlin.coroutines.Continuation<java.lang.Object>, ? extends java.lang.Object>, kotlin.coroutines.Continuation<? super kotlin.Unit>);
+    LineNumberTable:
+      line 258: 0
+      line 261: 29
+    LocalVariableTable:
+      Start  Length  Slot  Name   Signature
+          0      30     0  this   Lcom/htmake/reader/api/controller/BaseController;
+          0      30     1 concurrentCount   I
+          0      30     2 startIndex   I
+          0      30     3 endIndex   I
+          0      30     4 handler   Lkotlin/jvm/functions/Function3;
+          0      30     5 $completion   Lkotlin/coroutines/Continuation;
+
+  public final java.lang.Object limitConcurrent(int, int, int, kotlin.jvm.functions.Function3<? super kotlinx.coroutines.CoroutineScope, ? super java.lang.Integer, ? super kotlin.coroutines.Continuation<java.lang.Object>, ? extends java.lang.Object>, kotlin.jvm.functions.Function2<? super java.util.ArrayList<java.lang.Object>, ? super java.lang.Integer, java.lang.Boolean>, kotlin.coroutines.Continuation<? super kotlin.Unit>);
+    LineNumberTable:
+      line 263: 63
+      line 264: 101
+      line 265: 104
+      line 266: 107
+      line 267: 110
+      line 269: 118
+      line 269: 128
+      line 270: 130
+      line 271: 131
+      line 272: 138
+      line 273: 144
+      line 274: 161
+      line 275: 164
+      line 279: 196
+      line 280: 200
+      line 281: 206
+      line 273: 209
+      line 285: 215
+      line 285: 225
+      line 288: 227
+      line 289: 235
+      line 263: 336
+      line 290: 442
+      line 290: 453
+      line 291: 455
+      line 292: 479
+      line 293: 480
+      line 294: 504
+      line 295: 514
+      line 296: 524
+      line 297: 540
+      line 298: 550
+      line 300: 561
+      line 302: 574
+      line 291: 576
+      line 306: 583
+      line 307: 588
+      line 310: 602
+      line 311: 611
+      line 312: 617
+      line 313: 625
+      line 316: 701
+      line 318: 709
+      line 319: 733
+      line 320: 734
+      line 263: 822
+      line 320: 894
+      line 321: 907
+      line 318: 909
+      line 325: 916
+      line 326: 921
+      line 327: 936
+      line 329: 939
+      line 330: 947
+      line 331: 970
+      line 334: 973
+      line 340: 979
+    LocalVariableTable:
+      Start  Length  Slot  Name   Signature
+        101     229     0  this   Lcom/htmake/reader/api/controller/BaseController;
+        101     229     1 concurrentCount   I
+        101     229     2 startIndex   I
+        101     229     3 endIndex   I
+        101     229     4 handler   Lkotlin/jvm/functions/Function3;
+        101     229     5 needContinue   Lkotlin/jvm/functions/Function2;
+        104     226     7 lastIndex   I
+        107     223     8 loopCount   I
+        110     220     9 resultCount   I
+        115     215    10 loopStart   J
+        625     191    12 costTime   J
+        130     200    14 deferredList   Ljava/util/ArrayList;
+        138     192    15 coroutineCount   I
+        227     589    16 resultList   Ljava/util/ArrayList;
+        158      57    17     i   I
+        455     144    17 stillDeferredList   Ljava/util/ArrayList;
+        730      86    19     i   I
+        476     107    20     i   I
+        504      67    21 deferred   Lkotlinx/coroutines/Deferred;
+         53     930    26 $continuation   Lkotlin/coroutines/Continuation;
+         60     923    25 $result   Ljava/lang/Object;
+}

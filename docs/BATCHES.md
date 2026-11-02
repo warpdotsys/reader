@@ -719,3 +719,62 @@ ABI 一致   : 411
 ABI 不一致 : 11   （全部为 2d 批已登记的既有差异）
 ```
 
+### 3a-2 `BaseController`（889 行 CFR ≈ 24 个成员，衍生 12 个类）
+
+**状态：ABI 全绿；12 个类中 11 个指令序列完全一致，本体有 6 个方法停留在 loose 档**
+
+制品里的形态：`BaseController` 是 `open class ... : CoroutineScope`，持有
+`coroutineContext` / `loginExpireDays` / `appConfig` / `env` / `userMutex` 五个字段，
+外加 3 个 suspend 方法（各自带协程状态机）。
+
+#### 规约（顺序即试错顺序）
+
+1. **必须 `open class`**。写成 `class` 会让 5 个已还原的 Controller 子类全部报
+   `This type is final, so it cannot be inherited from`，连带几十条 "receiver type mismatch"
+   的级联错误——级联信息会掩盖真正的第一因，先看**第一条**错误。
+2. **不能写 `userMutex.withLock { }`**。这样写会把 `removeAll` 的谓词编译成
+   `BaseController$saveUserSession$2$1`（多一层嵌套）；制品是 `saveUserSession$2`。
+   改成显式 `lock()` + `try { ... } finally { unlock() }` 后，12 个合成类名与制品**逐一相同**。
+   顺带：`Mutex()` 在字节码里是 `Mutex$default(false, 1, null)`，也就是走默认参数，不是 `Mutex(false)`。
+3. **`x.length == 0` 要写成 `x.isEmpty()`**。制品里是
+   `checkcast CharSequence` + `invokeinterface CharSequence.length` + 一个假布尔
+   （内联扩展的 `$i$f$` 标记）；写 `x.length` 得到的是 `invokevirtual String.length`，
+   不是同一个方法。同理 `length > 0` → `isNotEmpty()`。
+   改完差异方法从 11 个降到 10 个。
+4. **`when (context)` 而不是 `if / else if`**。`getUserStorage`、`saveUserStorage`、
+   `getUserWebdavHome` 开头那段 `is RoutingContext / is String` 分派，制品里有 subject
+   临时变量，导致后面局部槽位整体后移一格。换成 `when` 后三个方法转正。
+5. **`getUserInfoClass` 是单表达式**：`return getUserInfoMap(username)?.toDataClass<User>()`。
+   写成 `?: return null` 是早退（`aconst_null; areturn`），制品是 `aconst_null; goto <merge>`。
+6. **`limitConcurrent` 的 `coroutineCount` 必须提到 `while` 外**：制品 continuation 有
+   `I$5` 字段，说明它跨 `delay(10)` 存活；而且日志第 2 个占位符传的是 `coroutineCount`，
+   不是 `resultCount`（占位符文案叫 `concurrentCount` 是对的）。提出去之后
+   `BaseController$limitConcurrent$3` 的 ABI 转正。
+7. `appConfig` / `env` / `userMutex` 是**公开只读属性**（制品有 `getAppConfig` 等 getter），
+   不是 `private val`；`loginExpireDays` 才是 `private var`（无 getter）。
+
+#### 核验
+
+```
+已比对类数 : 452
+ABI 一致   : 423
+ABI 不一致 : 11        （全部为第 2d 批已登记的既有差异）
+
+BaseController 家族（12 个类）：
+  指令序列完全一致 : 11
+  结构与调用不同   : 1  （BaseController 本体，6 个方法）
+```
+
+#### 已登记的 loose 档差异（6 个方法，全在本体）
+
+| 方法 | 差异性质 |
+| --- | --- |
+| `getUserInfoClass` | 局部槽位整体差 1 格（制品 v3 起、我们 v2 起），指令语义等价 |
+| `getUserInfoMap` | 制品多一处内联扩展的假布尔 `iconst_0; istore`，其余等价 |
+| `formatUser` | 同上：`user == null` 分支前多一处假布尔 |
+| `checkAuth` | 状态机指令数 796 vs 703，分支布局与寄存器分配不同，语义等价 |
+| `saveUserSession` | 同上 |
+| `limitConcurrent` | 同上：外层 `block25 / block26` 的两级 `break` 结构未完全还原 |
+
+这 6 条都能对上同样的调用、同样的常量、同样的分支条件，但**没有**做到指令级一致，
+按 `docs/GOAL.md` 记 loose，不宣称完成。
