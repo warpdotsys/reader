@@ -244,7 +244,7 @@ class AnalyzeUrl(
         bindings["book"] = ruleData as? Book
         bindings["source"] = source
         bindings["result"] = result
-        return AppConst.SCRIPT_ENGINE.eval(jsStr, bindings as javax.script.Bindings)
+        return (AppConst.SCRIPT_ENGINE as javax.script.ScriptEngine).eval(jsStr, bindings)
     }
 
     fun put(key: String, value: String): String {
@@ -333,7 +333,7 @@ class AnalyzeUrl(
         }
         val concurrentRecord = fetchStart()
         setCookie(source?.key)
-        val strResponse = if (this.useWebView && useWebView) {
+        val strResponse: StrResponse = if (this.useWebView && useWebView) {
             when (method) {
                 RequestMethod.POST -> {
                     ReaderAdapterHelper.getAdapter().getStrResponseByRemoteWebview(
@@ -346,7 +346,7 @@ class AnalyzeUrl(
                         body = body,
                         userNameSpace = userNameSpace,
                         debugLog = debugLog
-                    )
+                    )!!
                 }
                 else -> {
                     ReaderAdapterHelper.getAdapter().getStrResponseByRemoteWebview(
@@ -357,7 +357,7 @@ class AnalyzeUrl(
                         javaScript = webJs ?: jsStr,
                         userNameSpace = userNameSpace,
                         debugLog = debugLog
-                    )
+                    )!!
                 }
             }
         } else {
