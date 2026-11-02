@@ -1118,3 +1118,24 @@ ABI 无新增差异（545 比对 / 515 一致 / 12 不一致，仍是 3a-10 的 
 与 `Book` 同构：data class + `variableMap` 惰性委托 + `Companion` 缓存表。
 `variableMap$2` 的差异是惰性初始化的 lambda 里集合装配顺序（1.5.21 稳定化往返），
 不影响语义。
+
+### 3a-12 `SearchBook` + `Cookie` / `Cache` / `SearchKeyword`
+
+**状态：7 个类，6 个指令级完全一致。**
+`SearchBook`（610 行 CFR，3 个类）里 `SearchBook$variableMap$2` 与 `BookChapter` 同款
+惰性初始化差异（1 个方法 loose）；另外三个小实体（112/128/130 行 CFR）**全绿**。
+
+三个小实体都是纯 data class，照抄默认值即可，没有坑：
+
+```kotlin
+data class Cookie(var url: String = "", var cookie: String = "")
+data class Cache(val key: String = "", var value: String? = null, var deadline: Long = 0L)
+data class SearchKeyword(
+    var word: String = "",
+    var usage: Int = 1,
+    var lastUseTime: Long = System.currentTimeMillis()
+)
+```
+
+`Cookie.key`/`Cache.key` 在制品里没有 setter（只有 getter），所以是 `val`——
+**判断 val/var 看 javap 里有没有 `setXxx`**，比猜字段的 ACC_FINAL 更直接。
