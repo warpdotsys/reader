@@ -9,9 +9,30 @@
 
 ## 第 2d 批 —— help（进行中）
 
-**状态：20/22 文件已还原；ABI 271/276 一致；指令完全一致 179 个类**
+**状态：闭包合并；ABI 356/374；已编译 374 / 936 类**
 
-已完成：
+### 闭包（已完成合并）
+`help` 与 `data.entities` 的核心依赖链必须整体切换，否则二进制类无法引用源码类。
+成员共 9 个文件，已全部落地：
+
+| 文件 | 行数 | 说明 |
+| --- | --- | --- |
+| `help/JsExtensions` | 1912 | 接口 + 80 个默认方法（ajax/connect/cacheFile/queryTTF/加解密…） |
+| `data/entities/BaseSource` | 1008 | 接口 + 默认实现（loginJs/headerMap/loginInfo/variable/evalJS） |
+| `model/analyzeRule/AnalyzeUrl` | 2842 | 2842 行 CFR → 约 700 行 Kotlin |
+| `data/entities/BookSource` | 1565 | 26 参 data class + Companion/Converters/ExploreKind |
+| `adapters/ReaderAdapterInterface` | 84 | 12 参 webview 方法 + 两个 getWorkDir |
+| `adapters/ReaderAdapterHelper` | 42 | object |
+| `adapters/DefaultAdpater` | 112 | workDir 分支逻辑 |
+| `help/SourceAnalyzer` | 1730 | 待做（依赖已就绪） |
+
+### 已知差异（闭包引入，11 处）
+
+- `BookSource.evalJS` 多一个编译器生成的 `throws java.lang.Exception`（继承 `BaseSource` 的 `@Throws`）
+- `AnalyzeUrl$UrlOption` 的 `headers`/`body`/`retry` 存取器类型与制品不一致（`d2` 说字段是 `Any?`/`Int?`，但制品访问器是 `String`）
+- 其余 9 处是合成 lambda 命名：`$cancel$1$1`、`$executeBlock$2`、`$ajaxAll$1`、`$connect$1/2`、`$queryTTF$font$1`、`$getHeaderMap$$inlined$fromJsonObject$1`
+
+### 已完成文件
 
 | 文件 | 语言 | 备注 |
 | --- | --- | --- |
