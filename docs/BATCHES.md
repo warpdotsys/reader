@@ -1149,3 +1149,13 @@ data class SearchKeyword(
 
 教训：`wc -l` 看到 10 行不要直接判定「占位」——**先 `grep '^data class'`**，
 骨架文件如果属性声明对，剩下的只是默认值和方法，工作量比从零写小一半。
+
+### 3a-14 `Bookmark` / `SearchResult` / `ReplaceRule`（260 / 267 / 386 行 CFR）
+
+**状态：3 个类全部指令级完全一致。**
+
+三个都是 data class，但被已还原的 controller 反向依赖（`BookmarkController` /
+`ReplaceRuleController` 用它们的字段和 `fromJson`）。补全后 controller 侧零改动、
+ABI 无变化（548 比对 / 518 一致 / 12 不一致）。
+
+到这里 `io.legado.app.data.entities` 包的顶层类已全部还原完毕。
