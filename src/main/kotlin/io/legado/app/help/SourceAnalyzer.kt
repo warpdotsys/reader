@@ -328,7 +328,7 @@ object SourceAnalyzer {
         var customOrder: Int = 0,
         var enabled: Boolean = true,
         var enabledExplore: Boolean = true,
-        var enabledCookieJar: Boolean? = false,
+        var enabledCookieJar: Boolean = false,
         var concurrentRate: String? = null,
         var header: String? = null,
         var loginUrl: Any? = null,
