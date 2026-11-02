@@ -28,7 +28,6 @@ import io.legado.app.utils.Base64
 import io.legado.app.utils.EncoderUtils
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonObject
-import io.legado.app.utils.hasUrlEncoded
 import io.legado.app.utils.isDataUrl
 import io.legado.app.utils.isJson
 import io.legado.app.utils.isXml
@@ -94,9 +93,8 @@ class AnalyzeUrl(
         }
     }
 
-    override fun getUserNameSpace(): String {
-        return ruleData?.userNameSpace ?: "unknow"
-    }
+    override val userNameSpace: String
+        get() = ruleData?.getUserNameSpace() ?: "unknow"
 
     fun initUrl() {
         ruleUrl = mUrl
@@ -217,7 +215,7 @@ class AnalyzeUrl(
             val value = if (queryM.size > 1) queryM[1] else ""
             when {
                 charset.isNullOrEmpty() -> {
-                    if (hasUrlEncoded(value)) {
+                    if (io.legado.app.utils.NetworkUtils.hasUrlEncoded(value)) {
                         fieldMap[queryM[0]] = value
                     } else {
                         fieldMap[queryM[0]] = URLEncoder.encode(value, "UTF-8")
@@ -246,7 +244,7 @@ class AnalyzeUrl(
         bindings["book"] = ruleData as? Book
         bindings["source"] = source
         bindings["result"] = result
-        return AppConst.SCRIPT_ENGINE.eval(jsStr, bindings)
+        return AppConst.SCRIPT_ENGINE.eval(jsStr, bindings as javax.script.Bindings)
     }
 
     fun put(key: String, value: String): String {
@@ -338,27 +336,25 @@ class AnalyzeUrl(
         val strResponse = if (this.useWebView && useWebView) {
             when (method) {
                 RequestMethod.POST -> {
-                    ReaderAdapterInterface.getStrResponseByRemoteWebview(
-                        ReaderAdapterHelper.getAdapter(),
-                        urlNoQuery,
-                        key = source?.key,
+                    ReaderAdapterHelper.getAdapter().getStrResponseByRemoteWebview(
+                        url = urlNoQuery,
+                        tag = source?.key,
                         headerMap = headerMap,
                         sourceRegex = sourceRegex,
-                        jsStr = webJs ?: jsStr,
-                        isPost = true,
+                        javaScript = webJs ?: jsStr,
+                        post = true,
                         body = body,
                         userNameSpace = userNameSpace,
                         debugLog = debugLog
                     )
                 }
                 else -> {
-                    ReaderAdapterInterface.getStrResponseByRemoteWebview(
-                        ReaderAdapterHelper.getAdapter(),
-                        url,
-                        key = source?.key,
+                    ReaderAdapterHelper.getAdapter().getStrResponseByRemoteWebview(
+                        url = url,
+                        tag = source?.key,
                         headerMap = headerMap,
                         sourceRegex = sourceRegex,
-                        jsStr = webJs ?: jsStr,
+                        javaScript = webJs ?: jsStr,
                         userNameSpace = userNameSpace,
                         debugLog = debugLog
                     )

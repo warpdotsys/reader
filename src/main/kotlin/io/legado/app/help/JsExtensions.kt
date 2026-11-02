@@ -42,7 +42,7 @@ import java.util.zip.ZipInputStream
 
 interface JsExtensions {
 
-    val source: BaseSource
+    val source: BaseSource?
 
     val userNameSpace: String
 
@@ -696,10 +696,10 @@ interface JsExtensions {
     }
 
     fun digestHex(data: String, algorithm: String): String {
-        return io.legado.app.utils.DigestUtil.digester(algorithm).digestHex(data)
+        return cn.hutool.crypto.digest.DigestUtil.digester(algorithm).digestHex(data)
     }
 
     fun digestBase64Str(data: String, algorithm: String): String {
-        return io.legado.app.utils.Base64.encodeToString(io.legado.app.utils.DigestUtil.digester(algorithm).digest(data), 2)
+        return io.legado.app.utils.Base64.encodeToString(cn.hutool.crypto.digest.DigestUtil.digester(algorithm).digest(data), 2)
     }
 }

@@ -125,6 +125,6 @@ interface BaseSource : JsExtensions {
         bindings["baseUrl"] = key
         bindings["cookie"] = CookieStore(userNameSpace)
         bindings["cache"] = CacheManager(userNameSpace)
-        return AppConst.SCRIPT_ENGINE.eval(jsStr, bindings)
+        return AppConst.SCRIPT_ENGINE.eval(jsStr, bindings as javax.script.Bindings)
     }
 }
