@@ -44,15 +44,21 @@ foreach ($root in $compiledRoots) {
 }
 
 if ($prefixes.Count -eq 0) {
-    Write-Warning '没有找到编译产物，回退到按源码文件名推导（可能过度排除）'
+    Write-Warning '没有找到编译产物，回退到按源码推导（会逐文件判断是否真的声明了同名类型）'
     foreach ($root in @((Join-Path $ProjectRoot 'src\main\kotlin'), (Join-Path $ProjectRoot 'src\main\java'))) {
         if (-not (Test-Path $root)) { continue }
         Get-ChildItem $root -Recurse -File -Include *.kt, *.java | ForEach-Object {
             $rel = $_.FullName.Substring($root.Length + 1).Replace('\', '/')
             $dir = if ($rel.Contains('/')) { $rel.Substring(0, $rel.LastIndexOf('/') + 1) } else { '' }
             $base = [IO.Path]::GetFileNameWithoutExtension($rel)
-            [void]$prefixes.Add("$dir$base")
-            [void]$prefixes.Add("$dir${base}Kt")
+            # 文件门面 XKt 只要文件里有顶层声明就会生成；Kotlin 源码一律按存在处理
+            if ($_.Extension -eq '.kt') { [void]$prefixes.Add("$dir${base}Kt") }
+            # 同名类型 X 只有文件里真的声明了才产出——Book.kt 里只有 logger，不能排除 Book.class
+            $text = [IO.File]::ReadAllText($_.FullName)
+            $esc = [regex]::Escape($base)
+            if ($text -match "(?m)^\s*(?:public |internal |private |abstract |open |final |sealed |data |enum |annotation )*(?:class|interface|object)\s+$esc\b") {
+                [void]$prefixes.Add("$dir$base")
+            }
         }
     }
 }
