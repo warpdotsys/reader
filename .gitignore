@@ -30,3 +30,7 @@ Thumbs.db
 
 !gradle/wrapper/gradle-wrapper.jar
 .wip/
+.abi.txt
+.bc-lvt.txt
+.bc-full.txt
+.bcdiff.txt
