@@ -1279,6 +1279,26 @@ ABI 无变化（548 比对 / 518 一致 / 12 不一致）。
 
 到这里 `io.legado.app.data.entities` 包的顶层类已全部还原完毕。
 
+#### 规约（5 条）
+
+1. **`isXxx` + data class 不必然触发 IR bug**：`ReplaceRule`（12 个参数）直接写
+   `var isEnabled` 编译正常，getter/setter 就是 `isEnabled()` / `setEnabled()`，与制品一致。
+   只有 `Book`（33 个参数）那个特例才崩——**不要反射性地改名加 `@get:JvmName`**，
+   那会给本来正确的类白造一处字段名差异。
+2. **`@JsonProperty` 必须写在 `@get:` 站点**。`ReplaceRule.isEnabled` / `isRegex` 的 getter 带注解；
+   漏掉不但少约 100 字节、常量池缺 `Lcom/fasterxml/jackson/annotation/JsonProperty;`，
+   **Jackson 还会把字段序列化成 `enabled` / `regex`——API 契约就变了**。
+3. **⚠️ 验收盲区：`verify-bytecode` 看不见注解。** `@JsonProperty` 只进
+   `RuntimeVisibleAnnotations`，指令序列一模一样。这类差异只有 `javap -v`（或类文件大小）
+   能抓到。本批三个类额外做了 `javap -v` 全量归一化 diff（LNT、常量池序号、模块名归一后零差异），
+   但**这个检查没有进脚本**，属流程缺口，登记在此备查。
+4. **val / var 一律看 `setXxx` 有无**：`SearchResult` 10 个属性全 `val`；
+   `Bookmark` 只有 `time` / `bookName` / `bookAuthor` 是 `val`。
+5. **LNT 行号不可复原**：制品 `SearchResult` 原始文件 14 行、`package` 在第 1 行、class 在第 3 行；
+   `Bookmark` class 在第 8 行、参数从第 10 行起（第 9 行有一行无字节码内容的空档）。
+   本仓库统一加 `// Restored…` 头 + KDoc 后必然偏移，属非语义差异，
+   **不要为了对齐行号去改写文件布局**。
+
 ### 3a-15 analyzeRule 包开局：`RuleDataInterface` / `RuleData` / `AnalyzeByRegex`
 
 **状态：7 个类全部指令级完全一致**（RuleDataInterface 2 + RuleData 4 + AnalyzeByRegex 1）。
