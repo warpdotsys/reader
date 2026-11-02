@@ -1033,22 +1033,53 @@ copy/lock/unLock）都返回 `Unit` 且以 `context.response()...end()` 收尾�
    `isFailure-impl ? null : value` + `checkNotNull` + `checkcast`。
    `HttpTTSController.convertToEntity` 是后者。
 
-### 3a-8 `UserController`（2015 行 CFR，21 个类，18 个成员）
+### 3a-8 `UserController`（2015 行 CFR，21 个类，19 个成员）
 
-**状态：21/21 类名一致；12/21 类指令级一致；ABI 全一致（未进不一致清单）**
+**状态：21/21 类名一致；20/21 类指令级一致；本体 10/19 成员一致，9 项 loose；
+ABI 全一致（未进不一致清单）**
+
+> ⚠️ **本批有一处真实语义差异，必须记住**：`getUserLimit`。
+> 制品是 `License.validHost(host)` + `license.userMaxLimit`；当前实现走「无许可分支」取值。
+> Kotlin 1.5.21 在 `License.kt` 与调用点**同批编译**时必崩，且分两个阶段：
+> 引用 `validHost` → psi2ir `Undefined parameter referenced: value-parameter queryHost`；
+> 降到只读属性 → IR lowering `No mapping for symbol: VALUE_PARAMETER INSTANCE_RECEIVER … License`。
+> 独立 probe（单文件 + 制品 classpath）不崩，只在整模块编译时崩，改方法体/写法/降版本都绕不过去。
+> **这一处的行为与制品不同，其它成员无语义差异。**
 
 最大的一批。`login` 一个方法就有 1007 条指令、60+ 行 LNT，状态机 17 个。
 关键教训：`uploadFile` 少写一层 `.forEach {}` 会让合成类名从
 `$lambda-7$lambda-6$` 退化成 `$lambda-6$lambda-5$`——**嵌套 lambda 的编号是从外往里
 1 递增的，少一层就整体前移**。这是本批唯一一次类名不一致，靠 diff 抓出来的。
 
-#### 规约
+#### 规约（顺序即试错顺序）
 
-1. **嵌套 lambda 的 `$lambda-N` 编号按声明顺序全类递增**，不是每方法重置。
-   改一处 lambda 的层数，后面所有编号都会移位，写完必须 diff 类名。
-2. **`getUserLimit` 里对 `License` 只读属性**（`license.userMaxLimit` 之类）不会触发
-   psi2ir 的 `Undefined parameter referenced`，可以放心用；一旦开始调
-   `License.validHost(...)` 就会崩。
+1. **`map[key]` 在制品里不是 `Map.get`**。制品是 `getOrDefault(key, null)` 加一层内联包装
+   （`astore 临时; aconst_null; astore 默认值; iconst_0; istore 标记; …; getOrDefault`）。
+   写 `userMap[username]` 得到 `Map.get`，整段少 8 条指令；写
+   `userMap.getOrDefault(username, null)` 才逐条对上（工程里能编过，独立 probe 反而报
+   "null can not be a value of a non-null type"——判据以工程编译为准）。
+2. **`saveUserSession(context, user)` 必须是两参数**。第三参 `regenerateToken` 走默认值，
+   制品是 `saveUserSession$default(..., iconst_4, aconst_null)`；写成三参数会少
+   `checkcast BaseController / iconst_4 / aconst_null` 三条。
+3. **早退 `if (!x) continue` / `return@forEach` 会多出 `ifne +2; goto`**。制品是单条
+   `ifeq/ifne` 直跳循环尾——原文写的是正向 `if (x) { … }`。
+   `getUserInfo`、`uploadFile`、`deleteUsers`、`forEachUser` 四处都是这个差别。
+4. **`$lambda-N` 编号是文件级计数器，少一层内联 lambda 就会整体差 1**。
+   症状：`forEachUser$lambda-6$lambda-5$$inlined$toDataClass$1` vs 制品的
+   `…$lambda-7$lambda-6$…`。定位手法：`javap -p -l` 抓两边的 `$i$a$-…` 名字集合，
+   差集直接指出「哪个方法少了一个 lambda」——本轮是 `uploadFile` 写成了 `for (it in …)`，
+   制品是 `context.fileUploads().forEach { … }`。
+5. **`isEmpty()` 与 `isNullOrEmpty()` 都要看 `ifnull`**：`isNullOrEmpty()` 多一条 `ifnull`
+   且多一个假布尔。制品 `login` 里 `isEmpty()` 带两个假布尔却**没有** `ifnull`，
+   1.5.21 复现不出来（`isEmpty()`=1 个标记、`isNullOrEmpty()`=2 个+`ifnull`），记编译噪声。
+6. **`var type: String? = null` 再赋平台值、且被 lambda 捕获时**，制品会插
+   `checkNotNullExpressionValue(type, "type")`；声明成平台类型（`var type = …getParam(…)`）
+   会丢掉这条断言。
+7. **`as? MutableMap<K,V>` 的形态**：制品是 `ifnull + asMutableMap + ifnull` 两段检查，
+   `as?` 生成的是 `TypeIntrinsics.isMutableMap + checkcast + goto + aconst_null`。
+8. **`logout`** 另有一处 `nop`（try 起点）位置差异和 1 处槽位差 1，属编译噪声。
+9. **恢复期验证本类必须 `rm -rf build` 后全量编译**：`build/` 里已有 `License.class` 时，
+   增量编译会报 `Cannot access class 'com.htmake.reader.entity.License' … conflicting dependencies`。
 
 ### 3a-9 `RestVerticle`（493 行 CFR，6 个类）
 
