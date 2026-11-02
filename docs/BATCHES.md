@@ -1159,3 +1159,15 @@ data class SearchKeyword(
 ABI 无变化（548 比对 / 518 一致 / 12 不一致）。
 
 到这里 `io.legado.app.data.entities` 包的顶层类已全部还原完毕。
+
+### 3a-15 analyzeRule 包开局：`RuleDataInterface` / `RuleData` / `AnalyzeByRegex`
+
+**状态：7 个类全部指令级完全一致**（RuleDataInterface 2 + RuleData 4 + AnalyzeByRegex 1）。
+
+这是 `analyzeRule` 包（49 个类、11 个顶层文件、合计 8000+ 行 CFR）的第一批，
+也是解锁 `rss` 包和 `webBook` 包的前置——之前 rss 包就是因为 `AnalyzeRule` 还是 7 行占位、
+`Cannot access class io.legado.app.data.entities.BaseSource` 而回滚的。
+
+`RuleData` 是 `RuleDataInterface` 的唯一实现，`AnalyzeByRegex` 只依赖接口类型，
+所以这三个能一起切。剩下的 `AnalyzeRule`（2420 行）/ `AnalyzeUrl`（2842 行）/
+`AnalyzeByJSoup`（916）/ `RuleAnalyzer`（765）/ `QueryTTF`（601）每一个都是独立的大工程。
