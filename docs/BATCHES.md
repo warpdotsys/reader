@@ -1139,3 +1139,13 @@ data class SearchKeyword(
 
 `Cookie.key`/`Cache.key` 在制品里没有 setter（只有 getter），所以是 `val`——
 **判断 val/var 看 javap 里有没有 `setXxx`**，比猜字段的 ACC_FINAL 更直接。
+
+### 3a-13 `BookGroup` / `TxtTocRule`（185 / 188 行 CFR）
+
+**状态：2 个类全部指令级完全一致。**
+
+这两个文件此前不是纯占位，而是**只有 10 行的 data class 骨架**（属性对、但方法/构造默认值不全）。
+补全后两个类字节码逐条相同，ABI 无变化（548 比对 / 518 一致 / 12 不一致仍是原样）。
+
+教训：`wc -l` 看到 10 行不要直接判定「占位」——**先 `grep '^data class'`**，
+骨架文件如果属性声明对，剩下的只是默认值和方法，工作量比从零写小一半。
