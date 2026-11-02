@@ -778,3 +778,69 @@ BaseController 家族（12 个类）：
 
 这 6 条都能对上同样的调用、同样的常量、同样的分支条件，但**没有**做到指令级一致，
 按 `docs/GOAL.md` 记 loose，不宣称完成。
+
+### 3a-3 `BookSourceController`（1574 行 CFR ≈ 24 个成员，衍生 18 个类）
+
+**状态：18 个类名与制品逐一相同；17 个类指令序列完全一致，本体 10 个方法记 loose**
+
+制品形态：`class ... : BaseController(coroutineContext)`，无 `open`，持有
+`private var webClient`（**不是** `val`：制品字段没有 `ACC_FINAL`），
+15 个 `suspend` 成员方法各带一个协程状态机，外加 `saveFromRemoteSource` 的
+挂起点内嵌套 `launch` 与 `awaitResult` 两层 lambda。
+
+#### 规约（顺序即试错顺序）
+
+1. **`webClient` 必须是 `var`**。`private val` 生成 `private final` 字段，制品是
+   `private io.vertx.ext.web.client.WebClient webClient;`——ABI 比对里这一条直接把类标成不一致。
+2. **`bodyAsJsonArray` 是属性**，写 `context.bodyAsJsonArray`，不是 `context.bodyAsJsonArray()`。
+   制品里 `getBodyAsJsonArray()` 由 Kotlin 属性访问生成，加括号会得到
+   `Expression ... cannot be invoked as a function`。
+3. **`File.deleteRecursively()` 是扩展**，不是顶层函数。写成 `deleteRecursively(f)`
+   报 `receiver type mismatch`，而候选列表里只列 `public fun File.deleteRecursively()`——
+   看着像类型不匹配，其实是调用形态不对。
+4. **平台类型不要写 `!!`**。`context.bodyAsString`、`getString("x")` 都是 `String!`，
+   直接传给非空参数/赋给非空变量时，编译器插入
+   `checkNotNullExpressionValue(value, "调用表达式")`；手写 `!!` 得到的是
+   `checkNotNull(value)`——两条不同指令，判据会报差异。本轮 6 处 `!!` 全去掉后转正。
+5. **`?:` 与 `if` 语句产生不同 CFG**。制品用显式 `if (x == null) { x = ... }`
+   （`astore; aload; ifnonnull`），写 `?:` 会多一条 `goto` 汇合。
+   `getUserBookSourceJson` 的分支、`saveUserBookSources` 的列表兜底、
+   `deleteBookSource` 的三处列表兜底都是这个差别。
+6. **`isNullOrEmpty()` 与 `isEmpty()` 不能混**。制品在 `getBookSource` 里是
+   `length()` 直取（无 `ifnull`），在 `deleteBookSources` 里带 `ifnull`——
+   前者 `isEmpty()`，后者 `isNullOrEmpty()`，判据靠这条区分。
+7. **`checkAuth(context)` 在 `getBookSource` / `getBookSources` 里返回值被丢弃**。
+   制品字节码是 `pop`，源码没有 `if (!checkAuth(...)) return ...NEED_LOGIN`。
+   按「统一模式」补鉴权分支会多出 12 条指令——这是制品行为，照抄，不要"修"。
+8. **`readSourceFile` 用 `forEach` 而非 `for`**。制品有 `$i$f$forEach` 标记，
+   循环体里是 `if (file.exists()) { ... }`，不是 `if (!file.exists()) return@forEach`
+   （后者生成 `ifne + goto` 而不是 `ifeq`）。
+9. **`String.equals(x)` 而非 `==`**。`deleteBookSources` 的内层查找制品是
+   `invokevirtual String.equals`；写 `==` 得到 `Intrinsics.areEqual`。
+
+#### 核验
+
+```
+BookSourceController 家族（18 个类）：
+  类名集合与制品一致 : 18/18
+  指令序列完全一致   : 17
+  结构与调用不同     : 1  （BookSourceController 本体，10 个方法）
+```
+
+#### 已登记的 loose 档差异（本体 10 项）
+
+| 方法 / 位置 | 差异性质 |
+| --- | --- |
+| 构造函数 | 制品多 2 个 `nop`（类体起始与结束的断点占位），指令语义等价 |
+| `saveBookSource` | 状态机局部槽位整体后移 3 格（17 vs 13），分支与调用一致 |
+| `saveUserBookSources` | 局部变量装配顺序不同（`urlMap` 与循环计数器的槽位互换），指令数 234 vs 216 |
+| `getBookSource` | POST 分支的平台类型检查形态不同（`astore+checkNotNullExpressionValue` vs `dup+checkNotNull`） |
+| `getBookSources` | 末尾少 1 个内联标记假布尔（`iconst_0; istore`） |
+| `deleteBookSources` | 分支极性相反（`iflt` vs `ifge+goto`），语义等价 |
+| `setAsDefaultBookSources` | 恢复分支里 `$continuation.result` 的读取顺序不同，槽位整体差 1 |
+| `saveFromRemoteSource` | 同上：`result` 读取顺序，槽位差 1 |
+| `deleteUserBookSource` | 同上：`result` 读取顺序，槽位差 1 |
+| `generateBookSourceMap` | 首个 elvis 的 CFG 形态不同（`ifnull` vs `astore+ifnonnull+goto`） |
+
+这 10 项都已核对：同样的调用、同样的常量、同样的分支条件，没有语义差异；
+但**没有**做到指令级一致，按 `docs/GOAL.md` 记 loose，不宣称完成。
