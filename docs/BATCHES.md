@@ -1109,3 +1109,12 @@ var inShelf: Boolean = false,
 1. **`@get:JvmName` 能改方法名，改不了字段名**。字段名永远跟 Kotlin 属性名走。
 2. 遇到 IR lowering 崩且报 `No mapping for symbol: VALUE_PARAMETER INSTANCE_RECEIVER`，
    先看是不是 `isXxx` 属性——这是 1.5.21 已知坑，不是你的代码写错。
+
+### 3a-11 `BookChapter`（525 行 CFR，3 个类）
+
+**状态：3/3 类名一致；2/3 指令级完全一致；`BookChapter$variableMap$2` 1 个方法 loose；
+ABI 无新增差异（545 比对 / 515 一致 / 12 不一致，仍是 3a-10 的 1 处 + 2d 批 11 处）**
+
+与 `Book` 同构：data class + `variableMap` 惰性委托 + `Companion` 缓存表。
+`variableMap$2` 的差异是惰性初始化的 lambda 里集合装配顺序（1.5.21 稳定化往返），
+不影响语义。
