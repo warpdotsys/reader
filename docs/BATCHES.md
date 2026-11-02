@@ -1073,3 +1073,39 @@ copy/lock/unLock）都返回 `Unit` 且以 `context.response()...end()` 收尾�
    你的变量名），完全对不上。
 5. **`Cookie.setMaxAge(long)` / `setPath(String)` 返回 `Cookie`，不合成 Kotlin 属性**。
    写 `cookie.maxAge = x` 编译不过，必须 `cookie.setMaxAge(x)`。
+
+### 3a-10 `Book`（1804 行 CFR，7 个类，33 个构造参数）
+
+**状态：类名一致；20 个类比对里 14 个指令级一致；`Book` 本体 8 个方法 loose；
+verify-abi 多出 1 处（私有字段名，见下）**
+
+#### 编译器 bug（重要）
+
+`isInShelf` 作为 data class 构造属性时，Kotlin 1.5.21 的 IR lowering **必崩**：
+
+```
+Caused by: java.lang.RuntimeException: Exception while generating code for:
+FUN DEFAULT_PROPERTY_ACCESSOR name:<get-isInShelf> ...
+Caused by: java.lang.IllegalStateException: No mapping for symbol:
+  VALUE_PARAMETER INSTANCE_RECEIVER name:<this> type:io.legado.app.data.entities.Book
+```
+
+试过无效：`@get:JsonProperty`、`@JsonProperty`（默认 target）、完全去掉注解——
+**与注解无关**，是「`isXxx` 布尔属性 + data class + 33 个构造参数」这个组合触发。
+
+**绕过**：属性改名 `inShelf`，用 `@get:JvmName("isInShelf")` 把 getter/setter 名改回去：
+
+```kotlin
+@get:JsonProperty("isInShelf")
+@get:JvmName("isInShelf")
+var inShelf: Boolean = false,
+```
+
+代价：**私有字段名**变成 `inShelf`（制品是 `isInShelf`），verify-abi 会报这一处；
+对外 API（`isInShelf()` / `setInShelf(boolean)`）完全一致。
+
+#### 规约
+
+1. **`@get:JvmName` 能改方法名，改不了字段名**。字段名永远跟 Kotlin 属性名走。
+2. 遇到 IR lowering 崩且报 `No mapping for symbol: VALUE_PARAMETER INSTANCE_RECEIVER`，
+   先看是不是 `isXxx` 属性——这是 1.5.21 已知坑，不是你的代码写错。
