@@ -556,7 +556,7 @@ class AnalyzeUrl(
         }
     }
 
-    class ConcurrentRecord(
+    data class ConcurrentRecord(
         val concurrent: Boolean,
         var time: Long,
         var frequency: Int
@@ -564,7 +564,7 @@ class AnalyzeUrl(
 
     companion object {
         val paramPattern: Pattern = Pattern.compile("\\s*,\\s*(?=\\{)")
-        val pagePattern: Pattern = Pattern.compile("<(.*?)>")
+        private val pagePattern: Pattern = Pattern.compile("<(.*?)>")
         private val concurrentRecordMap = HashMap<String, ConcurrentRecord>()
     }
 }

@@ -153,9 +153,16 @@ interface JsExtensions {
             .headers(headers)
             .method(Connection.Method.GET)
             .execute()
-        handleCookieJar(urlStr, response)
+        val cookies = response.cookies()
+        val cookieStore = CookieStore(userNameSpace)
+        val cookie = cookieStore.mapToCookie(cookies)
+        if (cookie != null) {
+            val domain = NetworkUtils.getSubDomain(urlStr)
+            cookieStore.replaceCookie("${domain}_cookieJar", cookie)
+        }
         return response
     }
+
 
     fun head(urlStr: String, headers: Map<String, String>): Connection.Response {
         val response = Jsoup.connect(urlStr)
@@ -165,9 +172,16 @@ interface JsExtensions {
             .headers(headers)
             .method(Connection.Method.HEAD)
             .execute()
-        handleCookieJar(urlStr, response)
+        val cookies = response.cookies()
+        val cookieStore = CookieStore(userNameSpace)
+        val cookie = cookieStore.mapToCookie(cookies)
+        if (cookie != null) {
+            val domain = NetworkUtils.getSubDomain(urlStr)
+            cookieStore.replaceCookie("${domain}_cookieJar", cookie)
+        }
         return response
     }
+
 
     fun post(urlStr: String, body: String, headers: Map<String, String>): Connection.Response {
         val response = Jsoup.connect(urlStr)
@@ -178,11 +192,6 @@ interface JsExtensions {
             .headers(headers)
             .method(Connection.Method.POST)
             .execute()
-        handleCookieJar(urlStr, response)
-        return response
-    }
-
-    private fun handleCookieJar(urlStr: String, response: Connection.Response) {
         val cookies = response.cookies()
         val cookieStore = CookieStore(userNameSpace)
         val cookie = cookieStore.mapToCookie(cookies)
@@ -190,7 +199,10 @@ interface JsExtensions {
             val domain = NetworkUtils.getSubDomain(urlStr)
             cookieStore.replaceCookie("${domain}_cookieJar", cookie)
         }
+        return response
     }
+
+
 
     fun base64Decode(str: String): String {
         return EncoderUtils.base64Decode(str, 2)

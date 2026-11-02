@@ -52,7 +52,7 @@ data class BookSource(
     private var _userNameSpace: String = ""
 
     @Transient
-    var debugLog: DebugLog? = null
+    private var debugLog: DebugLog? = null
 
     override val source: BaseSource
         get() = this
