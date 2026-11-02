@@ -1249,13 +1249,25 @@ data class SearchKeyword(
 
 ### 3a-13 `BookGroup` / `TxtTocRule`（185 / 188 行 CFR）
 
-**状态：2 个类全部指令级完全一致。**
+**状态：2 个类全部指令级完全一致**（各 23 个成员 / 308 与 312 条指令，连局部变量槽位都一致）。
 
-这两个文件此前不是纯占位，而是**只有 10 行的 data class 骨架**（属性对、但方法/构造默认值不全）。
-补全后两个类字节码逐条相同，ABI 无变化（548 比对 / 518 一致 / 12 不一致仍是原样）。
+**如实更正**：这两个文件此前就是**完整的 data class 实现**（10 行），不是占位、也不是「属性对但
+默认值不全」的残废骨架。本批实际动作只是逐项复核 + 补 KDoc，字节码零改动。
 
-教训：`wc -l` 看到 10 行不要直接判定「占位」——**先 `grep '^data class'`**，
-骨架文件如果属性声明对，剩下的只是默认值和方法，工作量比从零写小一半。
+#### 规约
+
+1. **`wc -l` 看到 10 行不要直接判定「占位」**——先 `grep '^data class'` / `grep 'class '`。
+   属性声明齐全的 data class 骨架就是成品，剩下的只是注释和 KDoc。
+2. **`show` 属性必须叫 `show`，不能叫 `isShow`**：制品生成的是 `getShow()` 而不是 `isShow()`，
+   所以不触发 3a-10 的 `isXxx` bug，别自作聪明加 `@get:JvmName`。
+3. **制品里这两个类没有任何注解**（全制品 grep 不到 `androidx/room`，也没有 Room jar）。
+   3.2.14 服务端已剥掉 Android 上游的 `@Entity` / `@PrimaryKey`，源码**不要补注解**——
+   补了就是 `RuntimeVisibleAnnotations` 差异。
+4. **LNT 比制品整体少一层**：制品 `data class` 在第 8 行、首参在第 10 行，本地是 7 / 8。
+   两个类偏移量完全相同，说明原始源在类声明前多 1 行、首参前多 1 行（形态与被删掉的
+   `@Entity` / `@PrimaryKey` 留下的空行一致）。verify-bytecode 归一化 LNT，不必追。
+5. **纯 data class 实体（无伴生对象、无 `variableMap`）可以做到 0 差异**，
+   不必套用 3a-10 / 3a-11 的降级口径。
 
 ### 3a-14 `Bookmark` / `SearchResult` / `ReplaceRule`（260 / 267 / 386 行 CFR）
 
