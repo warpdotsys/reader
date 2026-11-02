@@ -727,7 +727,13 @@ ABI 不一致 : 11   （全部为 2d 批已登记的既有差异）
 `coroutineContext` / `loginExpireDays` / `appConfig` / `env` / `userMutex` 五个字段，
 外加 3 个 suspend 方法（各自带协程状态机）。
 
-#### 规约（顺序即试错顺序）
+#### 规约
+
+0. **`@JsonProperty` 必须写 `@get:`**：写普通的 `@JsonProperty` 会落到构造参数
+   （`RuntimeVisibleParameterAnnotations`），制品是在 getter 的 `RuntimeVisibleAnnotations`。
+   同理**委托属性上的 `@Transient` 要写 `@delegate:Transient`**，直接写 `@Transient`
+   报 "not applicable to target 'member property with delegate'"。
+（顺序即试错顺序）
 
 1. **必须 `open class`**。写成 `class` 会让 5 个已还原的 Controller 子类全部报
    `This type is final, so it cannot be inherited from`，连带几十条 "receiver type mismatch"
@@ -1122,9 +1128,21 @@ Caused by: java.lang.IllegalStateException: No mapping for symbol:
 ```
 
 试过无效：`@get:JsonProperty`、`@JsonProperty`（默认 target）、完全去掉注解——
-**与注解无关**，是「`isXxx` 布尔属性 + data class + 33 个构造参数」这个组合触发。
+**与注解无关**，跟构造参数个数也无关。
 
-**绕过**：属性改名 `inShelf`，用 `@get:JvmName("isInShelf")` 把 getter/setter 名改回去：
+**真正触发的是三件套同时成立**（对照实验逐条排出来的）：
+
+1. 源码里有一个与制品**同 FQN** 的类（`Book`）；
+2. 属性访问器名与 `is` 前缀属性同名（`var isInShelf: Boolean` 的 getter 就叫 `isInShelf()`，
+   不是 `getIsInShelf()`）；
+3. 还有**别的源文件经二进制签名**引用这个成员——本工程是
+   `BookController.saveBookToShelf(): Pair<Book, String>`，`Book` 仍解析到制品类。
+
+验证：把属性改名成 `isShelf`/`isInShelfX` → 编过；把 `FileController.kt` 移走 → 编过；
+把 `FileController.kt:521` 的 `result.first.isInShelf` 改成 `(result.first as Book).isInShelf`
+→ BUILD SUCCESSFUL。
+
+**绕过（本工程采用）**：属性改名 `inShelf`，用 `@get:JvmName("isInShelf")` 把访问器名改回去：
 
 ```kotlin
 @get:JsonProperty("isInShelf")
@@ -1132,8 +1150,12 @@ Caused by: java.lang.IllegalStateException: No mapping for symbol:
 var inShelf: Boolean = false,
 ```
 
+Kotlin 内部按属性名 `inShelf` 走 codegen（不匹配 `is` 前缀规则），对外方法名却被
+`@JvmName` 改回 `isInShelf()` / `setInShelf(boolean)`，三件套里的第 2 条不成立，bug 消失。
+
 代价：**私有字段名**变成 `inShelf`（制品是 `isInShelf`），verify-abi 会报这一处；
-对外 API（`isInShelf()` / `setInShelf(boolean)`）完全一致。
+对外 API 完全一致，实测 7 个类里 3 个指令级完全一致、其余 4 个是内联装配顺序差异。
+比「改调用处加 `as Book`」便宜——那种改法要动别的类的源码，且 `BookController` 一还原就得回退。
 
 #### 规约
 
