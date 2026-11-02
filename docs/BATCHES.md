@@ -905,3 +905,62 @@ BookSourceController 家族（18 个类）：
 这 3 项已核对：过滤掉 `astore/aload` 往返后指令序列逐条相同，只差分支目标数值，
 无任何调用、常量、分支条件差异。把 `var home` 降级成 `val` 能让这 3 处对上，
 但会丢掉制品里的 `aconst_null; astore`，差异只是换位置，所以保留更接近原文的写法。
+
+### 3a-5 `WebdavController`（1319 行 CFR ≈ 12 个成员，衍生 16 个类）
+
+**状态：16 个类名逐一相同；15 个类指令级一致，本体 6 个方法停在 loose（分支位移 + 内联往返）**
+
+制品形态：`class ... : BaseController(coroutineContext)` 但构造函数是**三参数**——
+`(coroutineContext, router: Router, handler: (RoutingContext, Exception) -> Unit)`，
+类体内有 `init` 块把 webdav 路由挂到 router 上（两个静态 lambda：`lambda-1$lambda-0`、
+`_init_$lambda-1`）。另有 10 个 `suspend` 成员（list/mkdir/upload/download/delete/move/
+copy/lock/unLock）都返回 `Unit` 且以 `context.response()...end()` 收尾，加
+`checkAuthorization`（非 suspend）与 `backupToWebdav`（返回 `ReturnData`）。
+
+#### 规约（顺序即试错顺序）
+
+1. **合成类的名字由「lambda 被赋给谁」决定，这是本轮唯一卡住的地方**。
+   制品是 `WebdavController$webdavList$formatter$1`——中间那段 `formatter` 就是变量名。
+   只有写成**一行、`val`、显式函数类型**才会拿到这个名字：
+   ```kotlin
+   val formatter: (File, String, Boolean) -> String = { f, url, showName -> … }
+   ```
+   写成 `var formatter: ((…)->String)? = null; formatter = { … }`（两步式）会退化成
+   `webdavList$1`；写成局部函数 `fun formatter(…)` 会被内联成私有静态方法
+   `webdavList$formatter`，**根本不生成类**。三种都编译通过，只有第一种对上类名。
+2. **局部函数只有在被当作值传递时才会变成类**；被 `forEach{}` 直接调用时编译器把它内联成
+   `outer$name` 静态方法（含捕获参数）。所以「capture 了两个 `Ref$ObjectRef` 的 Lambda 子类」
+   一定来自 lambda 值，不是局部函数。
+3. **`fileUrl` / `fileResponse` / `dirResponse` 必须是 `var`**：制品给它们生成
+   `Ref$ObjectRef`（被 formatter lambda 捕获且可变）。写成 `val` 就直接捕获 String，
+   formatter 的构造签名会少两个 `Ref$ObjectRef` 参数。
+4. **`context.response().setStatusCode(207).end(...)` 这种链式调用不要拆成局部变量**，
+   拆了会多出槽位并让后续分支目标整体位移。
+5. **`checkAuthorization` 里的空判断是 `x == null || x.isEmpty()`**，
+   制品带一对 `astore/aload` 的稳定化往返（`checkcast CharSequence` 前后各一次），
+   比 `isNullOrEmpty()` 多约 20 条指令。
+6. **`init` 块里的两个 lambda 必须保持静态**（不捕获 `this` 以外的对象）：
+   `lambda-1$lambda-0` 与 `_init_$lambda-1` 是 `private static final`，
+   写进类方法体会变成实例方法并多一个 `this$0` 字段。
+
+#### 核验
+
+```
+已比对类数         : 16
+指令序列完全一致   : 15
+仅局部装配不同     : 0
+结构与调用不同     : 1
+无法比对           : 0
+```
+
+#### 已登记的 loose 档差异（6 个方法，全在本体）
+
+| 方法 | 差异性质 |
+| --- | --- |
+| `checkAuthorization` | 内联 `isEmpty` 的稳定化往返（制品 211 条 / 我们 191 条），分支条件与调用一致 |
+| `_init_$lambda-1` | switch 表项数值整体差 4（前置指令数不同），分支目标同比位移 |
+| `webdavList` | 同上的目标位移；`formatter` 调用点语义一致 |
+| `webdavUpload` / `webdavMove` / `webdavCopy` | 同上：分支目标位移 2~4，指令语义一致 |
+
+这 6 项都已核对：调用目标、字符串常量、分支条件一致，差异只在局部槽位与目标偏移；
+按 `docs/GOAL.md` 记 loose。
