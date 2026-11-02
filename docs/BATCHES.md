@@ -1409,3 +1409,56 @@ analyzeRule 包里除 `AnalyzeRule` / `AnalyzeUrl` / `AnalyzeByJSoup` / `RuleAna
    `ctx.let { try { return it.read(...) } catch … }` 同理（`let` 内 `it: ReadContext`）。
 8. **`let` 的展开在 1.5.21 里带 3 个 `iconst_0; istore` 标记**
    （`arrayListOf` / `isEmpty` 各 1 个，`map` 是 `$i$f$map` + `$i$f$mapTo` + 1 个 lambda 标记）。
+
+### 3a-18 `AnalyzeRule`（2420 行 CFR，13 个类）
+
+**状态：13/13 类名一致；7/13 指令级一致；本体 10 个方法 loose（全部编译噪声、
+逐条已定性）；ABI 新增 1 处（`AnalyzeRule$ajax$1` 多一个私有字段 `L$0`）。**
+
+**最重要的数字**：`AnalyzeRule` **本体不在 ABI 不一致清单里**。这是本工程第一个
+「千行级 CFR + 多状态机」但本体 ABI 完全一致的大类。
+
+修复过程中抓到并改掉的**唯一真实语义差异**：`getElements` 误多调了一次
+`sourceRule.makeUpRule(result)`——会让 JS 规则求值两次。
+
+#### 规约（5 条）
+
+1. **`access$getX$p` 只能靠「私有属性 + 显式 getter」生成**。`override val` 隐式 open，
+   内部一律发 getter。仓库里 `JsExtensions` 把它声明成 `val`，所以只能用
+   `private val source` + `override fun getSource()` + **文件头**
+   `@file:Suppress("VIRTUAL_MEMBER_HIDDEN","CANNOT_WEAKEN_ACCESS_PRIVILEGE","NOTHING_TO_OVERRIDE")`。
+   **写在属性上会多出 `getSource$annotations()`，ABI 直接红。**
+2. **`@JvmOverloads` 只在制品确有重载时加**：`evalJS` 没有 1 参重载，加了就进不一致清单。
+3. **`$reader_pro` 只是 JVM 名**，调用侧仍写 Kotlin 名 `getStringList(...)`；
+   跨模块调制品里的 `internal` 成员靠
+   `@file:Suppress("INVISIBLE_MEMBER","INVISIBLE_REFERENCE")`。
+4. **`SourceRule.rule` 用「无初值 + init 赋值」**；`defaultRuleType` 制品从不写入（恒为 0），
+   写 `= 0` 不会多指令。
+5. 10 个 loose 的定性：`String.valueOf(x)` vs `x.toString()`（4 个求值器）、
+   局部槽位整体差 1（`get`）、分支位移差 1–9 字节（`setBaseUrl`/`toNumChapter`/`getElement`/`getElements`）、
+   `splitSourceRule` 的 `String.trim()` 内联展开 vs `StringsKt.trim` 调用、
+   `splitPutRule`/`replaceRegex` 的参数求值顺序、`SourceRule.makeUpRule` 的
+   `?.let{} ?:` 展开形态（少 19 条指令，调用序列完全相同）。
+
+### 3a-19 `GsonExtensions.GSON` 补两个 builder 调用（真行为差异，已修）
+
+制品 `GsonExtensionsKt$GSON$2.invoke()` 在 `create()` 之前有
+`disableHtmlEscaping()`（偏移 43）与 `setPrettyPrinting()`（偏移 46），本仓库原来直接跳到
+`create()`。后果是**所有 `putVariable` 写出的 `variable` JSON 变成紧凑格式且 HTML 转义**，
+与制品不兼容（`@Metadata` 里那些 variable 字符串都是 pretty-print 过的）。
+
+补上后 `GSON$2` 从有差异变为**完全一致**（Gson 家族 6 个类里 5 个一致）。
+`GsonExtensionsKt` 本体仍有 5 处既有差异——与 3a-11 记的「在册结构差异 5」是同一批，
+不是本次改动引起的。
+
+### 3a-20 实验：`rootProject.name = "reader-pro"`（结论：ABI 不变，保留）
+
+3a-17 发现 `internal` 成员的 JVM 名带模块名后缀，于是把 `settings.gradle.kts`
+的 `rootProject.name` 从 `reader` 改成 `reader-pro` 试了一次。
+
+**实测：ABI 数字一分没变**（574 比对 / 543 一致 / 13 不一致，改前改后完全相同）。
+原因：工程里现存的 `internal` 成员此前都已用显式 `@JvmName("xxx\$reader_pro")` 顶住了，
+模块名自动生效在这里没有额外收益。
+
+**收益因此改为两点**：① `@Metadata` d2 的模块名自动对上（`verify-metadata.ps1` 里不用再做归一）；
+② 以后还原 `internal` 成员不必逐个写 `@JvmName`。**保留，不回滚。**

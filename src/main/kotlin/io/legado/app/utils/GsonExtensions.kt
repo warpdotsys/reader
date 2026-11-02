@@ -18,6 +18,8 @@ val GSON: Gson by lazy {
             MapDeserializerDoubleAsIntFix()
         )
         .registerTypeAdapter(Int::class.javaPrimitiveType, IntJsonDeserializer())
+        .disableHtmlEscaping()
+        .setPrettyPrinting()
         .create()
 }
 
