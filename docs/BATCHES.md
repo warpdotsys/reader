@@ -1336,15 +1336,36 @@ ABI 无变化（548 比对 / 518 一致 / 12 不一致）。
    d1/d2 一致基本等于「声明形态被复原」，成本只是两次 `javap -v`。
    脚本会把 `reader-pro` 归一成 `reader`（模块名差异不影响判据，见 3a-11 末段）。
 
-### 3a-16 `Debug` / `DebugKt` / `DebugLog` / `DebugLogKt`
+### 3a-16 `Debug` / `DebugLog`（**两个源文件**，7 个类）
 
-**状态：15 个类全部指令级完全一致。**
+**状态：7 个类全部指令级完全一致**——`Debug`、`DebugKt`、`DebugKt$logger$1`、`DebugLog`、
+`DebugLog$DefaultImpls`、`DebugLogKt`、`DebugLogKt$logger$1`。
+`javap -p -c -l` 的输出与制品**逐字符相同**（含常量池索引与 LineNumberTable），
+是全工程少有的「连 LNT 都对上」的批次。
 
-四个文件是一组不可拆的单元：`DebugKt` / `DebugLogKt` 是只有 logger 的门面，
-单独写不会生成 `access$getLogger$p`（skill 里已记的坑），必须跟本体一起做。
+**更正任务书里的一处误解**：这不是「四个文件」。`DebugKt` / `DebugLogKt` 是
+`Debug.kt` / `DebugLog.kt` 的**文件门面**，不是独立源文件——真去建 `DebugKt.kt`
+只会得到 `DebugKtKt.class`。这也细化了 skill 里「门面不可单独复现」那条：
+门面与本体同文件，`access$getLogger$p` 取决于**同文件内有无引用者**
+（`DebugLogKt` 有，`DefaultImpls` 在调它；`DebugKt` 的 logger 无人引用，所以没有 accessor，
+但字段和 `<clinit>` 照样存在）。原来那个 7 行占位本身就是 `Debug.kt` 的正确上半截。
+
+#### 规约
+
+1. **`Debug` 是 `object`，不是 class**：`INSTANCE` + private 构造器 + 两个委托给
+   `DebugLog$DefaultImpls` 的 `log`。源码就是一行 `object Debug : DebugLog`。
+2. **`DebugLog` 的 3 参 `log` 不能写 `override`**：它不是 `HttpLoggingInterceptor.Logger`
+   的成员，写了报 `'log' overrides nothing` + 覆写函数不许有默认值。
+   只有 `log(message: String)` 才是 `override`。
+3. **这组类隐式依赖 `-Xjvm-default=disable`**（Kotlin 1.5.21 的默认值）：接口方法在接口里是
+   abstract，方法体与 `log$default` 全落在 `DebugLog$DefaultImpls`。
+   构建里若有人改成 `-Xjvm-default=all`，这一组会整体崩掉。
+4. **行号可以完全对齐**：header 后留空行使 logger 落第 8 行、object 第 10 行、
+   默认值 12–14、body 16–17、`log(String)` 20–21。小文件值得这么干——
+   对齐后 `javap` 逐字符相同，比「LNT 反正不查」的批次更硬。
 
 `DebugLog` 是接口，`log(url, msg, isLog = false)` 带默认参数——analyzeRule / rss 包
-大量 `debugLog?.log(...)` 全都靠它。这一批通了，`rss` 包的前置条件就只剩 `AnalyzeRule`。
+大量 `debugLog?.log(...)` 全靠它。这一批通了，`rss` 包的前置条件就只剩 `AnalyzeRule`。
 
 ### 3a-17 `AnalyzeByXPath` / `AnalyzeByJSonPath`
 
