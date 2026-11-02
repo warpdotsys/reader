@@ -685,3 +685,37 @@ ABI 不一致 : 0
 - **方法体未逐行核对。** 编译修正之外的代码来自 CFR，未与字节码逐指令比对。
 - **`me.ag2s.epublib.util.EpubArchivePolicy` 一类文件不存在于本制品。** 制品里的 epublib 与
   常见的 epublib 上游并不完全同源，未做上游比对。
+
+## 第 3a 批 —— com.htmake.reader.api.controller（进行中）
+
+**状态：`CURD` 已落地，ABI 与其 3 个合成 lambda 全部一致**
+
+### 本次落地
+
+| 文件 | 说明 |
+| --- | --- |
+| `api/controller/CURD.kt` | Controller 通用契约：17 个成员，其中 12 个带默认实现 |
+
+### 要点（都是编译/ABI 对照试出来的）
+
+- 制品里 `getTableName()` / `getEntityClass()` 是**函数**，不是属性。先写成 `val tableName`
+  会让已还原的 `BookmarkController`、`BookGroupController` 等全部报 "overrides nothing"——
+  它们的 `override fun` 就是判据。
+- 三个合成 lambda 的形态必须逐个按 `javap -p` 对照制品，同一句调用里可以混用：
+  - `save` / `saveMulti` 的 `onCheckEnd` 传的是**函数引用** `this::onCheckEnd`（生成
+    `FunctionReferenceImpl`）
+  - 同一调用的 `checker` 传的是**lambda** `{ jsonObject, value -> checker(...) }`
+    （生成 `Lambda` + `this$0` 字段）
+- `deleteMulti` 的 `itemList` 必须是 `var`。写成 `val` 时捕获的是 `T[]` 本身，制品捕获的是
+  `Ref$ObjectRef<T[]>`；这一个关键字不同就会多一个 ABI 差异类。
+- `convertToEntityList` 里 `Array.newInstance` 要写全限定名。`import java.lang.reflect.Array`
+  会遮蔽 `kotlin.Array`，`Array<T>` 直接报 "No type arguments expected for class Array"。
+
+### 核验
+
+```
+已比对类数 : 440
+ABI 一致   : 411
+ABI 不一致 : 11   （全部为 2d 批已登记的既有差异）
+```
+
