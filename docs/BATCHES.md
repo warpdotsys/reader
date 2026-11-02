@@ -1004,3 +1004,31 @@ copy/lock/unLock）都返回 `Unit` 且以 `context.response()...end()` 收尾�
 `getRssSources` / `saveRssSource` / `saveRssSources` / `deleteRssSource` /
 `getRssSourceByURL` / `getRssArticles` / `getRssContent` 全是同一类：局部变量顺序不同
 （多一对 `astore/aload` 的稳定化往返），调用目标、字符串常量、分支条件一致。
+
+### 3a-7 controller 包既有文件形态对齐
+
+`BookmarkController` / `ReplaceRuleController` / `HttpTTSController` / `BookGroupController`
+是前几批留下的实现，不是占位，但有几处写法与制品不同。按字节码逐处对齐后：
+
+| 文件 | 修正 | 结果 |
+| --- | --- | --- |
+| `BookmarkController` | `x.length == 0` → `isEmpty()`；`==` → `.equals()` | 3/3 类全绿 |
+| `ReplaceRuleController` | 三处 `x.length == 0` → `isEmpty()` | 3/3 类全绿 |
+| `HttpTTSController` | 两处 `length == 0`；`convertToEntity` 用 `getOrNull()!!` 而非 `getOrThrow()` | 3→1 个方法差异 |
+| `BookGroupController` | `groupId == x` → `groupId.equals(x)` | 5→3 个方法差异 |
+
+四个家族合计 11 个类：**9 个指令级完全一致**，`BookGroupController` 3 个方法、
+`HttpTTSController` 1 个方法（`convertToEntityList` 的集合构造形态）仍是 loose。
+
+#### 规约
+
+1. **`x.length == 0` 一律写 `isEmpty()`**。四个文件里 6 处都是这个差别：制品是
+   `checkcast java/lang/CharSequence` + `CharSequence.length` + 一个假布尔，
+   写 `String.length` 得到 `invokevirtual String.length`，不是同一个方法。
+2. **包装类型的相等用 `.equals()` 而不是 `==`**。`Long == Long` 编译成
+   `longValue()` + `lcmp`；制品是 `Object.equals`（两侧都装箱）。`BookmarkController`
+   和 `BookGroupController` 的 `checker` 都是这个差别。
+3. **`Result` 解包要看制品用哪个**：`getOrThrow()` 生成
+   `throwOnFailure` + `checkcast`；`getOrNull()!!` 生成
+   `isFailure-impl ? null : value` + `checkNotNull` + `checkcast`。
+   `HttpTTSController.convertToEntity` 是后者。

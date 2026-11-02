@@ -22,10 +22,10 @@ class HttpTTSController(coroutineContext: CoroutineContext) :
 
     override fun beforeSave(var1: HttpTTS, db: DB<HttpTTS>): ReturnData? {
         val returnData = ReturnData()
-        if (var1.name.length == 0) {
+        if (var1.name.isEmpty()) {
             return returnData.setErrorMsg("名称不能为空")
         }
-        if (var1.url.length == 0) {
+        if (var1.url.isEmpty()) {
             return returnData.setErrorMsg("链接不能为空")
         }
         return null
@@ -44,7 +44,7 @@ class HttpTTSController(coroutineContext: CoroutineContext) :
     }
 
     override fun convertToEntity(var1: JsonObject): HttpTTS {
-        return HttpTTS.fromJson(var1.toString()).getOrThrow()
+        return HttpTTS.fromJson(var1.toString()).getOrNull()!!
     }
 
     override fun convertToEntityList(var1: String): Array<HttpTTS> {

@@ -38,7 +38,7 @@ class BookGroupController(coroutineContext: CoroutineContext) :
     }
 
     override fun checker(var1: JsonObject, var2: BookGroup): Boolean {
-        return var2.groupId == var1.getLong("groupId")
+        return var2.groupId.equals(var1.getLong("groupId"))
     }
 
     override fun onCheckEnd(var1: BookGroup, var2: Boolean, bookGroupList: JsonArray) {
@@ -63,7 +63,7 @@ class BookGroupController(coroutineContext: CoroutineContext) :
 
     override fun beforeSave(var1: BookGroup, db: DB<BookGroup>): ReturnData? {
         val returnData = ReturnData()
-        if (var1.groupName.length == 0) {
+        if (var1.groupName.isEmpty()) {
             return returnData.setErrorMsg("分组名称不能为空")
         }
         return null
