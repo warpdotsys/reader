@@ -1311,6 +1311,31 @@ ABI 无变化（548 比对 / 518 一致 / 12 不一致）。
 所以这三个能一起切。剩下的 `AnalyzeRule`（2420 行）/ `AnalyzeUrl`（2842 行）/
 `AnalyzeByJSoup`（916）/ `RuleAnalyzer`（765）/ `QueryTTF`（601）每一个都是独立的大工程。
 
+#### 规约（7 条，全部实测得来）
+
+1. **`arrayListOf()` 与 `ArrayList()` 靠 inline 标记区分**：前者在 `new ArrayList` 之前留
+   `iconst_0; istore <槽位>`，后者不留；标记槽位 = 变量槽位之后的下一个空槽
+   （`RuleData$variableMap$2` 里 `hashMapOf()` 同为 `iconst_0; istore_1`）。
+   本批唯一一处差异就出在 `books` 用错这个，改成 `ArrayList<ArrayList<String>>()` 后归零。
+2. **接口默认方法不要手写委托**。写 `fun getVariable(key: String): String? = variableMap[key]`，
+   编译器在 `-Xjvm-default=disable` 下自动产出 `RuleDataInterface$DefaultImpls` +
+   实现类末尾的委托 override（`public` 非 `final`，位置在 `getUserNameSpace` 之后）。
+   手写 `RuleDataInterface.DefaultImpls.getVariable(this, key)` 会把成员顺序和元数据搞乱。
+3. **`getUserNameSpace` 是函数不是属性**：`d2` 里只有 `"getUserNameSpace"`、没有
+   `"userNameSpace"`；`d1` 对应零参函数签名。**「名字以 get 开头的函数」只能靠 d2 判**，
+   javap 看不出来。
+4. **空 `static {}` 是 `hashMapOf()` 这类 inline 工厂的正常产物**（`RuleData` 和制品的
+   `BookChapter` 都有），不要去「清理」。
+5. **`info.add(resM.group(i)!!)` 生成 `dup; checkNotNull`**（无局部槽位）；
+   换成 `?: ""` 会变成 `astore; aload; ifnonnull` + 临时槽。
+   制品 LVT 里**没有** `string` 这个局部变量——CFR 里出现的那个是它编的。
+6. **`do { append } while (find())` 在这里是真 do-while**（先执行体后判条件）；
+   写成 `while (find()) {}` 会先判条件、**吃掉第一个匹配**，语义不同。
+7. **把 `@Metadata` 的 d1/d2 逐字比对纳入常规核验**——见 `scripts/verify-metadata.ps1`。
+   ABI 脚本排序且不看注解，测不出声明顺序 / 默认值写法 / 属性还是函数；
+   d1/d2 一致基本等于「声明形态被复原」，成本只是两次 `javap -v`。
+   脚本会把 `reader-pro` 归一成 `reader`（模块名差异不影响判据，见 3a-11 末段）。
+
 ### 3a-16 `Debug` / `DebugKt` / `DebugLog` / `DebugLogKt`
 
 **状态：15 个类全部指令级完全一致。**
