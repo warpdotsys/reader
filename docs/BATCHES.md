@@ -1032,3 +1032,44 @@ copy/lock/unLock）都返回 `Unit` 且以 `context.response()...end()` 收尾�
    `throwOnFailure` + `checkcast`；`getOrNull()!!` 生成
    `isFailure-impl ? null : value` + `checkNotNull` + `checkcast`。
    `HttpTTSController.convertToEntity` 是后者。
+
+### 3a-8 `UserController`（2015 行 CFR，21 个类，18 个成员）
+
+**状态：21/21 类名一致；12/21 类指令级一致；ABI 全一致（未进不一致清单）**
+
+最大的一批。`login` 一个方法就有 1007 条指令、60+ 行 LNT，状态机 17 个。
+关键教训：`uploadFile` 少写一层 `.forEach {}` 会让合成类名从
+`$lambda-7$lambda-6$` 退化成 `$lambda-6$lambda-5$`——**嵌套 lambda 的编号是从外往里
+1 递增的，少一层就整体前移**。这是本批唯一一次类名不一致，靠 diff 抓出来的。
+
+#### 规约
+
+1. **嵌套 lambda 的 `$lambda-N` 编号按声明顺序全类递增**，不是每方法重置。
+   改一处 lambda 的层数，后面所有编号都会移位，写完必须 diff 类名。
+2. **`getUserLimit` 里对 `License` 只读属性**（`license.userMaxLimit` 之类）不会触发
+   psi2ir 的 `Undefined parameter referenced`，可以放心用；一旦开始调
+   `License.validHost(...)` 就会崩。
+
+### 3a-9 `RestVerticle`（493 行 CFR，6 个类）
+
+**状态：6/6 类名一致；5/6 类指令级完全一致；主类 8 个方法 loose；ABI 全一致**
+
+这是 `CoroutineVerticle` 的抽象基类，`router` 用 `lateinit var`、`port` 用 `open var`。
+
+#### 规约（全部是 ABI 级的，错一条 verify-abi 就红）
+
+1. **`port` 必须写 `open var`**。父类有同名非 final 的 `getPort()/setPort()`，写成
+   普通 `var` 生成的 getter 是 `final`，ABI 直接不一致（4 个方法差异全消）。
+2. **`suspend (RoutingContext) -> Unit` 与 `-> Any?` 是两种类型**，即使方法体不返回值。
+   `coroutineHandlerWithoutRes` 的 `$fn` 字段泛型是
+   `Function2<RoutingContext, Continuation<Object>, Object>`——源码必须写 `-> Any?`，
+   写 `-> Unit` 会变成 `Continuation<? super Unit>`。
+3. **lambda 捕获变量的顺序 = 构造函数参数顺序 = 字节码里的 aload 序列**。
+   `ctx.success(fn(ctx))` 与 `val res = fn(ctx); ctx.success(res)` 捕获顺序相反
+   （前者 ctx 先、后者 fn 先），`verify-abi` 会报构造函数签名不一致。
+4. **内层 lambda 想引用外层变量时，内层参数写 `_`**：
+   `it.addHeadersEndHandler { _ -> ... it.getCookie(...) }`。写成 `{ ctx: RoutingContext -> }`
+   会让 Kotlin 在 SAM 转换里给**参数**插 `checkNotNullParameter`（字符串常量还会带上
+   你的变量名），完全对不上。
+5. **`Cookie.setMaxAge(long)` / `setPath(String)` 返回 `Cookie`，不合成 Kotlin 属性**。
+   写 `cookie.maxAge = x` 编译不过，必须 `cookie.setMaxAge(x)`。
