@@ -7,6 +7,21 @@
 > 该分支上的每片源码通过 `-PrestoreBootstrap` 引导编译后立即做 ABI 核验，见 [BUILD.md](BUILD.md)。
 > `main` 保持绿色。
 
+### 第 2e 批补充（RssSource）
+
+`RssSource`(1014 行 CFR) 已还原：28 参 data class + BaseSource 实现 + Companion。
+要点：
+- `equals`/`hashCode` 是**手写**的（只比 sourceUrl），不是 data class 生成的那份；
+  但 componentN/copy 仍是 data class 生成的 → 写在类体里覆盖即可。
+- `BaseSource` 的 `tag`/`key`/`userNameSpace`/`logger` 是属性，不是 getXxx 函数，
+  必须写 `override val ... get() = ...`。
+- `logger` 的 getter 在制品里直接 `return null`（`debugLog` 只写不读）。
+- `sortUrl` 支持 `<js>`/`@js:` 前缀，用 `evalJS` 求值后按 `(&&|\n)+` 拆分，
+  再按 `::` 取前两段；为空时回退 `Pair("", sourceUrl)`。
+- Companion 的 `fromJsonDoc` 按 26 个 `$.xxx` 逐字段读（不读 variableComment/loginUi）。
+
+新增 1 处已知差异：`RssSource.evalJS` 多 `throws java.lang.Exception`
+（继承 `BaseSource` 的 `@Throws`，与 `BookSource` 同因）。
 ## 第 2d 批 —— help（进行中）
 
 **状态：闭包合并；ABI 356/374；已编译 374 / 936 类**
