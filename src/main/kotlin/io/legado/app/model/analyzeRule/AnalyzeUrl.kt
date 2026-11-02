@@ -40,7 +40,7 @@ import java.net.URLEncoder
 import java.util.HashMap
 import java.util.LinkedHashMap
 import java.util.regex.Pattern
-import javax.script.SimpleBindings
+import com.script.SimpleBindings
 
 class AnalyzeUrl(
     val mUrl: String,
@@ -244,7 +244,7 @@ class AnalyzeUrl(
         bindings["book"] = ruleData as? Book
         bindings["source"] = source
         bindings["result"] = result
-        return (AppConst.SCRIPT_ENGINE as javax.script.ScriptEngine).eval(jsStr, bindings)
+        return AppConst.SCRIPT_ENGINE.eval(jsStr, bindings)
     }
 
     fun put(key: String, value: String): String {

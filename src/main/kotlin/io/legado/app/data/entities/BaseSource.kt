@@ -10,7 +10,7 @@ import io.legado.app.utils.EncoderUtils
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonObject
 import java.lang.Exception
-import javax.script.SimpleBindings
+import com.script.SimpleBindings
 
 interface BaseSource : JsExtensions {
 
@@ -125,6 +125,6 @@ interface BaseSource : JsExtensions {
         bindings["baseUrl"] = key
         bindings["cookie"] = CookieStore(userNameSpace)
         bindings["cache"] = CacheManager(userNameSpace)
-        return (AppConst.SCRIPT_ENGINE as javax.script.ScriptEngine).eval(jsStr, bindings)
+        return AppConst.SCRIPT_ENGINE.eval(jsStr, bindings)
     }
 }
