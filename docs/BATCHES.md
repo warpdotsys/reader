@@ -1181,3 +1181,11 @@ ABI 无变化（548 比对 / 518 一致 / 12 不一致）。
 
 `DebugLog` 是接口，`log(url, msg, isLog = false)` 带默认参数——analyzeRule / rss 包
 大量 `debugLog?.log(...)` 全都靠它。这一批通了，`rss` 包的前置条件就只剩 `AnalyzeRule`。
+
+### 3a-17 `AnalyzeByXPath` / `AnalyzeByJSonPath`
+
+**状态：5 个类全部指令级完全一致**（XPath 1 + JSonPath 4，含 3 个 lambda 合成类）。
+
+analyzeRule 包里除 `AnalyzeRule` / `AnalyzeUrl` / `AnalyzeByJSoup` / `RuleAnalyzer` /
+`QueryTTF` 之外的分析器都已就位。这两个都能直接引用制品里的接口类型编译通过，
+不需要等 `AnalyzeRule` 本体还原。
