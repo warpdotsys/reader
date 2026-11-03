@@ -1644,3 +1644,24 @@ BaseBook 源码版自己没编过，Book / SearchBook 跟着挂。**已全部回
    原因是 private 的 8 参重载与它的调用点（public 的 7 参重载）在**同一个类**里，
    编译器认为不需要桥。制品却有，说明原文的调用点与 private 定义之间有跨类语义
    （很可能 `$default` 合成方法也参与调用）。留待后续单独处理。
+
+### 3a-28 两个「看着像 Kotlin、其实是 Java」的类
+
+`Encoding`（116 行 CFR，编码常量表）和 `EncodingDetectHelp`（69 行）都属于
+`io.legado.app.help`。我按 CFR 写成 Kotlin 之后，类名 diff 直接露馅：
+
+```
+我们: Encoding.class + Encoding$Companion.class
+制品: Encoding.class + EncodingDetectHelp.class
+```
+
+制品里**没有 `Encoding$Companion`**，说明它不是 Kotlin 类。回头看 `javap -v`：
+`Encoding` 没有 `@Metadata`，是**纯 Java**。
+
+**判定方法（30 秒）**：`javap -v <类> | grep -c Metadata`，0 就是 Java 类。
+这个判据在 3a-26 的 `SpringContextUtils` 上用过一次，这次又踩——
+**动手写之前先跑一遍，别等类名 diff 才发现**。
+
+后果：写成 Kotlin 会多出 `Companion` 合成类、并且所有静态字段变成
+`@JvmField` 的另一种形态，ABI 直接错。这两个类只能进 `src/main/java`，
+不能在 `src/main/kotlin` 里还原。已删除，等 java 源集方案。
