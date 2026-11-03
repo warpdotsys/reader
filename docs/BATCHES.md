@@ -1462,3 +1462,32 @@ analyzeRule 包里除 `AnalyzeRule` / `AnalyzeUrl` / `AnalyzeByJSoup` / `RuleAna
 
 **收益因此改为两点**：① `@Metadata` d2 的模块名自动对上（`verify-metadata.ps1` 里不用再做归一）；
 ② 以后还原 `internal` 成员不必逐个写 `@JvmName`。**保留，不回滚。**
+
+### 3a-21 `rss` 包重启成功（`Rss` / `RssParserDefault` / `RssParserByRule`，5 个类）
+
+**状态：5/5 类名一致；2/5 指令级完全一致（两个协程状态机）；3 个本体各有 1–2 个方法 loose；
+ABI 无新增差异（579 比对 / 548 一致 / 13 不一致）。**
+
+这个包在 3a 早期回滚过一次——那时 `AnalyzeRule` 还是 7 行占位，编译报
+`Cannot access class io.legado.app.data.entities.BaseSource`。`AnalyzeRule` 落地后
+（3a-18）原样重来一次就成了。**回滚的东西不要丢，前置补齐后成本只是重写一遍。**
+
+#### 踩到的 4 个坑（全是「制品签名与直觉不同」）
+
+1. **`Rss.getContent` 返回 `String` 不是 `String?`**；`getArticles` / `parseXML` 返回
+   `Pair<List<RssArticle>, String>`，第二项也非空（`nextUrl` 声明成 `var nextUrl: String = ""`）。
+   CFR 看不出可空性，必须 `javap -s` 看 `Continuation<? super java.lang.String>` 上有没有
+   `@Nullable`。
+2. **`AnalyzeUrl` 第 6 参数 `baseUrl: String = ""` 是非空的**，制品调用点靠**默认值掩码**
+   （`iconst 314`）跳过它，不是显式传 null。Kotlin 侧必须用**具名参数**：
+   ```kotlin
+   AnalyzeUrl(sortUrl, null, page, source = rssSource, ruleData = ruleData,
+              headerMapF = rssSource.getHeaderMap(), debugLog = debugLog)
+   ```
+   照 CFR 的位置顺序传 `null` 会报 `Null can not be a value of a non-null type String`。
+3. **`BaseSource.getHeaderMap(hasLoginHeader: Boolean = false)` 是函数不是属性**，
+   写 `rssSource.headerMap` 报 Unresolved。制品是
+   `getHeaderMap$default(rssSource, false, 1, null)`——`BaseSource` 里根本没有 headerMap 属性。
+4. **Kotlin 里不能写 `obj.setXxx(v)` 去调 `var` 属性的 setter**：
+   `analyzeRule.setRuleData(rssArticle)` 报 Unresolved reference，得写
+   `analyzeRule.ruleData = rssArticle`。
