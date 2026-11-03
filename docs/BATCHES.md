@@ -1491,3 +1491,22 @@ ABI 无新增差异（579 比对 / 548 一致 / 13 不一致）。**
 4. **Kotlin 里不能写 `obj.setXxx(v)` 去调 `var` 属性的 setter**：
    `analyzeRule.setRuleData(rssArticle)` 报 Unresolved reference，得写
    `analyzeRule.ruleData = rssArticle`。
+
+### 3a-22 `verify-metadata.ps1` 全量结果：66 处不一致，绝大多数是声明形态噪声
+
+用 `-ShowList` 跑全量，579 个类里 66 个 `d1`/`d2` 对不上。抽查 `AnalyzeByJSonPath`
+（这个类 verify-bytecode 是 5/5 全绿）：
+
+```
+制品: ..., "getList", "Ljava/util/ArrayList;", "rule", ...
+我们: ..., "getList", "Ljava/util/ArrayList;", "Lkotlin/collections/ArrayList;", "rule", ...
+```
+
+我们多一个 `Lkotlin/collections/ArrayList;`——Kotlin 类型别名与 Java 类型在元数据里的写法差别，
+JVM 描述符完全相同。**这类噪声占 66 处的大多数**（类型别名、KDoc、声明顺序）。
+
+真正有行为含义的是少数，比如 `Book` 的 `isShelf`（`@get:JvmName` 改名后 d2 里属性名变了）。
+
+**用法定位：这个脚本不是闸门，是定位器。** 当某个类的行为可疑时，用它看声明形态
+（属性还是函数、默认值写法、声明顺序）；不要把它当成第二个 verify-abi 去逐项追平——
+66 处里追平的收益接近零，风险是把本来正确的类改坏。
