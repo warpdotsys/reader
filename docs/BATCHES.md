@@ -2327,3 +2327,31 @@ psi2ir / IR lowering 两阶段崩。
 - **不影响任何已验收的类**：`FileController` 等调用它的地方传的是**制品的 `Book` 类型**，
   编译和运行时都正常
 - 全工程仍是 **800 / 784 / 152**，ABI **800 / 772 / 12 / 16**
+
+### 3a-49 `Debugger`（8 类）整份还原 + 三条规约
+
+之前 `Debugger.kt` 完全不存在（8 个类全缺）。按 CFR 逐个还原：
+
+- 类名 **8/8 完全一致**：本体 + 5 个状态机（`$exploreDebug$1` 等）+ `DebuggerKt` + `DebuggerKt$logger$1`
+- 字节码 **7/8 指令级完全一致**（5 个状态机全绿），本体 7 个方法 loose
+
+#### 规约
+
+1. **`runCatching{}.onSuccess{}.onFailure{}` 在 suspend 函数里生成一个状态机，不是三个**。
+   三个 lambda 全部内联进同一个 `$方法名$1` 类——所以「5 个 debug 方法 → 5 个类」，不是 15 个。
+   这也是为什么这些状态机 ABI 能对上：`L$0/L$1/L$2` 捕获槽位由**跨挂起点的局部变量**决定，
+   而不是 lambda 个数。
+2. **`log(msg = "…")` 必须用具名参数**：`DebugLog.log` 有三个默认参数
+   （`sourceUrl = ""` / `msg = ""` / `isHtml = false`），只传 msg 时制品生成的是
+   `DefaultImpls.log$default(this, null, "...", false, 5, null)`——mask 是 **5**（第 1、3 位）。
+   写成 `log("...")` 会变成传 `sourceUrl`，语义和字节码双错。
+3. **`contentDebug` 的 `onFailure` 不重抛**，其他四个都重抛。照制品写，别「统一风格」。
+
+#### 另外两小笔（同批）
+
+- **`CURDKt`（2 类）**：制品门面里只有 `private static final KLogger logger` + `static {}`。
+  在 `CURD.kt` 文件级补 `private val logger: KLogger = KotlinLogging.logger { }` 即可。
+- **`Coroutine$cancel$1$1$1`（1 类）**：`cancel` 里的 `launch` 要**直接展开**
+  `if (context == null) block(scope) else withContext(scope.coroutineContext + context) { block(this) }`。
+  写成 `dispatchVoidCallback(scope, it)` 会少一层状态机。`dispatchVoidCallback` 本身在
+  `start` / `finally` 还用着，**不能删**。
