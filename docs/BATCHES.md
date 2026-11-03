@@ -1856,3 +1856,16 @@ help 包的 Java 部分其实一直是通的，只是我从没检查过 `src/mai
 
 **文件名注意**：源文件叫 `Ext.kt`（不是 `ExtKt.kt`），编译产物才是 `ExtKt` 门面类。
 按「门面名 = 文件名 + Kt」反推源文件名会写错。
+
+### 3a-38 `AnalyzeByJSoup`（916 行 CFR，4 个类）——analyzeRule 包收官
+
+**状态：4/4 类名一致；2/4 指令级完全一致；本体 5 个方法 loose；
+ABI 零新增（652 比对 / 624 一致 / 12 不一致）。**
+
+**`io.legado.app.model.analyzeRule` 包至此全部还原**：
+`AnalyzeRule` / `AnalyzeUrl` / `AnalyzeByXPath` / `AnalyzeByJSonPath` / `AnalyzeByRegex` /
+`AnalyzeByJSoup` / `RuleAnalyzer` / `QueryTTF`（Java 源）/ `RuleData` / `RuleDataInterface`
+——10 个顶层文件，最大的 `AnalyzeUrl` 2842 行、`AnalyzeRule` 2420 行都过了。
+
+这个包从 3a 最早期的「`AnalyzeRule` 是 7 行占位、rss 包编译不过」一路做到全部落地，
+中间跨了 20 多个批次。
