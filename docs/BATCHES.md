@@ -1572,3 +1572,19 @@ inline fun <reified T> Gson.fromJsonObject(json: String?): Result<T?> =
 **四个重载（String / InputStream × Object / Array）都要补 `as`。**
 风险：这是 inline 函数，改完所有调用点的字节码都会变 —— **必须全量重跑两道闸门**，
 不能只看这几个类。留到专门一批做。
+
+### 3a-25 `BookChapterList`（229 行 CFR，4 个类）
+
+**状态：4/4 类名一致；3/4 指令级完全一致；本体 2 个方法 loose；ABI 全一致。**
+
+**关键坑：`debugLog?.let { it.log(...) }` 比 `if (debugLog != null) { ... }` 多占一个
+lambda 编号。** 症状是 `$analyzeChapterList$4$asyncArray$1$1` vs 制品的
+`$3$asyncArray$1$1`——整体差 1，而代码逻辑完全看不出问题。
+
+把开头那个 `?.let` 改成正向 `if`，四个类名立刻全对。这是 3a-8 第 4 条
+（`$lambda-N` 是**文件级**计数器）的第一次「反向应用」：
+之前都是「少写了一层 lambda 要补回去」，这次是「多写了一层要拆掉」。
+
+**排查顺序**：类名差 1 时不要急着读全部源码，先数文件里有几个 `?.let` / `forEach` /
+`runCatching` / `Array {}` / `async {}`——内联 lambda 一样占编号，但它们不生成
+`$lambda-N` 方法，`javap | grep lambda` 是查不到的。
