@@ -1791,3 +1791,20 @@ Gradle 的 java 源集本来就可用，**直接往那儿写就行**。以后遇
 `RuleAnalyzer` 源码化之后，`AnalyzeRule.kt`（源码）对它的引用风险解除——
 之前 `RuleAnalyzer` 是制品类而签名里带 `AnalyzeRule$SourceRule`（源码），
 属于随时会爆的混编隐患。
+
+### 3a-36 `Encoding` / `EncodingDetectHelp` 补成 Java 源（3a-28 的遗留收尾）
+
+3a-28 里按 Kotlin 写 `Encoding` 失败（多出 `Encoding$Companion`），当时记成「等 java 源集」。
+3a-35 发现 `src/main/java` 早就在用（`QueryTTF`、`BytesEncodingDetect` 都是 Java），
+于是把 CFR 的 Java 源码清掉头注释直接搬过去：
+
+- `Encoding.java`（112 行）+ `EncodingDetectHelp.java`（65 行）
+- **坑**：`sed '1,4d'` 把 `package` 行也删掉了，两个文件掉进默认包，
+  `EncodingDetectHelp` 访问同包的 `BytesEncodingDetect` 直接报
+  「BytesEncodingDetect 在 io.legado.app.help 中不是公共的」。
+  补回 `package io.legado.app.help;` 立刻过。
+  **教训：CFR 输出的头 4 行里就包含 `package` 声明，别整个 schedule 删。**
+- 类名 2/2 + 1/1 一致，ABI 不变（637 / 609 / 12）
+
+**顺手发现**：`BytesEncodingDetect.java`（3983 行）**早就是 Java 源了**——
+help 包的 Java 部分其实一直是通的，只是我从没检查过 `src/main/java`。

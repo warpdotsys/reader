@@ -1,8 +1,5 @@
-/*
- * Restored from reader-pro-3.2.14.jar; see docs/PROVENANCE.md.
- */
-
 package io.legado.app.help;
+
 
 import io.legado.app.help.BytesEncodingDetect;
 import io.legado.app.utils.TextUtils;
