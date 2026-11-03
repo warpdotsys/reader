@@ -2139,3 +2139,83 @@ BookController 不符合这个前提：
 **从 114 个类名的差集出发，一次只补 5–10 个通不过的类**，每补一轮就编译 + diff 类名，
 **用类名差集当唯一的进度指标**（它是离散的、可数的、不会骗人）。
 这相当于把「一次性大还原」换成「按类名差集爬坡」，更适合这种结构不规则的大文件。
+
+### 3a-44 BookController 第二次尝试的完整分析：三个硬阻塞
+
+（回滚结论见 3a-43，这里补报告带出来的根因）
+
+#### 硬阻塞 1：制品用 `-Xsam-conversions=indy` 编的，本仓不是
+
+`BookController` 外层类的 ABI diff 里有 7 条**唯一**的
+`descriptor: (Lkotlin/jvm/internal/Ref$BooleanRef;Lcom/htmake/.../BookController;Ljava/lang/Void;)V`
+—— 来自 `closeHandler { }` 这类 **Java SAM**（CFR 的 import 里有 `java.lang.reflect.LambdaMetafactory`）。
+
+本仓把这些编成 `$N` 类，**永远产生不了这些静态 `$lambda-N` 方法**。
+**外层类因此不可能 byte-level ABI 相等**，必须先做一次「加 `-Xsam-conversions=indy` +
+全量重跑两道闸门」的构建级实验（性质同 3a-41，需单开批次）。
+
+#### 硬阻塞 2：`Book.kt` 的属性名与制品元数据不一致
+
+制品 `Book` 的 `@Metadata` 里属性名是 `"isInShelf"`；本仓写
+`@get:JvmName("isInShelf") var inShelf`——**JVM 层 ABI 相同，但源码层不同**。
+
+后果：**一旦存在 `BookController.kt`，`FileController.kt:521` 的
+`result.first.isInShelf` 立刻编译失败**（类型从「制品 Book」变成「源码 Book」）。
+
+实测：**改 `Book.kt` 一行即可（ABI 不变）**。这也解释了上次为什么有人加
+`val Book.isInShelf` 扩展——**根因在 `Book.kt`，不在 `BookController`**。
+
+#### 硬阻塞 3：25 个续体类只差 ±1 个 spill 字段
+
+`deleteBooks$1 +L$3`、`getBookInfo$1 +L$5`、`bookSourceDebugSSE$1 -L$3`、
+`ttsByApi$1 -L$1,-L$2` 等。每个方法多留/少留一个跨挂起点的局部变量。
+**可以靠「生成→量化→调参」逐条收敛，但 25 个方法 × 逐个调，单会话做不完。**
+
+另外可直接修的：`setCover` 多一个 `userNameSpace` 形参、`getBookShelfBooks` 缺默认参数
+（少 `$default` 桥）、4 个 `access$` 合成器缺失。
+
+#### 留下的工具（在 `C:/Users/chong/AppData/Local/hermes/cache/scratch/bc/`）
+
+- `WIP_BookController.kt`：1841 行候选（54 类名、ABI 26），可直接续做
+- `all.json`：114 个类的 javap 全量签名（56 续体 / 30 Lambda / 9 SuspendLambda /
+  6 `toDataClass` / 3 `CoroutineExceptionHandler` / 1 `sortByDescending` /
+  1 `AdaptedFunctionReference` / 2 门面）
+- `abi_count.py` / `dc.py`：**秒级本地 ABI 逐类 diff**（不用等 4 分钟的 verify-abi）
+- `filt.py`：剥离协程脚手架，把 CFR 读成类 Kotlin 形态
+
+#### 建议顺序
+
+1. 先修 `Book.kt` 的 `inShelf` → `isInShelf`（1 行，ABI 不变），否则任何 BookController.kt 都编不过
+2. 单开一批试 `-Xsam-conversions=indy`，看它是否同时改善多个类的 `$lambda-N`（可能一次解锁外层类 ABI）
+3. 用 `bc/` 里的脚本按「一方法一测」推进：每个方法编译后只跑 `dc.py <类名>`，±1 spill 当场调
+
+### 3a-45 【进行中】`-Xsam-conversions=indy` 构建实验
+
+3a-44 发现制品 `BookController` 有 7 条 indy 形态的 SAM lambda
+（`descriptor: (Lkotlin/jvm/internal/Ref$BooleanRef;Lcom/htmake/.../BookController;Ljava/lang/Void;)V`），
+而本仓编成 `$N` 类。于是给 `build.gradle.kts:126` 加上 `-Xsam-conversions=indy` 试一次
+（备份在 `scratch/build.gradle.kts.bak2`）。
+
+**已确认的中间结果**：
+
+- 编译 `BUILD SUCCESSFUL`
+- `class-coverage` **完全不变**（800 / 784 / 152 / 16）——说明这个 flag **不改变生成哪些类**，
+  只改变调用点的形态（`invokedynamic` vs `new $N`）
+- `RestVerticle` 抽样：仍 5/6 一致（与改动前相同）
+- `YueduApi` 的 148 类：待验
+
+**verify-abi 结果（全量）**：**800 比对 / 772 一致 / 12 不一致 / 16 制品无此类** ——
+与改动前**完全相同**。
+
+**结论：保留这个 flag。**
+
+理由是三条：
+1. 对现有 800 个类的 ABI **零影响**（已验证），不存在破坏风险；
+2. 制品 `BookController` 确实有 indy 形态的 SAM lambda（3a-44 的 7 条 descriptor 是硬证据），
+   加了这个 flag 才**有可能**对上；
+3. 3a-41 的 `-Xjsr305=strict` 实验是「ABI 不变且目标类也不变」→ 无效回滚；
+   这次不同——**目标类（BookController）还没落地**，收益暂时无法验证，
+   但**不存在副作用**，所以留着等 BookController 重做时直接受益。
+
+**待办**：BookController 重做后要**回头看这个 flag 到底有没有让那 7 条 indy descriptor 对上**。
+如果没对上，说明还有别的构建差异没找出来；如果对上了，这就是「外层类 ABI 相等」的前提条件。
