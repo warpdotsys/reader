@@ -1804,6 +1804,30 @@ ABI 无新增（608 比对 / 580 一致 / 12 不一致）。**
 2. 先做两个独立的（3a-33），最后做依赖它们的 `WebBook`；
 3. `WebBookKt` 门面跟本体同文件，不单独建（3a-16）。
 
+#### 补记 6 条规约（报告到货后整理）
+
+1. **`getBookSource()` 必须是函数，不是属性**。制品里除 `sourceUrl`（`getfield`）外，
+   所有方法都用 `invokevirtual getBookSource()`。源码写 `val bookSource` 属性 →
+   内部访问全是 `getfield`，6 个方法立刻红。正确形态：
+   `private val bookSource` + `fun getBookSource() = bookSource`，调用点显式写 `getBookSource()`。
+2. **二级构造器（String 版）必须放在类体最前**（属性访问器之后、`sourceUrl` 之前）。
+   它决定常量池里 `BookSource.Companion.fromJson-IoAF18A`、`Result.isFailure-impl`、
+   `0x3FFFFFF` 那批常量的**入场顺序**；放到类尾会让后面所有索引整体前移 25 条，
+   **跨过 255 边界 → `ldc` 变成 `ldc_w`** → `getBookContent` 分支位移差 1 字节 →
+   4 个方法被误报为「结构与调用不同」。
+   **这是第一次把「常量池索引跨 255 改变指令宽度」当成一等公民记下来**——
+   以前只当归一化里的一个数值，现在知道它会被源码顺序影响。
+3. **判空直接写 `!book.infoHtml.isNullOrEmpty()`**，不要先 `val x = book.xxx`：
+   多一对 `astore/aload`，`getBookInfo` 整体偏移 +4 且槽位全体 +1。
+4. **`debugger` 要用「三个 `return` 的块状 getter」**，写成 `?:` / if-else 表达式
+   会生成 goto 合并与多余 checkcast。
+5. `BookSource.setUserNameSpace/setLogger`、`Book.setUserNameSpace`、
+   `SearchBook.setUserNameSpace` 在源码里都是**函数**，`obj.userNameSpace = x` 编不过；
+   `StrResponse` 同时有 `url()` 与 `getUrl()`，制品调 `getUrl()`。
+6. 遗留的 `preciseSearch` 已试过表达式体/块体、显式 `this@WebBook`、拆局部变量、
+   `?.let` 换 `?: throw` 等写法，Kotlin 1.5.21 一律生成同样的接收者物化，
+   判定为编译噪声而非语义差异。
+
 ### 3a-35 `RuleAnalyzer`（765 行）+ `QueryTTF`（607 行 **Java**）
 
 **状态：类名 4/4 + 16/16 全一致；18/20 指令级完全一致；两个本体各有 2–4 个方法 loose；
