@@ -1758,3 +1758,19 @@ ABI 无新增（608 比对 / 580 一致 / 12 不一致）。**
 
 **webBook 包现在只剩 `WebBook.kt`（972 行）+ `WebBookKt`（21 行门面）**，
 门面必须跟本体同文件，所以做 `WebBook` 时一起出。
+
+### 3a-34 `WebBook`（972 行 CFR，9 个类）——webBook 包收官
+
+**状态：9/9 类名一致；8/9 指令级完全一致（含 `WebBookKt` 门面与 7 个状态机）；
+本体只有 1 个方法 loose；ABI 无新增（617 比对 / 589 一致 / 12 不一致）。**
+
+972 行的 `class WebBook`（双构造器 + `@JvmOverloads` + 5 个 suspend 成员），
+一次做下来本体只差 1 个方法——**本工程里大文件还原质量最好的一次**。
+
+**webBook 包至此全部完成**：`BookChapterList` / `BookInfo` / `BookList` / `BookContent` /
+`WebBook` / `WebBookKt` 共 6 个顶层文件、28 个类，全部类名一致。
+
+回头看的顺序是对的：
+1. 先用 `javap -p WebBook | grep BookContent` 探依赖，确认 `BookList`/`BookContent` 各自独立；
+2. 先做两个独立的（3a-33），最后做依赖它们的 `WebBook`；
+3. `WebBookKt` 门面跟本体同文件，不单独建（3a-16）。
