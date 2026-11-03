@@ -1741,6 +1741,35 @@ ABI 无新增（601 比对 / 573 一致 / 12 不一致）。**
 命中就说明这个包必须整组切。localBook 和 webBook 都是这么判出来的：
 localBook 5 个文件 2013 行、webBook 3 个文件 2110 行，**一个都不能单独切**。
 
+另外：`TextFile.kt` 原来是 **7 行 logger 占位**，不是完整实现——之前看它能编译就以为
+有内容，实际上「能编译」不等于「有实现」。
+
+#### 规约（8 条，全部实测）
+
+1. **`Map<String, Any>` 的属性会写进 `+Ljava/lang/Object;`（声明处 variance）**，制品是无通配的
+   `Map<String,Object>`。症状：ABI 单里 `setInfo(Map<String, ? extends Object>)` vs
+   `setInfo(Map<String, Object>)`。解药：`var info: Map<String, @JvmSuppressWildcards Any>? = null`。
+   这是本批唯一可能新增 ABI 不一致的来源（CbzFile / PdfFile 各一处）。
+   注意 `Pair<Map<String, Any>, ...>` 的方法签名反而本来就不带通配，**只有属性/getter/setter 要修**。
+2. **`okhttp3.internal.Util.closeQuietly` 在 okhttp 4.9.1 里是 Kotlin `internal` 类**：
+   `import okhttp3.internal.Util` 直接 `Unresolved reference`，
+   `@Suppress("INVISIBLE_MEMBER","INVISIBLE_REFERENCE")` 也无效（成员级才管用，类级不可见）。
+   只能写 `try { document.close() } catch (e: IOException) {}`。
+   **PdfFile 的这 2 处字节码永远 loose，属工具链边界，不是写法问题。**
+3. **`for (x in enumeration)` 走的是 `kotlin.collections.iterator()` 扩展（hasNext/next）**，
+   制品用的是 `hasMoreElements`。原版写的是 `while (entries.hasMoreElements())`，别「优化」成 for。
+4. **`BookChapter` 必须 `BookChapter()` + 逐个 setter**：具名参数会走 `$default` 构造器，
+   少掉 `setTitle/setIndex/setBookUrl/setUrl` 四条调用，方法直接判结构差异。
+5. **`name == "ComicInfo.xml"` 编成 `Intrinsics.areEqual`，制品是 `String.equals`**——
+   原版写的是 `name.equals(...)`。平台类型（`entry.name`）上的 `==` 一律走 areEqual。
+6. **伴生对象的 `upBookInfo(book, onlyCover)` 用早返回**：`if (onlyCover) { ...; return }`。
+   写成 `if/else` 会多一条 `goto`，4 个 Companion 一起中招。
+7. **文件级 `private val logger` 被 Companion 用到时，门面类里才出现 `access$getLogger$p`**；
+   `TextFile.kt` 的 logger 没人引用，门面里只有字段没有 accessor。这两个门面
+   （`EpubFileKt` / `TextFileKt`）是本批唯二指令级完全一致的类，可当「logger 有没有被引用」的判据。
+8. **整组切确认有效**：5 个源码类就位后，`LocalBook.kt`（3a-29 验收版，一行未改）
+   一次编译通过，3a-30 的 `Cannot access class 'BookChapter'` 消失。
+
 ### 3a-33 `BookList` / `BookContent`（613 / 525 行 CFR）
 
 **状态：7/7 类名一致；5/7 指令级完全一致；两个本体各有 1–2 个方法 loose；
