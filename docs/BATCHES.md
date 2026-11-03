@@ -1869,3 +1869,26 @@ ABI 零新增（652 比对 / 624 一致 / 12 不一致）。**
 
 这个包从 3a 最早期的「`AnalyzeRule` 是 7 行占位、rss 包编译不过」一路做到全部落地，
 中间跨了 20 多个批次。
+
+### 3a-39 【回滚】`BookController` 首次尝试：83/114 类，ABI 12 → 50
+
+派子代理做 `BookController`（11622 行 CFR，114 个类）——工程最大的一块。
+它 41 分钟交了 **2170 行 Kotlin，能编译**，但：
+
+- 类名 **83/114**：缺 31 个合成类（`$addBookGroupMulti$2`、`$cacheBookSSE$3/$4`、
+  `$getBookContent$$inlined$toDataClass$1`、`$backupToMongodb$handler$1`、
+  `$$inlined$CoroutineExceptionHandler$1` 等）
+- ABI **12 → 50**（新增 38 处不一致）
+
+**决定回滚。** ABI 是硬指标，从 12 涨到 50 是退步——按「每批只允许既有已知差异保持不变」
+的规矩，宁可不要这 83 个类。`git` 工作区已清空，构建恢复 `BUILD SUCCESSFUL`。
+
+#### 下次怎么做得更好
+
+1. **11622 行不可能在一次子代理会话里做完**（它光读 CFR 就花了 20 分钟）。
+   正确姿势：先用 `javap -p -s` 把 114 个类的**完整成员签名**导出来，按
+   「签名先全对、方法体后补」的顺序分 3–4 次会话做，每次只做 1/3。
+2. **类名 diff 是最便宜的止损点**：83 vs 114 一眼能看出来，不用等 ABI 跑 4 分钟。
+   以后大文件先看类名，差得多就直接回滚，不往下验。
+3. 这个文件缺的合成类大量是 `$$inlined$` 系列（内联函数 + lambda），与
+   `GsonExtensions` 那个已知根因（3a-24）同源——**修 GsonExtensions 可能一次消掉其中好几处**。
