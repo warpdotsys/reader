@@ -6,7 +6,11 @@ import com.htmake.reader.db.DB
 import com.htmake.reader.utils.gson
 import io.vertx.core.json.JsonArray
 import io.vertx.core.json.JsonObject
+import mu.KLogger
+import mu.KotlinLogging
 import io.vertx.ext.web.RoutingContext
+
+private val logger: KLogger = KotlinLogging.logger { }
 
 /**
  * Controller 的通用 CRUD 契约。

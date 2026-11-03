@@ -105,7 +105,13 @@ class Coroutine<T> constructor(
         job.cancel(cause)
         cancel?.let {
             MainScope().launch {
-                dispatchVoidCallback(scope, it)
+                if (it.context == null) {
+                    it.block(scope)
+                } else {
+                    withContext(scope.coroutineContext + it.context) {
+                        it.block(this)
+                    }
+                }
             }
         }
     }

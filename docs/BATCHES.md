@@ -2355,3 +2355,38 @@ psi2ir / IR lowering 两阶段崩。
   `if (context == null) block(scope) else withContext(scope.coroutineContext + context) { block(this) }`。
   写成 `dispatchVoidCallback(scope, it)` 会少一层状态机。`dispatchVoidCallback` 本身在
   `start` / `finally` 还用着，**不能删**。
+
+### 3a-50 剩余 27 个零散类的两类根因（都不可当场解）
+
+152 个缺的类里，`BookController` 占 114，剩下 38 个本轮清点完毕：
+
+**已做的 11 个**：`Debugger`（8）+ `CURDKt`（2）+ `Coroutine$cancel$1$1$1`（1）
+
+**剩余 27 个，卡在两处**：
+
+#### 根因 A：`License` 编译崩溃（12 类）
+
+- `LicenseController`（10 类） + `LicenseControllerKt`（2 类）
+- 任何类调用 `License.validHost(String)` 时，Kotlin 1.5.21 在 psi2ir / IR lowering 必崩
+  （3a-8 记录过 6 种写法全无效；3a-47 确认换 Java 源也不行）
+
+#### 根因 B：lambda 编号错位（15 类）
+
+- `SourceAnalyzer`（11 类）：`SourceAnalyzer$jsonToBookSource_IoAF18A$lambda-10$$inlined$fromJsonObject$1..10`
+- `BaseSource`（3 类）：`$DefaultImpls$getHeaderMap$lambda-4$lambda-2$$inlined$fromJsonObject$1` 等
+- `JsExtensions`（1 类）：`$connect$2$invokeSuspend$$inlined$fromJsonObject$1`
+
+**判据**：类名里的 `$lambda-N` 是**文件级计数器**（3a-8 第 4 条）。
+我们文件里的 lambda 数量/顺序与制品不同 → N 偏移 → 整串类名对不上。
+
+**`SourceAnalyzer` 的特殊性**：我们的 `jsonToBookSource` 里 `fromJsonObject` 调用 **11 次**，
+CFR 里 **105 次**。但这不是「补调用」就行——`$lambda-10` 这个**外层编号**决定了全部 10 个子类的名字，
+**必须先让整个文件的 lambda 序列与制品完全一致**，才可能对上。这跟 `BookController` 是同一类问题：
+**编号是全局的，局部对齐无效**。
+
+#### 结论
+
+**零散类这条线也做到头了**。剩下 27 个（+ BookController 114）都需要「整文件 lambda 序列对齐」，
+成本远高于收益，且 BookController 已经证明这条路在当前工具链下走不通。
+
+**全工程可交付状态**：`800 + 11 = 811` 个类，缺 141。
