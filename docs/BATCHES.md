@@ -1708,3 +1708,17 @@ LocalBook.kt: (51, 39): Cannot access class 'io.legado.app.data.entities.BookCha
 **新的判断方法（动手前 30 秒能做完）**：看这个包引用的**制品类的方法签名里有没有源码类**。
 `javap -p <制品类> | grep <源码类名>` 有命中，就必须整组切；没有才能单文件推进。
 这条比「二进制不能引用源码」更好用，因为它能提前判断，而不是编译崩了才发现。
+
+### 3a-31 `com.htmake.reader.db` 本来就有实现，别再重写
+
+我按 CFR 重写了 `DB` / `JSONTable` / `SQLTable`（114/170/169 行），编译炸在
+`Unresolved reference: mapTo` 和 `saveStorage` 的参数类型上。`git status` 一查：
+**这三个文件本来就存在**（48 / 124 / 122 行），我只是把好好的实现覆盖了。
+`git checkout --` 恢复后编译立刻通过。
+
+**教训（skill 里已经写过，但我没执行）**：动手前**先 `read_file` 看目标文件**，
+不要凭「这个包还没做」的印象就直接写。判断未还原的正确姿势是
+`grep -c 'class ' <file>` 或直接看行数，不是凭 coverage 的包级统计。
+
+db 包现状：5 个顶层类比对，2 个指令级一致，`SQLTable` 还有 4 个方法 loose，
+`DB` / `JSONTable` 已基本对齐——是**既有实现的小瑕疵**，不是缺文件。
