@@ -1588,3 +1588,37 @@ lambda 编号。** 症状是 `$analyzeChapterList$4$asyncArray$1$1` vs 制品的
 **排查顺序**：类名差 1 时不要急着读全部源码，先数文件里有几个 `?.let` / `forEach` /
 `runCatching` / `Array {}` / `async {}`——内联 lambda 一样占编号，但它们不生成
 `$lambda-N` 方法，`javap | grep lambda` 是查不到的。
+
+### 3a-26 【阻塞】`BookInfo` 被混编陷阱卡住（BaseBook 二进制 vs RuleDataInterface 源码）
+
+`BookInfo.kt` 已按 391 行 CFR 写完（200 行 Kotlin），但编译崩在：
+
+```
+class io.legado.app.data.entities.BaseBook, unresolved supertypes:
+  io.legado.app.model.analyzeRule.RuleDataInterface
+```
+
+根因：`BaseBook` 仍是**制品二进制类**，它 `extends RuleDataInterface`；而 `RuleDataInterface`
+在 3a-15 已经换成**源码**。二进制类不能引用源码类（skill 里的混编顺序陷阱）。
+
+**试过把 BaseBook 也换成源码**（106 行 CFR：接口 + `getKindList()` 默认实现 + DefaultImpls 的
+`getVariable` 委托），结果**级联更严重**：
+
+```
+class io.legado.app.data.entities.Book, unresolved supertypes: BaseBook
+class io.legado.app.data.entities.SearchBook, unresolved supertypes: BaseBook
+class com.htmake.reader.api.controller.BookController, unresolved supertypes: BaseController
+```
+
+BaseBook 源码版自己没编过，Book / SearchBook 跟着挂。**已全部回滚**，仓库干净
+（`rm -f BookInfo.kt BaseBook.kt` 后 BUILD SUCCESSFUL）。
+
+**诡异之处**：`BookChapterList.kt` 同样访问 `book.bookUrl`（BaseBook 的成员）、
+`book.getUserNameSpace()`（RuleDataInterface 的成员），却编译通过。
+说明这个混编边界是**编译器行为不稳定的区域**，不是干净的「二进制不能引用源码」一刀切——
+同一个耦合，在 A 文件里过、在 B 文件里炸。
+
+**结论**：webBook 剩余文件（`BookInfo` / `BookList` / `BookContent` / `WebBook` / `WebBookKt`）
+在 `BaseBook` 完成源码化之前都有踩雷风险。要往下走，得先把
+`BaseBook` + `BaseSource` + 它们的实现者**整组**切成源码并同步验证——那是独立一批的活，
+不能顺手夹带。当前 `BookChapterList` 是安全的（已验收），剩余 5 个文件挂起。
