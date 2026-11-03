@@ -1774,3 +1774,20 @@ ABI 无新增（608 比对 / 580 一致 / 12 不一致）。**
 1. 先用 `javap -p WebBook | grep BookContent` 探依赖，确认 `BookList`/`BookContent` 各自独立；
 2. 先做两个独立的（3a-33），最后做依赖它们的 `WebBook`；
 3. `WebBookKt` 门面跟本体同文件，不单独建（3a-16）。
+
+### 3a-35 `RuleAnalyzer`（765 行）+ `QueryTTF`（607 行 **Java**）
+
+**状态：类名 4/4 + 16/16 全一致；18/20 指令级完全一致；两个本体各有 2–4 个方法 loose；
+ABI 无新增（637 比对 / 609 一致 / 12 不一致）。**
+
+**`QueryTTF` 是纯 Java 类**——子代理按 3a-28 的判据（`javap -v | grep Metadata` 为 0）
+主动写进了 `src/main/java/io/legado/app/model/analyzeRule/QueryTTF.java`（607 行）。
+
+**这解开了 3a-28 留下的悬念**：当时记的是「等 java 源集方案」，实际上
+`src/main/java` 早就存在（`com/htmake/reader/lib/tts/**` 一堆 Java 源），
+Gradle 的 java 源集本来就可用，**直接往那儿写就行**。以后遇到无 `@Metadata` 的类，
+不用再标记为阻塞，直接 `.java` 落到 `src/main/java` 对应包路径。
+
+`RuleAnalyzer` 源码化之后，`AnalyzeRule.kt`（源码）对它的引用风险解除——
+之前 `RuleAnalyzer` 是制品类而签名里带 `AnalyzeRule$SourceRule`（源码），
+属于随时会爆的混编隐患。
