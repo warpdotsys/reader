@@ -1622,3 +1622,25 @@ BaseBook 源码版自己没编过，Book / SearchBook 跟着挂。**已全部回
 在 `BaseBook` 完成源码化之前都有踩雷风险。要往下走，得先把
 `BaseBook` + `BaseSource` + 它们的实现者**整组**切成源码并同步验证——那是独立一批的活，
 不能顺手夹带。当前 `BookChapterList` 是安全的（已验收），剩余 5 个文件挂起。
+
+### 3a-27 `BookInfo`（391 行 CFR）+ `BaseBook` 源码化
+
+**状态：`BaseBook` 2/2 类名一致（DefaultImpls 1 方法 loose）；`BookInfo` 1/1 类名一致、
+9 个方法 loose；ABI 从 11 变成 12（新增的那一处正是 `BookInfo`）。**
+
+#### 解决混编阻塞
+
+3a-26 里 `BookInfo` 崩在 `BaseBook`（二进制）无法解析 `RuleDataInterface`（源码）。
+这次把 `BaseBook` 也零件化（106 行 CFR：7 个 `var` + `getKindList()` 默认实现），
+**这次编译通过了**——上一次失败是我自己文件里 `splitNotBlank(",", "\n")` 的转义写坏了，
+不是设计问题。教训：**混编失败时先看自己的文件有没有低级错误，再怀疑架构**。
+
+#### BookInfo 的两点
+
+1. **`coroutineContext.ensureActive()` 需要 `import kotlin.coroutines.coroutineContext`**，
+   否则报 `Unresolved reference: coroutineContext`（suspend 函数里不是自动可见的）。
+2. **ABI 差一处：`access$analyzeBookInfo`**。制品有
+   `public static final Object access$analyzeBookInfo(...)` 这个合成桥，我们没有。
+   原因是 private 的 8 参重载与它的调用点（public 的 7 参重载）在**同一个类**里，
+   编译器认为不需要桥。制品却有，说明原文的调用点与 private 定义之间有跨类语义
+   （很可能 `$default` 合成方法也参与调用）。留待后续单独处理。
