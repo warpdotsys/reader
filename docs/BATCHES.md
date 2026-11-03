@@ -1510,3 +1510,30 @@ JVM 描述符完全相同。**这类噪声占 66 处的大多数**（类型别�
 **用法定位：这个脚本不是闸门，是定位器。** 当某个类的行为可疑时，用它看声明形态
 （属性还是函数、默认值写法、声明顺序）；不要把它当成第二个 verify-abi 去逐项追平——
 66 处里追平的收益接近零，风险是把本来正确的类改坏。
+
+### 3a-23 `AnalyzeUrl` 补全（24 个类）——ABI 不一致从 13 降到 11
+
+**状态：24/24 类名一致；18/24 指令级完全一致；本体 9 个方法 + `UrlOption` 4 个方法 loose；
+`AnalyzeUrl` 与 `AnalyzeUrl$UrlOption` 两个本体已从不一致清单里救出。**
+
+子代理中途被 provider 掐断（71 次调用 / 16 分钟），但它落盘的 161 行改动（574 → 650 行）
+是有效的：编译通过、ABI 从 13 直接降到 11。
+**中断的子代理不要从零重来**——先编译、先跑闸门，看它留在盘上的东西值多少。
+
+剩下唯一一处 `AnalyzeUrl$UrlOption$getHeaderMap$$inlined$fromJsonObject$1`，与
+`BookChapter$variableMap$2` 同源（`GsonExtensionsKt.fromJsonObject` 的内联展开），
+属已知上游问题，不是 AnalyzeUrl 自己的写法。
+
+#### 现在这 11 个 ABI 不一致的构成（必须心里有数）
+
+| 类 | 性质 |
+| --- | --- |
+| `Book` | 3a-10 的 `@get:JvmName` 私有字段名代价 |
+| `AnalyzeRule$ajax$1` | 3a-18 的 `L$0` 溢出槽 |
+| `RemoteWebview$getStrResponse$strResponse$1` | 2d 批既有 |
+| `Coroutine$cancel$1$1` / `$executeBlock$2` / `$executeBlock$2$1` | 2d 批既有（3 处） |
+| `JsExtensions$ajaxAll$1` / `$connect$1` / `$connect$2` / `$queryTTF$font$1` | 2d 批既有（4 处） |
+| `AnalyzeUrl$UrlOption$getHeaderMap$$inlined$fromJsonObject$1` | GsonExtensions 上游问题 |
+
+**9 个是 2d 批就存在的**，2 个是我们自己引入的（Book / `AnalyzeRule$ajax$1`），
+1 个等上游（GsonExtensions）修。**再往下压需要先动 GsonExtensions，那是全局影响面。**
