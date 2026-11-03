@@ -1740,3 +1740,21 @@ ABI 无新增（601 比对 / 573 一致 / 12 不一致）。**
 **这组值得记的方法论**：`javap -p <制品类> | grep <源码类名>` 先探一遍——
 命中就说明这个包必须整组切。localBook 和 webBook 都是这么判出来的：
 localBook 5 个文件 2013 行、webBook 3 个文件 2110 行，**一个都不能单独切**。
+
+### 3a-33 `BookList` / `BookContent`（613 / 525 行 CFR）
+
+**状态：7/7 类名一致；5/7 指令级完全一致；两个本体各有 1–2 个方法 loose；
+ABI 无新增（608 比对 / 580 一致 / 12 不一致）。**
+
+先用 3a-30 的判据探了一遍依赖：
+- `javap -p WebBook | grep BookContent` **命中** → `WebBook` 依赖 `BookContent`
+- `BookList` / `BookContent` 各自只引用自己 → **可以单独做**
+
+所以顺序是 BookList + BookContent 先，`WebBook`（972 行）最后。
+
+`BookContent` 那个三段式结构（外层调 private 重载 → 单页 `while` 翻页 →
+多页 `withContext(Dispatchers.IO)` 里 `Array(size){ async{} }` 再 `forEach{ await() }`）
+写对了，只差 1 个方法；`BookList` 差 2 个。
+
+**webBook 包现在只剩 `WebBook.kt`（972 行）+ `WebBookKt`（21 行门面）**，
+门面必须跟本体同文件，所以做 `WebBook` 时一起出。
