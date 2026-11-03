@@ -1537,3 +1537,38 @@ JVM 描述符完全相同。**这类噪声占 66 处的大多数**（类型别�
 
 **9 个是 2d 批就存在的**，2 个是我们自己引入的（Book / `AnalyzeRule$ajax$1`），
 1 个等上游（GsonExtensions）修。**再往下压需要先动 GsonExtensions，那是全局影响面。**
+
+### 3a-24 【待验证】`GsonExtensions.fromJsonObject` 缺 `as T?` —— 4 处 loose 的共同根因
+
+对照 CFR（`reference/decompiled/io/legado/app/utils/GsonExtensionsKt.java` 50-75 行），
+制品的 `fromJsonObject` 在 `fromJson` 之后有一条我们**没有**的指令：
+
+```java
+Object t = $this$fromJsonObject.fromJson(json, type);
+Intrinsics.reifiedOperationMarker(2, "T");     // ← 本仓库缺
+Object t2 = t;
+object = Result.constructor-impl(t2);
+```
+
+`reifiedOperationMarker` 只在**用了 reified 类型参数的强制转换**时才生成。
+也就是说原文是：
+
+```kotlin
+inline fun <reified T> Gson.fromJsonObject(json: String?): Result<T?> =
+    runCatching { fromJson<T>(json, genericType<T>()) as T? }        // ← 缺 as T?
+```
+
+本仓库现在写的是 `runCatching { fromJson<T>(json, genericType<T>()) }`，没有 `as T?`，
+所以内联展开到每个调用点都少这一条 —— 这正是
+
+- `BookChapter$variableMap$2`
+- `SearchBook$variableMap$2`
+- `Book$variableMap$2`
+- `AnalyzeUrl$UrlOption$getHeaderMap$$inlined$fromJsonObject$1`（唯一还挂在 ABI 不一致清单里的那个）
+
+四处差异的共同根因。`fromJsonArray` 同理（`as List<T>?`，制品对应
+`reifiedOperationMarker(4, "T")` + `t instanceof List ? (List) t : null`）。
+
+**四个重载（String / InputStream × Object / Array）都要补 `as`。**
+风险：这是 inline 函数，改完所有调用点的字节码都会变 —— **必须全量重跑两道闸门**，
+不能只看这几个类。留到专门一批做。
