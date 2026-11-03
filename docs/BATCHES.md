@@ -1987,3 +1987,57 @@ ABI 零新增（652 比对 / 624 一致 / 12 不一致）。**
 **字节码只告诉你「不一样」，行为差分才告诉你「错没错」。**
 遇到 `continue` / `break` 这种控制流可疑的地方，这个手段比逐条比指令便宜得多，
 而且能抓到那种「字节码只差一条指令、但逻辑完全跑偏」的错误（上面第 2 条就是）。
+
+### 3a-38 补记：AnalyzeByJSoup 的 6 条规约 + 一个 build 配置级发现
+
+（主体见 3a-38 前段）
+
+#### 规约（6 条）
+
+1. **`-Xjsr305=strict` 下 `Element? == null` 编不过**：报
+   `No method 'equals(Any?): Boolean' available`。根因是 jsoup `Node.equals(Object)`
+   在 strict 下参数被视为非空。写 `temp === null` 即可，字节码与 `==` 完全相同（探针验过）。
+2. **`String.trim()` 在 1.5.21 里不内联**：编成 `invokestatic StringsKt.trim(CharSequence)`，
+   而制品是整段内联循环（`Intrinsics.compare(it, 32) <= 0`）。写 `trim { it <= ' ' }`
+   才逐指令一致——`SourceRule` 构造器 107 条指令由此从 52 复原到全等。
+3. **属性初始化器 ≠ `init {}` 块**：`var elementsRule: String = if (...) ... else ...`
+   写成 init 块会多两条 `nop`（SourceRule 因此差 2）。
+4. **`curList` 要声明成 `MutableList<Int?>`**：`add(curInt)` 才不会插
+   `Intrinsics.checkNotNull`，`first()` 才编成 `checkcast Integer`（制品如此）。
+5. **`val ix = n; n--` 编 `iinc`，`val ix = n--` 编 `iconst_m1; iadd`**——
+   同一语义两种写法指令不同。
+6. `while (0 <= n)`（常量在左）+ 循环体内 `continue` → 入口一次判断 + 回边一次判断，
+   与制品一致。
+
+#### ⚠️ build 配置级发现：`-Xjsr305=strict`
+
+`getResultLast` / `getElementsSingle` / `getString` 的一部分差异被证明**来自 build 配置而非源码**：
+
+同一段源码加 `-Xjsr305=strict` 会把 `checkNotNullExpressionValue` 从「变量名 + 使用点」
+挪到「表达式文本 + 赋值点」。制品的消息文本（`text` / `html` / `url` / `elements`）
+正是**不带该 flag** 的形态。
+
+**如果去掉这个 flag，好几个类的差异可能一次收敛**——这可能是继 3a-20（`rootProject.name`）
+之后第二个「改一行构建配置消掉一批差异」的机会。`build.gradle.kts` 目前不在任何批次的
+授权范围内，**需要单开一批做「去 flag + 全量重跑两道闸门」的实验**，不能顺手改。
+
+### 3a-41 【负结果】去掉 `-Xjsr305=strict` 对 ABI 与字节码都没有影响
+
+3a-38 补记里子代理推测：`getResultLast` / `getElementsSingle` / `getString` 的
+`checkNotNullExpressionValue` 消息文本差异，可能是因为 build 里加了 `-Xjsr305=strict`。
+
+实测（`build.gradle.kts:126` 改成 `freeCompilerArgs = listOf()` 后 `rm -rf build` 全量重编）：
+
+| 指标 | 有 strict | 去掉 strict |
+| --- | --- | --- |
+| ABI | 652 比对 / 624 一致 / 12 不一致 | **完全相同** |
+| AnalyzeByJSoup 字节码 | 4 类 / 2 一致 / 2 差异 | **完全相同** |
+
+**没有任何改善。** 已把 `build.gradle.kts` 原样恢复（`freeCompilerArgs = listOf("-Xjsr305=strict")`）。
+
+**结论**：`-Xjsr305=strict` 影响的是**可空性注解的严格性**（决定某些表达式编不编得过，
+例如 jsoup 的 `Element? == null` 会报 `No method 'equals(Any?): Boolean' available`），
+但**不影响** `checkNotNullExpressionValue` 的生成位置——那个由 Kotlin 1.5.21 的内联展开
+策略决定，源码层面改不动。
+
+**子代理那个假设是错的**，记下来免得后人再试。
