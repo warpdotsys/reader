@@ -1892,3 +1892,42 @@ ABI 零新增（652 比对 / 624 一致 / 12 不一致）。**
    以后大文件先看类名，差得多就直接回滚，不往下验。
 3. 这个文件缺的合成类大量是 `$$inlined$` 系列（内联函数 + lambda），与
    `GsonExtensions` 那个已知根因（3a-24）同源——**修 GsonExtensions 可能一次消掉其中好几处**。
+
+### 3a-40 `BookList` / `BookContent` 完整报告：8 条协程体重建规约
+
+（主体见 3a-33，这里补报告里带出来的规约与一次失败实验）
+
+#### 规约（8 条）
+
+1. **`javap -l -p` 是还原协程体最强的线索**：给出原始局部变量名、槽位、起止偏移。
+   `$i$a$-let-<类>$<方法>$N` 的 `N` 直接说明内联 lambda 的嵌套顺序与个数
+   （`BookList` 是 `$2 / $2$1 / $3 / $4`；`BookContent` 只有 `$2`）。
+   `LineNumberTable` 给出原文件行号，能反推语句分组（行号差 7 行说明中间有注释或空行）。
+2. **出现 `$this$xxx$iv` / `$i$f$xxx` / `*$iv` 变量就说明用了标准库内联高阶函数**。
+   制品没有这些 ⇒ 原文不是 `forEachIndexed`，而是手写
+   `var index = 0; for (item in xs) { … index++ … }`，且 `index++` 写在实参里。
+3. **`x.length > 0` 与 `x.isNotEmpty()` 字节码不同**：后者是 `checkcast CharSequence` +
+   `invokeinterface length`，前者是 `invokevirtual String.length`。
+   类名对、方法 loose 时先试这个。同理 `x.length == 0` ↔ `x.isEmpty()`。
+4. **省略默认参数会体现在 `$default` 的 mask 常量上**：`AnalyzeUrl` 传显式 null 得 288，
+   全用命名参数只传 source/ruleData/headerMapF/debugLog 得 318（= 制品）。
+   **看到 mask 差就数「哪些位没置」，别去调参数顺序。**
+5. **`@Throws` 只能加在制品真有的重载上**：`BookContent` 的 suspend 重载没有 `throws`
+   （加了立刻多 2 处 ABI 不一致），私有重载有。判据是 `javap -p -s` 行尾的 `throws`——
+   **它在 `-s` 模式下会打出来，所以算 ABI**。
+6. **参数名会进 lambda 的捕获字段**（`$bookChapter` vs `$chapter`），**也算 ABI**。
+   `javap -p` 里 `$` 前缀字段名对不上，八成是外层函数的参数名写错了。
+7. **`Ref$ObjectRef<T>.element` 的 `checkNotNullExpressionValue` 是本仓环境噪声**
+   （同一 stdlib 下制品没有），别为了它改源码形态，记成已知差异即可。
+8. **`StrResponse` 同时有 `url()` 和 `getUrl()`**；CFR 写 `getUrl()` 时多半真是 `getUrl()`，
+   动手前 `javap | grep -i url` 确认，别猜。
+
+#### 一个失败的实验：把 `BookInfo` 的 8 参重载改成 public
+
+报告指出 `BookList.getInfoItem` 永久差 1 条 `aload`，因为 `BookInfo` 的 8 参重载
+被写成 `private`（制品是 `public`）。试了：
+
+- 改成 `public` → **`BookInfo` 从 1 个 loose 方法变成 8 个**（`$default` 桥的生成方式跟着变）
+- 净效果变差，**已回滚**
+
+**结论**：这处「1 条 `aload`」的代价比「`BookInfo` 8 个方法」便宜，保持 `private`。
