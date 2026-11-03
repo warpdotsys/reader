@@ -1684,3 +1684,27 @@ BaseBook 源码版自己没编过，Book / SearchBook 跟着挂。**已全部回
    `var bookFile: File = book.getLocalFile()` 把类型钉死。
 3. `nameAuthorPatterns` 是 `object` 的 `private val arrayOf(...)`，对应制品的
    `private static final Pattern[]` + `static {}` 初始化，不要写成 companion。
+
+### 3a-30 【阻塞】localBook 的解析器组被 BookChapter 源码化反噬
+
+写完 `UmdFile`（244 行 CFR：class + companion + 5 个 `@Synchronized` 方法）后编译崩：
+
+```
+LocalBook.kt: (51, 39): Cannot access class 'io.legado.app.data.entities.BookChapter'
+```
+
+`BookChapter` 是 3a-11 已经验收的**源码类**。`LocalBook` 里 `EpubFile.getChapterList(book)`
+这类调用，接收者 `EpubFile` 还是**制品二进制**，而它的方法签名里带着 `BookChapter`——
+二进制类引用源码类，混编陷阱又踩一次。
+
+**和 3a-26（BaseBook）是同一个模式，但反噬方向相反**：上次是「实体接口 ← 二进制实现」，
+这次是「解析器（制品）→ 实体（源码）」。
+
+**结论**：localBook 这包要往下走，必须把 5 个解析器
+（`EpubFile` 623 / `TextFile` 609 / `CbzFile` 269 / `PdfFile` 268 / `UmdFile` 244，
+合计 2013 行 CFR）**整组**源码化，不能一个一个来。`LocalBook`（147 行）本身已验收
+（3a-29），它依赖的正是这 5 个。`UmdFile.kt` 已写完但删掉了——单独放进来只会让整仓编译红。
+
+**新的判断方法（动手前 30 秒能做完）**：看这个包引用的**制品类的方法签名里有没有源码类**。
+`javap -p <制品类> | grep <源码类名>` 有命中，就必须整组切；没有才能单文件推进。
+这条比「二进制不能引用源码」更好用，因为它能提前判断，而不是编译崩了才发现。
