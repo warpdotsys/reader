@@ -1955,3 +1955,35 @@ ABI 零新增（652 比对 / 624 一致 / 12 不一致）。**
 - 净效果变差，**已回滚**
 
 **结论**：这处「1 条 `aload`」的代价比「`BookInfo` 8 个方法」便宜，保持 `private`。
+
+### 3a-35 补记：RuleAnalyzer / QueryTTF 的 7 条规约
+
+（主体见 3a-35 前段）
+
+1. **CFR 会把循环末尾的 `break` 反写成 `if (cond) continue`** ——**语义全错**。
+   判据：`continue` 之后若字节码直接落到「循环后」块、没有回边 `goto`，那就是 `break`。
+   `chompCodeBalanced` / `chompRuleBalanced` 原文是 `if (depth <= 0 && otherDepth <= 0) break`，
+   照 CFR 写成 `continue` 会让 `pos` 扫到串尾——而 chomp 的返回值就是「这一段是否平衡」。
+2. **Kotlin 的 `continue` 只跳最内层循环**。CFR 的 `continue block0`（目标是最外层
+   `while(true)`）必须写 `continue@block0`；写在 `do{}while()` 里的裸 `continue` 跳的是内层。
+   **这次是靠行为差分抓到的——字节码层面只差一条指令，看不出错。**
+3. **`arrayListOf<String>()` ≠ `ArrayList<String>()`**：前者构造器里多一对
+   `iconst_0; istore_3`。CFR 两者都渲染成 `new ArrayList`。
+4. **CFR 的 `CmapFormat tab; … tab = (CmapFormat4) table;` 不可编译**——那是局部变量
+   按槽合并的产物；实际是每个分支各自声明 `CmapFormat4 tab = (CmapFormat4) table;`。
+5. **Java 源类判据四件套**：`Compiled from "X.java"` + 无 `@Metadata` +
+   有 `$assertionsDisabled` + 有空 `X$1`（javac 1.8 私有嵌套类构造器的访问标记类）。
+   比 3a-28 的「只看 `@Metadata`」更准，尤其对没有静态断言的老 Java 类。
+6. **局部变量声明位置决定 slot 编号**：`int i;` 提到方法头会让其后所有 foreach 变量槽
+   整体 +1，整段字节码错位；要按首次使用处声明。
+7. **遇到 `Xxx$1` 这种空类不要当垃圾删掉**——它是 `-target 1.8` 的产物，
+   缺了类名 diff 就不过。
+
+#### 一条值得推广的验收手段：行为差分
+
+这个子代理最后用**行为差分**收尾——反射同一份探针分别跑制品类与本仓类，
+28 条规则 ×（`code=false/true` × 5 种分隔符）+ 3 组 `innerRule`，**392 行输出零差异**。
+
+**字节码只告诉你「不一样」，行为差分才告诉你「错没错」。**
+遇到 `continue` / `break` 这种控制流可疑的地方，这个手段比逐条比指令便宜得多，
+而且能抓到那种「字节码只差一条指令、但逻辑完全跑偏」的错误（上面第 2 条就是）。
