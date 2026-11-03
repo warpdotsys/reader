@@ -2219,3 +2219,41 @@ BookController 不符合这个前提：
 
 **待办**：BookController 重做后要**回头看这个 flag 到底有没有让那 7 条 indy descriptor 对上**。
 如果没对上，说明还有别的构建差异没找出来；如果对上了，这就是「外层类 ABI 相等」的前提条件。
+
+### 3a-46 【负结果】`Book.kt` 不能改成 `isInShelf`——3a-10 的 IR bug 依然触发
+
+3a-44 的报告说「改 `Book.kt` 一行（`inShelf` → `isInShelf`）即可，ABI 不变」，
+并推测这是 `FileController:521` 编译失败的真根因。
+
+**实测：不行。** 把
+
+```kotlin
+@get:JsonProperty("isInShelf")
+@get:JvmName("isInShelf")
+var inShelf: Boolean = false,
+```
+
+改成
+
+```kotlin
+@get:JsonProperty("isInShelf")
+var isInShelf: Boolean = false,
+```
+
+后立刻在 IR lowering 崩（`Backend Internal error: Exception during IR lowering`，1 分钟）。
+
+**即使 `BookController.kt` 不存在**（3a-10 三件套的第 3 条不成立），`isInShelf` 这个名字本身
+就足以触发。已回滚（`Book.kt.bak`），`BUILD SUCCESSFUL`。
+
+#### 因此 BookController 的切换必须连带 FileController
+
+`FileController.kt:521` 写的是 `result.first.isInShelf`。`result` 来自
+`bookController.saveBookToShelf(...)`：
+
+- **BookController 是制品时**：`result.first` 是**制品的 Book** → 属性名 `isInShelf` ✓ 编得过
+- **BookController 源码化后**：`result.first` 是**源码 Book** → 属性名 `inShelf` → 那行必须改成
+  `result.first.inShelf`
+
+**所以这两件事必须同批做**：`BookController` 源码化 + `FileController:521` 改 `inShelf`。
+单独做任何一边都会编不过。这是 3a-30「整组切换」原则的又一个实例——
+**判据是「制品方法的返回类型」而不是「文件属于哪个包」**。
