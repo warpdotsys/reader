@@ -2257,3 +2257,28 @@ var isInShelf: Boolean = false,
 **所以这两件事必须同批做**：`BookController` 源码化 + `FileController:521` 改 `inShelf`。
 单独做任何一边都会编不过。这是 3a-30「整组切换」原则的又一个实例——
 **判据是「制品方法的返回类型」而不是「文件属于哪个包」**。
+
+### 3a-47 【负结果】`License` 不能换成 Java 源——会丢掉 `@Metadata`
+
+全工程仅有的两处已知行为差异（`UserController.getUserLimit`、`YueduApi` 的 `/simple-web/*`）
+都源自同一个编译崩溃：`License.validHost(String)` 与调用点同批编译时，
+psi2ir / IR lowering 两阶段崩。
+
+曾考虑「把 `License` 换成 Java 源」来绕开（因为 `src/main/java` 已验证可用，3a-35/3a-36）。**不可行**：
+
+- 制品 `License` **有 `@Metadata`**（`javap -v | grep -c Metadata` = 1）→ 它是 **Kotlin 类**，
+  不是 Java 类（对比 `QueryTTF` / `Encoding` 的判据四件套，3a-35 补记第 5 条）
+- 换 Java 会丢掉 `@Metadata`、丢掉 `data class` 的 `componentN` / `copy` / `equals` / `hashCode` / `toString`
+- 构造函数也会从「Kotlin 默认参数 + `$default` 桥」变成 Java 重载 → **ABI 必崩**
+
+而 `License` 当前**不在 12 个 ABI 不一致清单里**（说明它现在的源码版是对的），改它反而是破坏。
+
+#### 结论：两处语义差异暂时无解
+
+只有两种可能解开：
+1. 找到 Kotlin 1.5.21 这个 IR bug 的真正触发条件并绕开——3a-8 已试过 6 种写法
+   （`isEmpty` / `equals` / `let` 包裹 / 改参数名 / 显式类型 / 换返回值写法），全无效；
+2. 换一个能编过的 Kotlin 版本——3a 早期试过 1.5.20，同样崩在 `visitIfExpression`；1.5.1 的插件不存在。
+
+**保留现状**：两处差异在代码里都有注释说明原因，此处登记为**已知且不可消除**。
+如果将来上 Kotlin 1.6+，值得重跑一次看这个 bug 是否已修。
