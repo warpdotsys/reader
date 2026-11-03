@@ -1665,3 +1665,22 @@ BaseBook 源码版自己没编过，Book / SearchBook 跟着挂。**已全部回
 后果：写成 Kotlin 会多出 `Companion` 合成类、并且所有静态字段变成
 `@JvmField` 的另一种形态，ABI 直接错。这两个类只能进 `src/main/java`，
 不能在 `src/main/kotlin` 里还原。已删除，等 java 源集方案。
+
+### 3a-29 `LocalBook`（147 行 CFR，1 个类）
+
+**状态：1/1 类名一致；本体 1 个方法 loose；ABI 无新增（589 比对 / 561 一致 / 12 不一致）。**
+
+`io.legado.app.model.localBook` 包的第一批（该包 8 个文件合计 2198 行 CFR，src 里原本只有
+一个 `TextFile.kt`）。`LocalBook` 是这包的调度器：按 `book.isEpub()/isUmd()/isCbz()/isPdf()`
+分派到对应解析器，剩下全交给 `TextFile`。
+
+#### 规约
+
+1. **`book.localFile` 编译不过——它是 `fun getLocalFile(): File` 不是属性。**
+   Kotlin 里只有 `val localFile` 或 Java getter 才能写 `book.localFile`；Kotlin 的
+   `fun getLocalFile()` 必须显式调用。同理 `getFolderName()` / `getBookDir()`。
+2. **`FileUtils.delete(File, Boolean)` 与 `delete(String, Boolean)` 重载会让平台类型歧义**：
+   `var bookFile = book.getLocalFile()` 推出的 `File!` 两边都能匹配，必须写
+   `var bookFile: File = book.getLocalFile()` 把类型钉死。
+3. `nameAuthorPatterns` 是 `object` 的 `private val arrayOf(...)`，对应制品的
+   `private static final Pattern[]` + `static {}` 初始化，不要写成 companion。
