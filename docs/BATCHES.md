@@ -1722,3 +1722,21 @@ LocalBook.kt: (51, 39): Cannot access class 'io.legado.app.data.entities.BookCha
 
 db 包现状：5 个顶层类比对，2 个指令级一致，`SQLTable` 还有 4 个方法 loose，
 `DB` / `JSONTable` 已基本对齐——是**既有实现的小瑕疵**，不是缺文件。
+
+### 3a-32 localBook 整组源码化（5 个解析器）
+
+**状态：15/15 类名一致；4/15 指令级完全一致；5 个解析器本体各有 3–10 个方法 loose；
+ABI 无新增（601 比对 / 573 一致 / 12 不一致）。**
+
+一次把 `EpubFile`(623) / `TextFile`(609) / `CbzFile`(269) / `PdfFile`(268) / `UmdFile`(244)
+五个解析器全切成源码（合计 2013 行 CFR），3a-30 的混编阻塞彻底解开。
+
+**整组切换是唯一可行路径**：只做一两个的话，剩下的制品类方法签名里还带着 `BookChapter`，
+整仓立刻 `Cannot access class`。5 个全切之后 `LocalBook`（3a-29，已验收）才能正常调它们。
+
+11 个 loose 全部集中在解析器本体的文件格式处理上（zip/xml/pdf 解析的循环与缓冲装配），
+调用目标、常量、分支条件已逐处核对，属编译噪声级别。
+
+**这组值得记的方法论**：`javap -p <制品类> | grep <源码类名>` 先探一遍——
+命中就说明这个包必须整组切。localBook 和 webBook 都是这么判出来的：
+localBook 5 个文件 2013 行、webBook 3 个文件 2110 行，**一个都不能单独切**。
