@@ -39,6 +39,8 @@ import java.util.Locale
 import java.util.SimpleTimeZone
 import java.util.UUID
 import java.util.zip.ZipInputStream
+import io.legado.app.utils.GSON
+import io.legado.app.utils.fromJsonObject
 
 interface JsExtensions {
 
@@ -79,8 +81,20 @@ interface JsExtensions {
     }
 
     fun connect(urlStr: String, header: String?): StrResponse = runBlocking {
-        val analyzeUrl = AnalyzeUrl(urlStr, source = source, debugLog = logger)
-        analyzeUrl.getStrResponse(urlStr, header)
+        val headerMap = GSON.fromJsonObject<Map<String, String>>(header).getOrNull()
+        val analyzeUrl = AnalyzeUrl(
+            urlStr,
+            source = source,
+            headerMapF = headerMap,
+            debugLog = logger
+        )
+        runCatching {
+            analyzeUrl.getStrResponseAwait()
+        }.onFailure {
+            it.printOnDebug()
+        }.getOrElse {
+            StrResponse(analyzeUrl.url, it.localizedMessage)
+        }
     }
 
     fun webView(html: String?, url: String?, js: String?): String? {
