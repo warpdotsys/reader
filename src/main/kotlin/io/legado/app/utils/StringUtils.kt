@@ -11,7 +11,7 @@ import java.util.regex.Pattern
 
 object StringUtils {
 
-    private const val TAG = "StringUtils"
+    private val TAG = "StringUtils"
     private const val HOUR_OF_DAY = 24
     private const val DAY_OF_YESTERDAY = 2
     private const val TIME_UNIT = 60
@@ -204,8 +204,9 @@ object StringUtils {
             return ""
         }
         var wordsS = ""
+        var words = 0
         if (isNumeric(wc)) {
-            val words = Integer.parseInt(wc)
+            words = Integer.parseInt(wc)
             if (words > 0) {
                 wordsS = "" + words + '字'
                 if (words > 10000) {
@@ -244,10 +245,8 @@ object StringUtils {
 
     fun repeat(str: String, n: Int): String {
         val stringBuilder = StringBuilder()
-        var i = 0
-        while (i < n) {
+        for (i in 0 until n) {
             stringBuilder.append(str)
-            i++
         }
         return stringBuilder.toString()
     }
@@ -260,8 +259,7 @@ object StringUtils {
         val m = p.matcher(data)
         val buf = StringBuffer(data.length)
         while (m.find()) {
-            val string = m.group(1)!!
-            val ch = (Integer.parseInt(string, 16)).toChar().toString()
+            val ch = Integer.parseInt(m.group(1), 16).toChar().toString()
             m.appendReplacement(buf, java.util.regex.Matcher.quoteReplacement(ch))
         }
         m.appendTail(buf)

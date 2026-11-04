@@ -4460,3 +4460,86 @@ if (s.length() > 0) {
 #### 结果
 
 `compared 1 / exact 1 / different 0`，`StringUtil` 全清。
+
+### 3a-93 StringUtils：两个方法归零 + 一个新判据（const val 陷阱）
+
+#### 1. `hexStringToByte` 归零：`const val TAG` 是错的
+
+`<clinit>` 对比：
+
+```
+制品 53: ldc_w "StringUtils"
+制品 54: putstatic TAG              ← 制品有 TAG 静态字段
+本地 53: getstatic INSTANCE         ← 我们根本没有 TAG 字段
+```
+
+我们写的是 `private const val TAG = "StringUtils"`。**`const val` 是编译期常量，
+会被内联到所有引用点，不生成 static 字段，也不进 `<clinit>`。**
+
+制品有 `ldc_w + putstatic`，说明它写的是**普通的 `private val TAG`**。
+
+```kotlin
+// 改前
+private const val TAG = "StringUtils"
+// 改后
+private val TAG = "StringUtils"
+```
+
+改完 `hexStringToByte` 直接归零。
+
+**新判据：`javap -p` 只比方法名集合，查不出缺字段。看到 `<clinit>` 里有
+`putstatic X` 而本地没有，就是缺字段或写了 `const val`。**
+
+#### 2. `repeat` 归零：`while` 改 `for (i in 0 until n)`
+
+```kotlin
+// 改前
+var i = 0
+while (i < n) { sb.append(str); i++ }
+
+// 改后
+for (i in 0 until n) { sb.append(str) }
+```
+
+字节码形态完全不同：
+
+```
+for (i in 0 until n):        while (i < n):
+  iload i                      L0: iload i
+  iload n                          iload n
+  if_icmpge END                    if_icmpge END
+  <body>                           <body>
+  iinc i, 1                        iinc i, 1   （或 iadd/istore）
+  iload i                          goto L0
+  iload n
+  if_icmplt <body>              ← 回跳
+```
+
+**判据：`if_icmpge` 前置 + `iinc` + `if_icmplt` 回跳 = `for (i in 0 until n)`；
+`goto` 回循环头 = `while`。**
+
+#### 3. `wordCountFormat` 42 → 16：`var` 提到 if 外
+
+```kotlin
+var wordsS = ""
+var words = 0                    // ← 新增：占位 iconst_0/istore
+if (isNumeric(wc)) {
+    words = Integer.parseInt(wc) // ← val 改 var 赋值
+```
+
+`iconst_0 / istore N` 出现在 `Integer.parseInt` **之前**，就是 `var x = 0` 的初始化占位。
+
+#### 4. 未修：`removeUTFCharacters`（21，不动）
+
+制品 24-25 有 `dup + checkNotNullExpressionValue`，我们没有。
+是 Kotlin 对平台类型 `Matcher.group()` 插入空检查的差异，源码层面加 `!!` 会变成
+`checkNotNull`（不同指令），加类型标注又多局部变量。**收益 21，暂放。**
+
+#### 本轮效果
+
+```
+hexStringToByte  6 -> 0
+repeat          19 -> 0
+wordCountFormat 42 -> 16
+StringUtils 合计 1118 -> 1093
+```
