@@ -3744,3 +3744,60 @@ is_trim_inlined = body.count('CharSequence.charAt') >= 1 and 'Intrinsics.compare
 参数不再内联，续体里多出两个局部变量槽位，后面所有槽位编号整体 +2。
 
 **不影响语义**（槽位是编译器分配的），但会让整个方法的字节码逐条错位。
+
+### 3a-81 `exportToEpub` 完全重写：35 行 → 19 行，delta 482 → 0
+
+#### 我们的实现（错的）
+
+遍历所有章节，逐章取内容，带 `try/finally`：
+
+```kotlin
+val chapterList = if (book.isLocalBook()) getLocalChapterList(...) else WebBook(...).getChapterList(book)
+setEpubMetadata(book, epubBook)
+setAssets(book, epubBook)
+chapterList.forEach { chapter ->
+    val content = if (book.isLocalBook()) LocalBook.getContent(book, chapter) else webBook.getBookContent(book, chapter)
+    setEpubContent(chapter.title, book, epubBook, content, userNameSpace)
+}
+setCover(book, epubBook, bookSource)
+val file = File(exportDir, book.name + ".epub")
+val outputStream = FileOutputStream(file)
+try { EpubWriter().write(epubBook, outputStream) } finally { outputStream.close() }
+```
+
+**505 条**字节码。
+
+#### 制品的实现（209 条）
+
+```kotlin
+val fileName = "${book.name}（${book.getRealAuthor()}）.epub"
+val filePath = FileUtils.getPath(exportDir, fileName)
+val file = FileUtils.createFileWithReplace(filePath)
+val epubBook = EpubBook()
+epubBook.version = "2.0"
+setEpubMetadata(book, epubBook)
+val assets = setAssets(book, epubBook)
+setCover(book, epubBook, bookSource)
+setEpubContent(assets, book, epubBook, bookSource, userNameSpace)
+EpubWriter().write(epubBook, FileOutputStream(file))
+return file
+```
+
+**四处关键差异**：
+
+1. **文件名带作者**：`"${book.name}（${book.getRealAuthor()}）.epub"`（我们只有 `book.name + ".epub"`）
+2. **用 `FileUtils.getPath` + `createFileWithReplace`**（我们直接 `File(exportDir, ...)`）
+3. **没有遍历章节的循环** —— 章节内容全交给 `setEpubContent`，而且第一个参数传的是
+   **`setAssets` 的返回值**（不是章节标题）
+4. **没有 `try/finally`** —— 直接 `EpubWriter().write(epubBook, FileOutputStream(file))`
+
+#### 为什么会写成那样
+
+`setEpubContent` 的签名是 `(contentModel: String, book, epubBook, bookSourceString, userNameSpace)`，
+我们看到第一个参数叫 `contentModel`，就以为要传章节内容，于是配了个章节遍历。
+
+**实际上制品传的是 assets 路径**。这个参数名有误导性 —— 它更像"资源模型前缀"。
+
+#### 结果
+
+`BookController` 的总 delta 18441 → **18130**。

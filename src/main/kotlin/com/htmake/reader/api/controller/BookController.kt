@@ -2963,32 +2963,16 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         bookSource: String,
         userNameSpace: String
     ): File {
+        val fileName = "${book.name}（${book.getRealAuthor()}）.epub"
+        val filePath = FileUtils.getPath(exportDir, fileName)
+        val file = FileUtils.createFileWithReplace(filePath)
         val epubBook = EpubBook()
-        epubBook.metadata.addTitle(book.name)
-        val chapterList = if (book.isLocalBook()) {
-            getLocalChapterList(book, bookSource, false, userNameSpace)
-        } else {
-            WebBook(bookSource, appConfig.debugLog, userNameSpace = userNameSpace).getChapterList(book)
-        }
+        epubBook.version = "2.0"
         setEpubMetadata(book, epubBook)
-        setAssets(book, epubBook)
-        val webBook = WebBook(bookSource, appConfig.debugLog, userNameSpace = userNameSpace)
-        chapterList.forEach { chapter ->
-            val content = if (book.isLocalBook()) {
-                LocalBook.getContent(book, chapter) ?: ""
-            } else {
-                webBook.getBookContent(book, chapter)
-            }
-            setEpubContent(chapter.title, book, epubBook, content, userNameSpace)
-        }
+        val assets = setAssets(book, epubBook)
         setCover(book, epubBook, bookSource)
-        val file = File(exportDir, book.name + ".epub")
-        val outputStream = FileOutputStream(file)
-        try {
-            EpubWriter().write(epubBook, outputStream)
-        } finally {
-            outputStream.close()
-        }
+        setEpubContent(assets, book, epubBook, bookSource, userNameSpace)
+        EpubWriter().write(epubBook, FileOutputStream(file))
         return file
     }
 
