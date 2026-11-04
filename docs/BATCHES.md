@@ -4838,3 +4838,50 @@ if (cond) {
 
 `TextFile$Companion.getContent` 试过把 `Regex("^[\\n\\s]+")` 的字符串先存变量，
 delta 21 → 26 变差，已回滚。制品是把字符串存到槽位 6，我们的中间变量落在别的位置。
+
+### 3a-100 CbzFile / EpubFile / PdfFile / UmdFile 四个 Companion 全清（144 delta）
+
+#### 现象：制品多 2 条指令，`access$getXxx$cp` 之后多一个 `ifnull`
+
+```
+制品                          本地
+0 getCFile                    0 getCFile
+1 ifnull          ← 多出      1 astore_2
+2 getCFile                    2 aload_2
+3 astore_2                    3 ifnonnull
+4 aload_2                     4 aconst_null
+5 ifnonnull                   5 goto
+...
+```
+
+四个类（`CbzFile`/`EpubFile`/`PdfFile`/`UmdFile`）的 `getXxxFile` 结构完全一样，
+delta 都是 36，都是这 2 条指令 + 整体错位。
+
+#### 试了三次
+
+| 写法 | 结果 |
+| --- | --- |
+| `if (x?.book?.bookUrl != book.bookUrl)` | 38/36，差 2 条（就是缺 `ifnull`）|
+| `if (x == null \|\| x!!.book.bookUrl != book.bookUrl)` | 38/32，本地变短（`!!` 走 `dup`+`checkNotNull`，不是 `?.`）|
+| `if (x == null \|\| x?.book?.bookUrl != book.bookUrl)` | **38/38，全部归零** |
+
+**制品的结构是「短路判断 + 安全调用链」的组合**：
+
+```kotlin
+if (cFile == null || cFile?.book?.bookUrl != book.bookUrl) {
+    cFile = CbzFile(book)
+    return cFile!!
+}
+```
+
+- `cFile == null` → `getCFile; ifnull <真分支>`（短路，null 时不求值右边）
+- `cFile?.book?.bookUrl` → `getCFile; astore_2; aload_2; ifnonnull; aconst_null; goto; ...`
+
+**新判据：`ifnull` 出现在 `?.` 链之前 = `x == null || x?.y` 的短路形式。
+`!!` 不会产生 `ifnull`，它走 `dup` + `checkNotNull` + `NPE` 分支。**
+
+#### 提醒
+
+`access$getXxx$cp` 桥本身不是问题——**四个类本来都有，我们的源码也是 companion 里访问
+private 属性，桥能正常生成**。43-且 43-之前的记录里把它当成「SAM/indy 无解」是误判，
+真正缺的只是那 2 条 `ifnull`。

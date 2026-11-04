@@ -139,7 +139,7 @@ class PdfFile(var book: Book) {
 
         @Synchronized
         private fun getPdfFile(book: Book): PdfFile {
-            if (cFile?.book?.bookUrl != book.bookUrl) {
+            if (cFile == null || cFile?.book?.bookUrl != book.bookUrl) {
                 cFile = PdfFile(book)
                 return cFile!!
             }

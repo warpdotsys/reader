@@ -104,7 +104,7 @@ class CbzFile(var book: Book) {
 
         @Synchronized
         private fun getCbzFile(book: Book): CbzFile {
-            if (cFile?.book?.bookUrl != book.bookUrl) {
+            if (cFile == null || cFile?.book?.bookUrl != book.bookUrl) {
                 cFile = CbzFile(book)
                 return cFile!!
             }

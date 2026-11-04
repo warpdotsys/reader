@@ -98,7 +98,7 @@ class UmdFile(var book: Book) {
 
         @Synchronized
         private fun getUFile(book: Book): UmdFile {
-            if (uFile?.book?.bookUrl != book.bookUrl) {
+            if (uFile == null || uFile?.book?.bookUrl != book.bookUrl) {
                 uFile = UmdFile(book)
                 return uFile!!
             }

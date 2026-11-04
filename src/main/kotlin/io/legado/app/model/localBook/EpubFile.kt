@@ -269,7 +269,7 @@ class EpubFile(var book: Book) {
 
         @Synchronized
         private fun getEFile(book: Book): EpubFile {
-            if (eFile?.book?.bookUrl != book.bookUrl) {
+            if (eFile == null || eFile?.book?.bookUrl != book.bookUrl) {
                 eFile = EpubFile(book)
                 return eFile!!
             }
