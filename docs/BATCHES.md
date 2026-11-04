@@ -3566,3 +3566,80 @@ ABI 闸门查不出来」。这次是字节码层面直接暴露（`getfield $bo
 ```
 
 **参数名不仅进 ABI，还直接出现在字节码指令里**，是比 ABI 描述符更强的证据。
+
+### 3a-78 101-300 段：`BookSource` 和 `RssArticle` 的 eq/toString 大改
+
+#### 怎么找到的
+
+按「方法条目数差 ≥ 20」筛 101-300 段的 48 个类，筛出 13 处疑似缺逻辑：
+
+```
+本地少165  BookSource.toString   (182/17)
+本地多110  RssArticle.hashCode   (4/114)
+本地少 95  JsExtensions$connect$1.invokeSuspend (139/44)
+本地多 90  RssArticle.equals     (29/119)
+...
+```
+
+**「本地少」= 我们缺逻辑，「本地多」= 我们多写了制品没有的东西**，两头都要查。
+
+#### `BookSource.toString`（182/17）
+
+我们手写了 `toString` 只拼两个字段：
+
+```kotlin
+override fun toString(): String {
+    return "BookSource(bookSourceUrl=$bookSourceUrl, bookSourceName=$bookSourceName)"
+}
+```
+
+制品是 **182 条** —— 说明制品**没有覆盖 `toString`**，走的是 `data class` 自动生成（把所有字段拼进去）。
+**直接删掉手写的那段**即可。
+
+#### `RssArticle.equals` / `hashCode`（29/119、4/114）
+
+反过来：制品**手写了**，我们靠 `data class` 自动生成（比对全部 11 个字段）：
+
+- 制品 `hashCode()`：**只有 `link.hashCode()`**（4 条）
+- 制品 `equals()`：**只比 `origin` 和 `link`**（29 条）
+
+补上手写版本后 `hashCode` 归零、`equals` 从 90 降到 12。
+
+#### `BookSource.equal(String?, String?)`（154/156）
+
+原来的写法把两个条件合成一个 return：
+
+```kotlin
+if (a == b) return true
+return a.isNullOrEmpty() && b.isNullOrEmpty()
+```
+
+制品字节码里 `a == b` 成立后**跳到另一个 `return true`**，是两个独立的 if：
+
+```kotlin
+if (a == b) { return true }
+if (a.isNullOrEmpty() && b.isNullOrEmpty()) { return true }
+return false
+```
+
+改成两个独立 `if` 后 delta 35 → 34（还差 2 条，未归零）。
+
+#### `RssArticle.putVariable`（29/24）
+
+制品在 `put` 时把 `HashMap` **上转型成 `Map`**（`checkcast Map` + `invokeinterface Map.put`），
+我们是 `invokevirtual HashMap.put`。改法：
+
+```kotlin
+val map: MutableMap<String, String> = variableMap
+if (value != null) { map.put(key, value) } else { variableMap.remove(key) }
+```
+
+delta 22 → 25（条数从 24 涨到 27，接近制品的 29，但仍有 2 条差异）。
+
+#### 这一轮的判断
+
+`BookSource` 和 `RssArticle` 这两个都是 **「data class 自动生成 vs 手写」搞反了**：
+一个该删手写、一个该加手写。这种错误只看源码看不出来，必须对着字节码条目数比。
+
+**四条方法都还差 2 条未归零**，说明方向对但收尾细节没到位。继续调需要多轮全量编译，
+先记录，转向别的类。

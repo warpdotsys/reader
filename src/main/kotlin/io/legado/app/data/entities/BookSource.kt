@@ -119,8 +119,13 @@ data class BookSource(
     }
 
     private fun equal(a: String?, b: String?): Boolean {
-        if (a == b) return true
-        return a.isNullOrEmpty() && b.isNullOrEmpty()
+        if (a == b) {
+            return true
+        }
+        if (a.isNullOrEmpty() && b.isNullOrEmpty()) {
+            return true
+        }
+        return false
     }
 
     override fun equals(other: Any?): Boolean {
@@ -133,10 +138,6 @@ data class BookSource(
 
     override fun hashCode(): Int {
         return bookSourceUrl.hashCode()
-    }
-
-    override fun toString(): String {
-        return "BookSource(bookSourceUrl=$bookSourceUrl, bookSourceName=$bookSourceName)"
     }
 
     data class ExploreKind(

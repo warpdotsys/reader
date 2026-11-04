@@ -21,6 +21,16 @@ data class RssArticle(
     var variable: String? = null
 ) : RuleDataInterface {
 
+    override fun equals(other: Any?): Boolean {
+        if (other == null) return false
+        if (other !is RssArticle) return false
+        return origin == other.origin && link == other.link
+    }
+
+    override fun hashCode(): Int {
+        return link.hashCode()
+    }
+
     @delegate:Transient
     override val variableMap: HashMap<String, String> by lazy {
         GSON.fromJsonObject<HashMap<String, String>>(variable).getOrNull() ?: hashMapOf()
@@ -38,8 +48,9 @@ data class RssArticle(
     }
 
     override fun putVariable(key: String, value: String?) {
+        val map: MutableMap<String, String> = variableMap
         if (value != null) {
-            variableMap.put(key, value)
+            map.put(key, value)
         } else {
             variableMap.remove(key)
         }
