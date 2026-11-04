@@ -165,12 +165,13 @@ public class Base64 {
                 output[op + 3] = alphabet[v & 0x3F];
                 p += 3;
                 op += 4;
-                if (--count != 0) continue;
-                if (this.do_cr) {
-                    output[op++] = 13;
+                if (--count == 0) {
+                    if (this.do_cr) {
+                        output[op++] = 13;
+                    }
+                    output[op++] = 10;
+                    count = 19;
                 }
-                output[op++] = 10;
-                count = 19;
             }
             if (finish) {
                 if (p - this.tailLen == len - 1) {

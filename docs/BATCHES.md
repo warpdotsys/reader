@@ -4989,3 +4989,51 @@ if (this.alef != 0) {
 #### 结果
 
 `compared 1 / exact 1 / different 0`。
+
+### 3a-103 Base64 Encoder 部分改善 + 止损判断
+
+#### 改了什么
+
+`Encoder.process` 里同一段逻辑写了两遍，一遍正向 `if`、一遍 `continue`：
+
+```java
+// 159 行（原本就对）
+if (--count == 0) { if (this.do_cr) output[op++] = 13; output[op++] = 10; count = 19; }
+
+// 168 行（错的）
+if (--count != 0) continue;
+if (this.do_cr) { output[op++] = 13; }
+output[op++] = 10;
+count = 19;
+```
+
+改成一致的 `if (--count == 0) { ... }`。
+
+`Encoder.process` 差异块 4 → 3，规模 7 → 5。
+
+#### 剩下的没啃（评估后放弃）
+
+```
+Encoder.process  1072/1074  3 块 5 条
+Decoder.process  2402/2407  9 块 23 条
+```
+
+剩余差异集中在 `switch (state)` 的 `case` 块里，形态是：
+
+```
+制品  if_icmpgt / if_icmpeq     ← 正向
+本地  if_icmple + goto / if_icmpne + goto  ← 带 goto
+```
+
+源码里 `if (d == -1) break;` 已经写对了，但 **`switch` 内的 `break` 和 `while` 内的 `break`
+编译形态不同**（前者 `goto <switch 末尾>`，后者 `goto <循环外>`），而且 `tableswitch`
+的分支布局还受 case 数量影响。
+
+**2400 条指令、23 条差异，要精确到 `switch` 的指令排布，成本远高于收益。**
+记下来，以后有精力再啃。
+
+#### 方法论记录
+
+这类「超长方法 + 差异分布在 switch/case 里」的情况，即使 difflib 给出了精确的差异块，
+**改动仍然要逐 case 对照字节码验证**，一轮编译 70 秒，试错成本高。
+**优先做「差异块少且集中在方法头部」的类**（像 `NGramParser_IBM420` 那样 5 条全在开头的）。
