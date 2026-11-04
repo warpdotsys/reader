@@ -2852,3 +2852,60 @@ BUILD SUCCESSFUL in 2m 46s
 **同一段源码在不同仓库状态下，可能一个崩、一个不崩。**
 
 所以凡是登记为「编译器 bug，无解」的结论，**当仓库结构发生大变化时都应重新验证一次**。
+
+### 3a-62 逐文件重构 lambda 序列：`JsExtensions` 全清，`BaseSource` 2/3
+
+用户要求「逐文件重构」，开始逐个对齐。
+
+#### 已完成
+
+**`JsExtensions`（1/1，全清）**
+
+缺失的 `JsExtensions$connect$2$invokeSuspend$$inlined$fromJsonObject$1` 补上了。
+
+根因：`connect(urlStr, header)` 的我们版本把 `header` 直接传给 `getStrResponse` 重载，
+制品是 `GSON.fromJsonObject<Map<String, String>>(header)` 解析成 Map 后传给 `AnalyzeUrl`
+的 `headerMapF` 参数。CFR 的真实结构（602-719 行）：
+
+```kotlin
+fun connect(urlStr: String, header: String?): StrResponse = runBlocking {
+    val headerMap = GSON.fromJsonObject<Map<String, String>>(header).getOrNull()
+    val analyzeUrl = AnalyzeUrl(urlStr, source = source, headerMapF = headerMap, debugLog = logger)
+    runCatching { analyzeUrl.getStrResponseAwait() }
+        .onFailure { it.printOnDebug() }
+        .getOrElse { StrResponse(analyzeUrl.url, it.localizedMessage) }
+}
+```
+
+踩的三个坑：
+- `printOnDebug` 是 `Throwable` 的扩展函数，要写 `it.printOnDebug()`，不是 `printOnDebug(it)`
+- `getStrResponseAwait` 是 suspend 且带 3 个默认参数
+- `analyzeUrl` 必须在 `runCatching` **外**创建（`getOrElse` 里要用它）
+
+**`BaseSource`（2/3）**
+
+`$getLoginHeaderMap$$inlined$fromJsonObject$1` 和 `$getLoginInfoMap$$inlined$fromJsonObject$1` 补上。
+
+根因：制品里 `getLoginHeaderMap()` / `getLoginInfoMap()` 是**接口方法**，我们写成了
+`val loginHeaderMap` 属性。字节码签名相同（都是 `getLoginHeaderMap()`），但 `DefaultImpls` 里
+**内联 lambda 的命名不同**：
+
+- 属性 → `$special$$inlined$fromJsonObject$1`
+- 方法 → `$getLoginHeaderMap$$inlined$fromJsonObject$1`
+
+调用点只有 `BookSource.kt` / `RssSource.kt` 的 `@JsonIgnoreProperties` 字符串，无真实调用，改动安全。
+
+#### 卡住的：`SourceAnalyzer`（0/11）
+
+制品 `lambda-10`，本地 `lambda-8`；制品 10 个 `fromJsonObject`，本地 11 个。
+
+**但编号不是简单的「文件里第 N 个 lambda」**：
+
+- 制品 `jsonToBookSources(String)` 用的是 **`for` 循环**（0 个 lambda）
+- 我们用的是 `items.forEach { }`（1 个 lambda）
+
+如果按「第 N 个」算，我们的编号应该**更大**，实际反而**小 2**。说明编号规则
+（可能是方法级计数、或者与内联展开的先后顺序有关）还没吃透。
+
+**这 11 个暂缓**——继续盲改只是碰运气。要解需要先做一次 controlled experiment：
+写几个最小样例，测出 `$lambda-N` 在「`runCatching` 包裹 + 内联高阶函数」组合下的真实编号规则。
