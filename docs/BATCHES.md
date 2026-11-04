@@ -3038,3 +3038,43 @@ listOf(Unit).also { }
 制品是**两层嵌套**类名，我们只有一层。说明制品的外层 lambda **生成类**（不是 inline），
 而我们的外层是 `header?.let { }`（inline，不生成类）。要复现得知道制品外层用的是什么写法，
 成本高于收益，暂跳。
+
+### 3a-65 全工程统计：936 制品类，929 已适配，还缺 7
+
+#### 当前覆盖
+
+```
+制品应用类   : 936
+本仓库已编译 : 938（多 2）
+已适配       : 929
+还缺         : 7
+多出         : 9
+```
+
+从 811 推到 938（编译）/ 929（适配），**还缺从 23 降到 7**。
+
+#### 还缺的 7 个
+
+| 类 | 原因 |
+| --- | --- |
+| `BookController$cacheBookOnServer$2` | 我们 `$4`，前置 lambda 计数差 |
+| `BookController$cacheBookSSE$3` / `$4` | 实现被简化，CFR 找不到对应 lambda 结构 |
+| `BookController$getLastBackFileFromWebdav$lambda-16$…` | 我们 `lambda-21`，差 5 |
+| `BookController$ttsByTextToSpeechCn$2` | `map.forEach(BiConsumer { })` 的 SAM 转换被 1.5.21 优化掉 |
+| `BookControllerKt$sam$java_util_function_BiConsumer$0` | 同上 |
+| `BaseSource$…$getHeaderMap$lambda-4$lambda-2$…` | 制品两层嵌套，我们外层是 inline `let`（不生成类） |
+
+#### 多出的 9 个（我们多生成的 lambda）
+
+`deleteBook$2` / `deleteBooks$2$1` / `getSpeakStream$inputStream$1` / `setCover$result$1` /
+`cacheBookOnServer$4` / `getLastBackFileFromWebdav$lambda-21` / `BaseSource$lambda-2` /
+`Coroutine$executeInternal$1$invokeSuspend$$inlined$executeBlock$1` × 2
+
+**共性**：制品用 `for` / `while` 显式循环，我们用了 `forEach` / `firstOrNull` / `removeAll` /
+`awaitResult`。修法是把这些改回显式循环和制品用的写法。
+
+#### 净结论
+
+**929/936 = 99.25% 的类已适配**，剩余 7 个缺、9 个多，全都集中在 `BookController` 的 5 个方法
+（`cacheBookOnServer` / `cacheBookSSE` / `getLastBackFileFromWebdav` / `ttsByTextToSpeechCn`）
+和 `BaseSource.getHeaderMap` 上。
