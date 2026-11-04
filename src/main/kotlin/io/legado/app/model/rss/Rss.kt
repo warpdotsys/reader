@@ -20,9 +20,8 @@ object Rss {
     ): Pair<List<RssArticle>, String> {
         val ruleData = RuleData()
         val analyzeUrl = AnalyzeUrl(
-            sortUrl,
-            null,
-            page,
+            mUrl = sortUrl,
+            page = page,
             source = rssSource,
             ruleData = ruleData,
             headerMapF = rssSource.getHeaderMap(),
