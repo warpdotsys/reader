@@ -493,7 +493,12 @@ extends CharsetRecognizer {
                 return -1;
             }
             this.alef = this.isLamAlef(det.fInputBytes[this.byteIndex]);
-            int next = this.alef != 0 ? 177 : unshapeMap[det.fInputBytes[this.byteIndex] & 0xFF] & 0xFF;
+            int next;
+            if (this.alef != 0) {
+                next = 177;
+            } else {
+                next = unshapeMap[det.fInputBytes[this.byteIndex] & 0xFF] & 0xFF;
+            }
             ++this.byteIndex;
             return next;
         }
@@ -508,13 +513,16 @@ extends CharsetRecognizer {
                     if (mb != this.spaceChar || !ignoreSpace) {
                         this.addByte(mb);
                     }
-                    boolean bl = ignoreSpace = mb == this.spaceChar;
-                }
-                if (this.alef != 0 && (mb = this.byteMap[this.alef & 0xFF]) != 0) {
-                    if (mb != this.spaceChar || !ignoreSpace) {
-                        this.addByte(mb);
-                    }
                     ignoreSpace = mb == this.spaceChar;
+                }
+                if (this.alef != 0) {
+                    mb = this.byteMap[this.alef & 0xFF];
+                    if (mb != 0) {
+                        if (mb != this.spaceChar || !ignoreSpace) {
+                            this.addByte(mb);
+                        }
+                        ignoreSpace = mb == this.spaceChar;
+                    }
                 }
             }
         }

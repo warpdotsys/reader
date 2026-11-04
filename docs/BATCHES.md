@@ -4932,3 +4932,60 @@ if (confidence == 0 || confidence == 100) break;
 - `CharsetRecog_gb_18030.nextChar`（100/98，规模 12）：同上 + 两处赋值表达式，结构较绕
 
 投入产出比低，先留着。
+
+### 3a-102 NGramParser_IBM420 归零：delta 1083，真实差异 5 条
+
+#### 又一次「delta 接近指令总数」的骗局
+
+```
+nextByte          48/47
+parseCharacters 1092/1092
+合计 delta 1083
+```
+
+difflib 对齐后：
+
+```
+nextByte:        1 处差异（istore_2）
+parseCharacters: 4 处差异（dup / iload 4）
+```
+
+**1092 条指令只有 4 条真差异。**
+
+#### 三处改动
+
+**1. `boolean bl = ignoreSpace = mb == this.spaceChar;` → `ignoreSpace = mb == this.spaceChar;`**
+
+CFR 反编译生成了一个**从未使用**的 `boolean bl`。它的存在让字节码多一条 `dup`
+（赋值结果既给 `bl` 又给 `ignoreSpace`）。制品没有这条 `dup` → 原始源码就是单赋值。
+
+**这是 CFR 的通病：它会把「表达式值被使用」的地方具名成一个局部变量，
+哪怕那个变量后面根本不再用。看到未使用的局部变量 + `dup`，优先怀疑是 CFR 产物。**
+
+**2. `int next = this.alef != 0 ? 177 : ...;` → if/else 语句**
+
+```
+制品：sipush 177 / istore_2 / goto    ← 真分支里赋值给 next
+本地：sipush 177 / goto               ← 三元结果压栈
+```
+
+3a-99 判据复用：**分支里有 `istore` = if/else 语句，没有 = 三元表达式**。
+
+**3. `if (this.alef != 0 && (mb = this.byteMap[...]) != 0)` → 拆成两层 if**
+
+赋值表达式 `(mb = ...)` 产生 `dup`，拆成：
+
+```java
+if (this.alef != 0) {
+    mb = this.byteMap[this.alef & 0xFF];
+    if (mb != 0) {
+        ...
+    }
+}
+```
+
+`mb` 存到槽位 4 再 load（`iload 4`），和多出来的 `dup` 正好对上。
+
+#### 结果
+
+`compared 1 / exact 1 / different 0`。
