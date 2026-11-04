@@ -43,7 +43,7 @@ open class ReaderApplication {
             registerKotlinModule()
         }
         Json.mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-        vertx.deployVerticle(yueduApi)
+        vertx().deployVerticle(yueduApi)
     }
 
     @Bean
@@ -53,8 +53,9 @@ open class ReaderApplication {
         options.logActivity = true
         options.isFollowRedirects = true
         options.isTrustAll = true
-        val httpClient = vertx.createHttpClient(HttpClientOptions().setTrustAll(true))
-        return WebClient.wrap(httpClient, options)
+        val httpClient = vertx().createHttpClient(HttpClientOptions().setTrustAll(true))
+        val webClient = WebClient.wrap(httpClient, options)
+        return webClient
     }
 
     companion object {
