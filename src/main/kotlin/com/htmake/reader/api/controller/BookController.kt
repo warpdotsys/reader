@@ -89,6 +89,11 @@ import kotlin.math.max
 import kotlin.jvm.internal.Ref
 import java.nio.file.Paths
 import kotlin.coroutines.CoroutineContext
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.core.JsonParser
+import com.fasterxml.jackson.core.JsonToken
+import com.fasterxml.jackson.databind.JsonNode
+import kotlin.io.use
 
 private val logger: KLogger = KotlinLogging.logger { }
 
@@ -438,7 +443,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         if (bookInfo == null || bookInfo.origin.length == 0) {
             return returnData.setErrorMsg("书籍未加入书架")
         }
-        val bookSource = getBookSourceStringBySourceURLOpt(bookInfo.origin, userNameSpace)
+        val bookSource = (getBookSourceStringBySourceURLOpt(bookInfo.origin, userNameSpace) ?: "")
         if (!bookInfo.isLocalBook()) {
             if (bookSource.isNullOrEmpty()) {
                 return returnData.setErrorMsg("未配置书源")
@@ -495,7 +500,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             bookInfo = getShelfBookByURL(bookUrl, userNameSpace)
             if (bookInfo != null && bookInfo.origin.length > 0) {
                 isInBookShelf = 1
-                bookSource = getBookSourceStringBySourceURLOpt(bookInfo.origin, userNameSpace)
+                bookSource = (getBookSourceStringBySourceURLOpt(bookInfo.origin, userNameSpace) ?: "")
             }
         }
         if (bookInfo == null) {
@@ -638,13 +643,13 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                 return returnData.setData(content)
             }
         }
-        var content = WebBook(bookSource, appConfig.debugLog, userNameSpace = userNameSpace)
+        var content = WebBook(bookSource ?: "", appConfig.debugLog, userNameSpace = userNameSpace)
             .getBookContent(book, chapterInfo, nextChapterUrl)
         if (appConfig.cacheChapterContent && chapterCacheFile != null) {
             chapterCacheFile.writeText(content)
         }
         try {
-            val bookSourceObject = BookSource.fromJson(bookSource).getOrNull() ?: BookSource()
+            val bookSourceObject = BookSource.fromJson(bookSource ?: "").getOrNull() ?: BookSource()
             BookHelp.saveImages(this, bookSourceObject, book, chapterInfo, content)
             content = updateImageLinkInContent(book, chapterInfo, content)
         } catch (e: Exception) {
@@ -1340,7 +1345,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                     arrayListOf(searchBook)
                 } else {
                     val bookSource =
-                        getBookSourceStringBySourceURLOpt(searchBook.origin, userNameSpace.element)
+                        (getBookSourceStringBySourceURLOpt(searchBook.origin, userNameSpace.element) ?: "")
                     if (bookSource == null) {
                         arrayListOf<SearchBook>()
                     } else {
@@ -1409,7 +1414,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         var book = context.bodyAsJson.mapTo(Book::class.java)
         val userNameSpace = getUserNameSpace(context)
         if (!book.isLocalBook()) {
-            val bookSource = getBookSourceStringBySourceURLOpt(book.origin, userNameSpace)
+            val bookSource = (getBookSourceStringBySourceURLOpt(book.origin, userNameSpace) ?: "")
             if (bookSource == null) {
                 return returnData.setErrorMsg("书源信息错误")
             }
@@ -1592,7 +1597,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         }
         val analyzeUrl = AnalyzeUrl(
             coverUrl,
-            source = BookSource.fromJson(sourceString).getOrNull()
+            source = BookSource.fromJson(sourceString ?: "").getOrNull()
         )
         try {
             analyzeUrl.getByteArrayAwait().let {
@@ -1633,7 +1638,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         val userNameSpace = getUserNameSpace(context)
         val book = getShelfBookByURL(bookUrl, userNameSpace)
             ?: return returnData.setErrorMsg("书籍信息错误")
-        val bookSourceString = getBookSourceStringBySourceURLOpt(bookSourceUrl, userNameSpace)
+        val bookSourceString = (getBookSourceStringBySourceURLOpt(bookSourceUrl, userNameSpace) ?: "")
         var searchBook: Book? = null
         if (bookSourceString.isNullOrEmpty()) {
             val localBookSourceList = asJsonArray(
@@ -1892,7 +1897,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                 if (!book.element!!.isLocalBook() && book.element!!.canUpdate && refresh) {
                     val bookSource = Ref.ObjectRef<String>()
                     bookSource.element =
-                        getBookSourceStringBySourceURLOpt(book.element!!.origin, userNameSpace)
+                        (getBookSourceStringBySourceURLOpt(book.element!!.origin, userNameSpace) ?: "")
                     if (bookSource.element != null) {
                         try {
                             withContext(Dispatchers.IO) {
@@ -1956,26 +1961,66 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
 
     suspend fun getBookSourceString(
         context: RoutingContext,
-        sourceUrl: String? = null,
+        sourceUrl: String = "",
         withExploreUrl: Boolean = false
-    ): String {
-        val userNameSpace = getUserNameSpace(context)
-        return getBookSourceStringBySourceURLOpt(sourceUrl ?: "", userNameSpace)
-    }
-
-    fun getBookSourceStringBySourceURLOpt(sourceUrl: String, userNameSpace: String): String {
-        if (sourceUrl.isEmpty()) {
-            return ""
-        }
-        val bookSourceList = asJsonArray(getUserStorage(userNameSpace, "bookSource"))
-            ?: return ""
-        for (item in bookSourceList) {
-            val jsonObject = asJsonObject(item)
-            if (jsonObject?.getString("bookSourceUrl") == sourceUrl) {
-                return jsonObject.toString()
+    ): String? {
+        var bookSourceString: String? = null
+        if (context.request().method() == HttpMethod.POST) {
+            val bookSource = context.bodyAsJson.getJsonObject("bookSource")
+            if (bookSource != null) {
+                bookSourceString = bookSource.toString()
             }
         }
-        return ""
+        val userNameSpace = getUserNameSpace(context)
+        if (bookSourceString.isNullOrEmpty()) {
+            val bookSourceUrl = if (context.request().method() == HttpMethod.POST) {
+                context.bodyAsJson.getString("bookSourceUrl", "")
+            } else {
+                context.queryParam("bookSourceUrl").firstOrNull() ?: ""
+            }
+            if (bookSourceUrl.isNotBlank()) {
+                bookSourceString = (getBookSourceStringBySourceURLOpt(bookSourceUrl, userNameSpace) ?: "")
+            }
+        }
+        if (bookSourceString.isNullOrEmpty() && sourceUrl.isNotEmpty()) {
+            bookSourceString = (getBookSourceStringBySourceURLOpt(sourceUrl, userNameSpace) ?: "")
+        }
+        return bookSourceString
+    }
+
+    fun getBookSourceStringBySourceURLOpt(sourceUrl: String, userNameSpace: String): String? {
+        if (sourceUrl.isBlank()) {
+            return null
+        }
+        var file = getStorageFile("data", userNameSpace, "bookSource")
+        if (!file.exists()) {
+            file = getStorageFile("data", "default", "bookSource")
+            if (!file.exists()) {
+                return null
+            }
+        }
+        try {
+            val objectMapper = ObjectMapper()
+            val factory = objectMapper.factory
+            var bookSourceString: String? = null
+            factory.createParser(file).use { closeable ->
+                val parser = closeable as JsonParser
+                if (parser.nextToken() == JsonToken.START_ARRAY) {
+                    while (parser.nextToken() != JsonToken.END_ARRAY) {
+                        if (parser.currentToken() != JsonToken.START_OBJECT) continue
+                        val jsonNode = parser.readValueAsTree<JsonNode>()
+                        if (!sourceUrl.equals(jsonNode.get("bookSourceUrl").asText())) continue
+                        bookSourceString = jsonNode.toString()
+                        break
+                    }
+                }
+            }
+            logger.info { bookSourceString }
+            return bookSourceString
+        } catch (e: Exception) {
+            logger.error("解析文件内容出错: {}  文件: \n{}", e, file)
+            throw e
+        }
     }
 
     fun getShelfBookByURL(url: String, userNameSpace: String): Book? {
@@ -2316,7 +2361,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         val bookSourceUrl = context.queryParam("bookSourceUrl").firstOrNull() ?: ""
         val key = context.queryParam("key").firstOrNull() ?: ""
         val userNameSpace = getUserNameSpace(context)
-        val bookSource = getBookSourceStringBySourceURLOpt(bookSourceUrl, userNameSpace)
+        val bookSource = (getBookSourceStringBySourceURLOpt(bookSourceUrl, userNameSpace) ?: "")
         if (bookSource.isEmpty()) {
             response.write("event: error\n")
             response.write("data: 书源信息错误\n\n")
@@ -2360,7 +2405,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             response.end()
             return
         }
-        val bookSource = getBookSourceStringBySourceURLOpt(book.origin, userNameSpace)
+        val bookSource = (getBookSourceStringBySourceURLOpt(book.origin, userNameSpace) ?: "")
         val chapterList = if (book.isLocalBook()) {
             getLocalChapterList(book, bookSource, false, userNameSpace)
         } else {
@@ -2409,7 +2454,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         for (i in 0 until bookUrlList.size()) {
             val bookUrl = bookUrlList.getString(i)
             val book = getShelfBookByURL(bookUrl, userNameSpace) ?: continue
-            val bookSource = getBookSourceStringBySourceURLOpt(book.origin, userNameSpace)
+            val bookSource = (getBookSourceStringBySourceURLOpt(book.origin, userNameSpace) ?: "")
             val chapterList = if (book.isLocalBook()) {
                 getLocalChapterList(book, bookSource, false, userNameSpace)
             } else {
@@ -2664,7 +2709,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             response.setStatusCode(404).end("书籍信息错误")
             return
         }
-        val bookSource = getBookSourceStringBySourceURLOpt(book.origin, userNameSpace)
+        val bookSource = (getBookSourceStringBySourceURLOpt(book.origin, userNameSpace) ?: "")
         val exportDir = File(getWorkDir("storage", "cache", "export", userNameSpace))
         if (!exportDir.exists()) {
             exportDir.mkdirs()
@@ -2866,7 +2911,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             ?: return returnData.setErrorMsg("书籍信息错误")
         book.setRootDir(getWorkDir())
         book.setUserNameSpace(userNameSpace)
-        val bookSource = getBookSourceStringBySourceURLOpt(book.origin, userNameSpace)
+        val bookSource = (getBookSourceStringBySourceURLOpt(book.origin, userNameSpace) ?: "")
         val chapterList = if (book.isLocalBook()) {
             getLocalChapterList(book, bookSource, false, userNameSpace)
         } else {
