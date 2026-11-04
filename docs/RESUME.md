@@ -1,4 +1,4 @@
-# 续接说明（2026-11-06 09:05）
+# 续接说明（2026-11-06 11:30）
 
 ## 用户目标（明确、无妥协）
 
@@ -10,7 +10,7 @@ ABI 一致性已经不重要，类名和字节码三重对齐才是目标。
 ```
 制品应用类   : 936
 已适配       : 930  (99.36%)   还缺 6 / 多出 3
-字节码完全一致: 753 / 930 (81.0%)   有差异 177 个类
+字节码完全一致: 754 / 930 (81.1%)   有差异 176 个类
 HEAD         : 见 git log（本轮最后提交在 3a-97 之后）
 D 盘可用     : 92G（清掉 handwriting-yolo-cache/uv 的 90G uv 缓存后）
 ```
@@ -83,7 +83,13 @@ powershell -NoProfile -Command "& { $env:JAVA_HOME='D:\Tools\java\jdk-11.0.8+10'
     `boolean bl = ignoreSpace = mb == x;`（`bl` 后面从不用）会多一条 `dup`。
     制品没有 `dup` → 原始源码就是单赋值 `ignoreSpace = mb == x;`。
     **看到未使用变量 + `dup`，优先怀疑 CFR 产物。**
-18. **`const val TAG` 不发 static 字段**：`const` 是编译期常量会内联，
+18. **`ldc_w` vs `ldc` 是假阳性**：`ldc_w` 只是常量池索引宽度（编号 > 255 用宽指令），
+    `norm()` 已归一化。**这是统计器第四次假阳性**（前三次：常量池编号、`nop`、跳转目标偏移）。
+19. **方法末尾多出 `iconst_1 / ireturn`**：本地写成了「末尾 `return true`」，
+    制品是单表达式（`return a == b || (...)`)只有一 return 点。
+20. **多余的 `override` 会改变字节码**：接口已有默认实现时，子类再写一遍
+    `override val x get() = this` 会从 `invokestatic DefaultImpls.getX` 变成 `checkcast`。
+21. **`const val TAG` 不发 static 字段**：`const` 是编译期常量会内联，
     制品有 `<clinit>` 里的 `putstatic TAG` 就说明是普通 `val`。
     **`javap -p` 只比方法名集合，查不出缺字段。**
 14. **`while (i < n)` vs `for (i in 0 until n)`**：前者 `goto` 回循环头，
