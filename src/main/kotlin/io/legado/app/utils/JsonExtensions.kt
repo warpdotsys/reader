@@ -14,10 +14,10 @@ val jsonPath: ParseContext by lazy {
 fun ReadContext.readString(path: String): String? = read(path, String::class.java)
 
 fun ReadContext.readBool(path: String): Boolean? =
-    read(path, Boolean::class.javaPrimitiveType!!)
+    read(path, Boolean::class.javaPrimitiveType)
 
 fun ReadContext.readInt(path: String): Int? =
-    read(path, Int::class.javaPrimitiveType!!)
+    read(path, Int::class.javaPrimitiveType)
 
 fun ReadContext.readLong(path: String): Long? =
-    read(path, Long::class.javaPrimitiveType!!)
+    read(path, Long::class.javaPrimitiveType)
