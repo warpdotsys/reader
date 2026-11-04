@@ -3801,3 +3801,68 @@ return file
 #### 结果
 
 `BookController` 的总 delta 18441 → **18130**。
+
+### 3a-82 负结果：`cacheBookOnServer` 加逻辑反而更差（640 → 839），已回滚
+
+#### 做了什么
+
+按字节码尾部推断出制品有 `BookHelp.saveImages(...)`、`File.writeText`、`BookSource` 解析、
+两个 `logger.info`、成功/失败计数器，于是把 24 行扩写成 48 行：
+
+```kotlin
+val successCount = Ref.IntRef()
+val failedCount = Ref.IntRef()
+for (i in 0 until bookUrlList.size()) {
+    ...
+    val cachedSet = getCachedChapterContentSet(book, userNameSpace).toMutableSet()
+    chapterList.forEachIndexed { index, chapter ->
+        if (cachedSet.contains(index)) return@forEachIndexed
+        try {
+            val content = ...
+            if (content.isNotEmpty()) {
+                File(cacheDir.absolutePath + File.separator + index + ".txt").writeText(content)
+                BookHelp.saveImages(this, BookSource.fromJson(bookSource).getOrNull() ?: BookSource(), book, chapter, content)
+            }
+            successCount.element++
+            cachedSet.add(index)
+        } catch (e: Exception) {
+            logger.info("cacheBookOnServer error: {}", e.message)
+            failedCount.element++
+        }
+    }
+    if (failedCount.element > 0) logger.info("缓存书籍出错: {}", book.name)
+}
+```
+
+#### 结果
+
+| | 改前 | 改后 | 制品 |
+| --- | --- | --- | --- |
+| `cacheBookOnServer` 条数 | 537 | **934** | 736 |
+| delta | 640 | **839** | — |
+
+**改后我们比制品多了 198 条**，delta 反而涨了 199。已回滚到 24 行版本。
+
+#### 为什么
+
+**制品的结构比我想的简单**。从尾部字节码能看出它**有** `saveImages`，但看不出它用的是什么循环
+控制结构。我用 `forEachIndexed` + `try/catch` 包住整块，每个 `forEachIndexed` 会生成
+`iterator` 遍历 + lambda 对象，`try/catch` 又会加异常表，加起来比制品的写法重得多。
+
+制品很可能是：
+
+```kotlin
+for (index in chapterList.indices) { ... }        // 普通 for，不带 lambda
+```
+
+或者 `try` 只包住取内容的单行，而不是包住整个循环体。
+
+#### 教训
+
+**「看起来更完整」不等于「更接近制品」。** 这次我根据"缺了什么"去补，却补出了比制品更重的结构。
+
+正确的做法是：**先照着字节码把控制结构还原出来**（是 `for` 还是 `forEach`，`try` 覆盖哪几行），
+再填内容。控制结构错了，内容再对也全错。
+
+**下次改这个方法时**：先只加 `for (index in chapterList.indices)` 骨架 + `saveImages` 一行，
+编译看 delta 是涨是跌，逐步逼近，不要一次写一大块。

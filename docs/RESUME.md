@@ -1,113 +1,125 @@
-# 恢复清单（断电/中断后从这里接）
+# 续接说明（2026-11-05 08:00）
 
-> 最后更新：2026-11-04 11:45
-> 本地工作笔记，不进 git。**恢复后直接续做，不等用户发话。**
+## 用户目标（明确、无妥协）
 
-## 当前策略（用户 2026-11-04 明确要求：不计代价要百分百源码）
+**最终要 100% 对得上的源码，无论多费劲。** 不接受"编译器版本差异"作为永久借口。
+ABI 一致性已经不重要，类名和字节码三重对齐才是目标。
 
-**目标是 936 个类全部有源码，ABI 恶化可接受。** 之前四次 BookController 尝试都是因为
-「ABI 不能恶化」的硬约束而回滚，**这个约束已经解除**。
-
-- 基线分支：`backup/abi10-baseline`（ABI 10 / 811 类时的状态，随时可回）
-- 另一条备份：`backup/before-kotlin-switch`
-
-## 进行中：BookController（51 个占位方法）
-
-```
-BookController* 类数: 73 / 制品 114（缺 52、多 11，实际对上 62）
-```
-
-**核心机制（已实测验证）**：占位方法只生成孤立的主类方法，不生成续体类。
-把方法体按 CFR 写成真实实现（带 suspend 调用）后，`$方法名$1` 这类内嵌类自动出现。
-
-例：`getBookshelf` 还原成真实实现（含 `checkAuth(context)` 和 `getBookShelfBooks(...)`
-两个 suspend 调用）后，`BookController$getBookshelf$1.class` 就生成了。
-
-**待还原的方法**（搜 `TODO(restore)` 或 `"未恢复"`）：
-`addBookGroupMulti`, `backupToMongodb`, `cacheBookOnServer`, `cacheBookSSE`,
-`getAvailableBookSource`, `getBookCover`, `getBookShelfBooks`,
-`getBookSourceStringBySourceURLOpt`, `getLastBackFileFromWebdav`, `getLocalChapterList`,
-`getShelfBook`, `getShelfBookByURL`, `refreshLocalBook`, `removeBookGroupMulti`,
-`restoreFromMongodb`, `saveBook`, `saveBookConfig`, `saveBookCover`, `saveBookGroupId`,
-`saveLocalBookCover`, `saveShelfBookLatestChapter`, `saveShelfBookProgress`, `saveToWebdav`,
-`searchBookSource`, `searchBookSourceSSE`, `searchBookWithSource`, `setBookSource`,
-`setEpubContent`, `syncBookProgressFromWebdav`, `syncFromWebdav`, `textToSpeech`,
-`ttsByTextToSpeechCn` 等
-
-## 关键约束
-
-- `FileController.kt:521` 已改成 `result.first.inShelf`（配合 BookController 源码化），**别改回去**
-- `Book.kt` 的 `inShelf` **不能**改成 `isInShelf`（IR 崩溃，3a-46）
-- 每次必须 `rm -rf build` 全量编译（增量编译报 conflicting dependencies）
-- `git` 用 `C:/Program Files/Git/cmd/git.exe`
-- 构建：`gradlew.bat classes "-PrestoreBootstrap=D:\Projects\reader\BOOT-INF\classes" --no-daemon`，
-  `JAVA_HOME=D:\Tools\java\jdk-11.0.8+10`
-
-## 已完成 / 已封存
-
-**ABI 10 / 811 类 / 字节码 75.1%**（`backup/abi10-baseline` 那个状态）：
-- `analyzeRule`、`webBook`、`localBook`、`entities`、`controller`（除 BookController）、
-  `api`（YueduApi 148 类）等全部完成
-- 19 个类做到字节码逐指令完全一致（BATCHES 3a-54）
-
-**已试过、不要再试的**：
-| 尝试 | 结果 | 记录 |
-|---|---|---|
-| Kotlin 1.5.0 / 1.5.10 | 编译崩（`@Transient` getter） | 3a-56 |
-| Kotlin 1.5.20 | ABI 11（比 1.5.21 差） | 3a-56 |
-| Kotlin 1.5.31 | ABI 27（大幅恶化） | 3a-56 |
-| `Book.kt` 改 `isInShelf` | IR 崩溃 | 3a-46 |
-| `License` 换 Java 源 | 丢 `@Metadata`，ABI 必崩 | 3a-47 |
-| 去掉 `-Xjsr305=strict` | 零改善 | 3a-41 |
-| BookController 直接开写 / 脚本生成骨架 | 类名 71/114、54/114 | 3a-39 / 3a-43 |
-
-## 剩余 141 个没源码的类
-
-- **BookController 114 个**（进行中）
-- **零散 27 个**：`LicenseController` 10 + `LicenseControllerKt` 2（卡 `License.validHost` 编译崩溃）、
-  `SourceAnalyzer` 11 + `BaseSource` 3 + `JsExtensions` 1（卡文件级 lambda 编号）
-
-## 逐文件重构的进展与边界（2026-11-05 03:35）
-
-### 已完成
-
-| 文件 | 进度 | 关键点 |
-| --- | --- | --- |
-| `JsExtensions` | **1/1 全清** | `connect(urlStr, header)` 用 `GSON.fromJsonObject` 解析 header 传给 `AnalyzeUrl.headerMapF` |
-| `BaseSource` | **2/3** | `loginHeaderMap`/`loginInfoMap` 是**接口方法**不是属性（属性 getter 的内联 lambda 叫 `special`） |
-| `BookController` | **2/8** | `getBookSourceStringBySourceURLOpt`（Jackson 流式）+ `getLocalChapterList`（网络书源逻辑） |
-
-### 关键规则（这轮吃透的）
-
-**`$lambda-N` 数的是「所有 lambda 表达式」，不是「生成的类」。**
-
-`let` / `forEach` / `runCatching` 这些 inline 函数的 lambda **不生成类，但占编号**。
-实测：带 `getOrNull()?.let { }` 时生成 `$4`，改成 `if (!x.isNullOrEmpty())` 后变成 `$3`。
-一个 `let` 正好差一个号。
-
-**另一个隐蔽的坑：参数名写错，ABI 闸门查不出来。**
-
-`getLocalChapterList(book, bookSource, refresh, userNameSpace, debugLog, mutex)` 被我写成
-`(book, bookSource, useCache, userNameSpace, refresh, mutex)`——第 3 个是 `refresh` 不是
-`useCache`，第 5 个是 `debugLog` 不是 `refresh`。JVM 描述符完全一样
-（`(Book,String,boolean,String,boolean,Mutex)`），**ABI 闸门一个字都查不出来**。
-
-### 剩余（都卡在编译器行为，不建议继续）
-
-- **`BookController` 6 个**：前置 lambda 计数差 1/3、SAM 转换被 1.5.21 优化掉
-- **`SourceAnalyzer` 11 个**：编号规则比「文件级/方法级」更复杂，需要 controlled experiment 才能确定
-- **`BaseSource` 1 个**：`getHeaderMap$lambda-4$lambda-2` 需要两层 lambda 嵌套
-
-**要真正解决，得先做 controlled experiment**：写几个最小样例，测出 `$lambda-N` 在
-「`runCatching` 包裹 + 内联高阶函数 + SAM 转换」组合下的真实编号规则。
-
-### 最终状态
+## 当前状态
 
 ```
 制品应用类   : 936
-本仓库已编译 : 935
-已适配       : 913
-还缺         : 21（BookController 6 + SourceAnalyzer 11 + BaseSource 1 + 其他 3）
-行为占位     : 0
-降级实现     : 0
+本仓库已编译 : 933
+已适配       : 930  (99.36%)   还缺 6 / 多出 3
+字节码完全一致: 720 / 930 (77.4%)   有差异 210 个类
+HEAD         : bde56ef (restore/core)
 ```
+
+## 三层验收脚本
+
+```bash
+# 类名覆盖
+powershell -NoProfile -Command "& { .\scripts\class-coverage.ps1 -Artifact 'D:\Projects\reader\BOOT-INF\classes' }"
+
+# 字节码（我自己写的 Python 版，比 PowerShell 快）
+python scripts/bytecode-diff.py --artifact 'D:/Projects/reader/BOOT-INF/classes' \
+  --local-dir 'D:/Projects/reader-repo/build/classes/kotlin/main' \
+  --local-dir 'D:/Projects/reader-repo/build/classes/java/main' \
+  --jobs 10 --out 'C:/Users/chong/AppData/Local/hermes/cache/scratch/bc/latest.json'
+
+# ABI
+powershell -NoProfile -Command "& { $env:JAVA_HOME='D:\Tools\java\jdk-11.0.8+10'; .\scripts\verify-abi.ps1 -Artifact 'D:\Projects\reader\BOOT-INF\classes' -JavaHome $env:JAVA_HOME }"
+```
+
+**每次改代码必须 `rm -rf build` 全量编译**，增量编译会报 conflicting dependencies。
+
+## 已确认的「编译噪声」判据（命中就跳过，不要浪费时间）
+
+1. **`trim()` 内联**：制品字节码里 `CharSequence.charAt` + `Intrinsics.compare(c, 32)`
+   → 1.5.1 把 `trim()` 当 `@InlineOnly` 展开 60+ 条，1.5.21 只发 `StringsKt.trim`。
+   **自动检测**：`'CharSequence.charAt' in body and 'Intrinsics.compare' in body`
+2. **`nop`**：编译器的行号占位，两侧插入点不同
+3. **常量池编号** `#123`：分配顺序不同，同一字符串可能 #9/#10
+4. **局部变量槽位偏移**：`astore 23` vs `astore 21`，改一处会整体位移
+5. **`checkNotNullExpressionValue`**：jsoup 等 Java 库的 `@NotNull` 在 `-Xjsr305=strict` 下的处理差异
+
+## 已确认的「真差异」判据
+
+1. **`invokeinterface Map.xxx` vs `invokevirtual HashMap.xxx`** → 局部变量声明类型不同
+2. **`String.valueOf(x)` vs `x.toString()`** → 前者是字符串模板 `"$x"`
+3. **`ldc "$this$xxx"` vs `ldc "it"`** → 带接收者的 lambda `T.() -> Unit` vs 普通单参
+4. **制品多 20+ 条 + `astore`/`goto`/`LogUtils`** → 缺 `try/catch`
+5. **`StringsKt.isBlank`** → 源码写 `isNullOrBlank()` 而不是 `== null`
+6. **`new cn/hutool/crypto/symmetric/AES`** → 直接用了 hutool，不是包一层 EncoderUtils
+7. **`astore` + `aload` vs `dup`** → 制品先把中间结果命名存变量，我们写链式
+8. **`data class` 自动生成 vs 手写**：比对方法条目数，182 条 = 自动生成全字段，
+   4/29 条 = 手写只比部分字段。**两个方向都可能错**（BookSource 该删手写，
+   RssArticle 该加手写）
+
+## 剩余 210 个有差异的类（按 delta 降序）
+
+```
+18441  com.htmake.reader.api.controller.BookController     ← 12 个方法，已在啃
+ 2691  com.htmake.reader.api.YueduApi
+ 2653  me.ag2s.epublib.domain.Relator
+ 2275  io.legado.app.utils.Base64$Decoder
+ 1808  com.htmake.reader.utils.ExtKt
+ 1746  io.legado.app.help.BytesEncodingDetect
+ 1647  com.htmake.reader.api.controller.UserController
+ 1445  io.legado.app.model.webBook.BookChapterList
+ 1263  io.legado.app.model.localBook.TextFile
+ 1140  io.legado.app.model.analyzeRule.RuleAnalyzer
+ 1087  com.htmake.reader.api.controller.LicenseController
+ 1087  io.legado.app.lib.icu4j.CharsetRecog_sbcs$NGramParser_IBM420
+ 1048  com.htmake.reader.api.controller.BookSourceController
+ 1043  org.kxml2.io.KXmlParser
+ 1040  io.legado.app.utils.Base64$Encoder
+ 1023  io.legado.app.utils.StringUtils
+  920  com.htmake.reader.api.controller.BaseController
+  903  io.legado.app.model.localBook.EpubFile
+  869  io.legado.app.model.webBook.BookInfo
+  850  io.legado.app.help.coroutine.Coroutine$executeInternal$1
+```
+
+## BookController 的 12 个待修方法（改前数据）
+
+```
+getBookContent       1830  2208/2092   ← 差 116
+getLocalChapterList   735   773/697    ← 差 76
+searchBookSourceSSE   694   825/862    ← 本地多 37
+cacheBookOnServer     640   736/537    ← 本地少 199（只补了 launch 外壳）
+searchBookContent     615   684/501    ← 本地少 183
+getChapterList        609   809/781
+cacheBookSSE          568   808/705
+searchBookMultiSSE    564   796/794
+searchBookMulti       533   661/651
+searchBookSource      514   616/645
+exportToEpub          482   → 已归零（3a-81）
+exportBook            473   499/308    ← 本地少 191
+```
+
+## 工作方法（已验证有效）
+
+1. **不要猜**：拿 `javap -c` 两侧对比，找第一条不同指令
+2. **先分类再动手**：用 `bytecode-diff.py` 看方法级 delta，判断是"缺逻辑"还是"编译噪声"
+3. **改完必须全量编译**（`rm -rf build`），1.5~3.5 分钟
+4. **一批改完跑一次校验**，记录到 `docs/BATCHES.md`（当前已到 3a-81）
+5. **每次提交都写清楚改了什么、为什么、delta 变化**
+
+## 不要做的事
+
+- 不要为了字节码一样而写反直觉的代码（比如手写一遍 trim）
+- 不要忽略"本地多"的情况（RssArticle 就是这么发现的）
+- 不要相信 `$i$f$xxx` 局部变量作为 inline 的证据（3a-70 的教训，类名才是证据）
+- 不要用增量编译
+
+## 提交规范
+
+```bash
+G="C:/Program Files/Git/cmd/git.exe"
+"$G" add -A
+"$G" -c user.name="Hermes" -c user.email="hermes@local" commit -m "中文说明 + delta 变化"
+"$G" push origin restore/core
+```
+
+push 偶尔会 `Internal Server Error`，等 30-60 秒重试即可。
