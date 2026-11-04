@@ -3325,3 +3325,24 @@ private suspend fun executeBlock(
 - `lambda-16` → 前面某方法多 2 个 inline lambda（文件级计数）
 - `$ttsByTextToSpeechCn$2` + `sam$BiConsumer$0` → SAM 转换策略（本条）
 - `lambda-4$lambda-2` → 外层 lambda 需为非 inline（成本高，未做）
+
+### 3a-72 字节码指令级校验：717/933 (76.8%)，比上一轮基线涨 120 个
+
+```
+已比对类数         : 933
+指令序列完全一致   : 717   (76.8%)
+仅局部装配不同     : 2
+结构与调用不同     : 213
+无法比对           : 3
+```
+
+对比上一轮基线（597/795 = 75.1%），**完全一致的类从 597 涨到 717**。
+涨幅来源有两部分：
+
+1. **分母变化**：795 → 933（`BookController` 从 112 涨到接近 114、`SourceAnalyzer` 11 个类全清、
+   `Coroutine` 补回 `executeBlock$2`）
+2. **新修的方法本身是一致的**：`deleteBook` / `deleteBooks` / `getSpeakStream` / `setCover` /
+   `cacheBookSSE` / `Coroutine.executeBlock` 都是按 CFR 逐行重写，指令序列自然对上
+
+剩下 213 个「结构与调用不同」是下一阶段的主战场（23%）。
+另有 3 个「无法比对」必须查清 —— 脚本自己就写了「不能默认它没问题」。
