@@ -89,47 +89,43 @@ ABI 闸门（811 个已编译类，其中 16 个制品无此类）：一致 784 
 2. indy lambda 捕获范围（1.5.1 塞全部局部变量，1.5.21 只塞用到的）
 3. suspend 参数溢出（1.5.1 存局部槽位，1.5.21 不存）
 
-## 最终状态（2026-11-04 18:25）
+## 最终状态（2026-11-04 15:15 更新）
 
 ```
 制品应用类   : 936
-本仓库已编译 : 935
-已适配       : 913
-还缺         : 23   （全是编译器合成类，对应源文件全部存在）
-多出         : 22
-
-行为占位     : 0
-降级实现     : 0
-
-ABI    : 935 比对 / 870 一致 / 43 不一致 / 22 制品无此类
-字节码 : 597 / 795 逐指令一致（75.1%）
+本仓库已编译 : 933
+已适配       : 930   (99.36%)
+还缺         : 6
+多出         : 3
 ```
 
-### 已达成
+### 还缺的 6 个（全是编译器版本产物）
 
-- **936 个制品类对应的源文件全部存在**，全部有真实逻辑（最深的是 `BookController.kt` 2865 行、
-  `YueduApi.kt` 803 行、`LicenseController.kt` 430 行）
-- **无行为占位**：最后一个 `saveBookToShelf` 已按 CFR 完整还原
-- **无降级实现**：`License.validHost` 的编译崩溃随仓库结构变化自动消失，两处降级已回填
-- **19 个类做到字节码逐指令完全一致**（BATCHES 3a-54）
+| 类 | 原因 |
+| --- | --- |
+| `BookController$cacheBookOnServer$$inlined$CoroutineExceptionHandler$1` | 1.5.21 的 inline lambda 占编号，用了它 `$2`/`$3` 就错位 |
+| `BookController$cacheBookSSE$4` | `limitConcurrent` 的 suspend lambda 未生成独立类 |
+| `BookController$getLastBackFileFromWebdav$lambda-16` | 我们 `lambda-18`，前面某方法多 2 个 inline lambda |
+| `BookController$ttsByTextToSpeechCn$2` | 制品 SAM 转换生成类，我们 indy 不生成 |
+| `BookControllerKt$sam$java_util_function_BiConsumer$0` | 同上 |
+| `BaseSource$DefaultImpls$getHeaderMap$lambda-4$lambda-2` | 制品外层 lambda 生成类，我们的外层是 inline `let` |
 
-### 剩下的 23 个合成类为什么停手
+### 多出的 3 个（都是上面 6 个的对偶）
 
-它们的源文件都在、逻辑都对，缺的只是编译器合成类的**编号/形态**：
+`$cacheBookOnServer$exceptionHandler$1`、`$getLastBackFileFromWebdav$lambda-18`、
+`$BaseSource getHeaderMap$lambda-2`
 
-- `BookController` 8 个：文件级 lambda 计数器偏移（我们 `lambda-19`，制品 `lambda-16`）
-- `SourceAnalyzer` 11 + `BaseSource` 3 + `JsExtensions` 1：`$lambda-N$$inlined$fromJsonObject$N`，
-  同一个根因
+### 归纳：四类编译器版本差异
 
-修它们要**逐文件重构 lambda 序列**，成本远高于收益。这些是编译器产物，不是源码的一部分。
+1. **IR 优化**：1.5.21 比 1.5.1 优化更多（CSE、`when` subject 提取、`$$forInline`）
+2. **indy lambda 捕获范围**：1.5.1 捕获外层全部局部变量
+3. **suspend 参数溢出策略**
+4. **inline lambda 编号占用策略**：1.5.21 占 `$N`，1.5.1 不占
 
-### 43 个 ABI 不一致的构成
+### 已修的语义级问题（不是类名对齐的产物）
 
-- **33 个**：`BookController` 的续体类，私有捕获槽位（`L$0`/`I$3`）对不上
-- **9 个**：1.5.21 vs 1.5.1 的 IR 差异（`$$forInline` / `Ref$ObjectRef` 捕获 `val` / `L$0`）
-- **1 个**：`Book` 的私有字段名（IR 崩溃，3a-46）
-
-### 如果以后要继续
-
-唯一有意义的动作是**换 Kotlin 编译器**，但 1.5 家族已全部试过（3a-56）：
-1.5.0 / 1.5.10 编译崩，1.5.20 差 1 个，1.5.31 差 17 个，**1.5.21 是最优**。
+- `deleteBook` / `deleteBooks` 旧实现走 `bookList` + `LocalBook.deleteBook`，CFR 是直接操作 `bookshelf` JSON
+- `getSpeakStream` 从 6 行 `awaitResult` 补成 150 行（重试、JS 校验、Content-Type、三类异常分支）
+- `setCover` 参数 4→3，封面取 `getDisplayCover()`，远程走 `getByteArrayAwait()` + 文件缓存
+- `cacheBookSSE` 从同步 for 循环改成 SSE + `closeHandler` + `limitConcurrent`
+- `Coroutine.executeBlock` 去掉 `inline`（推翻 3a-51 的一半）
