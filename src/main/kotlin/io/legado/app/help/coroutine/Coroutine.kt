@@ -174,11 +174,11 @@ class Coroutine<T> constructor(
         }
     }
 
-    private inline suspend fun executeBlock(
+    private suspend fun executeBlock(
         scope: CoroutineScope,
         context: CoroutineContext,
         timeMillis: Long,
-        crossinline block: suspend CoroutineScope.() -> T
+        block: suspend CoroutineScope.() -> T
     ): T {
         val context2 = scope.coroutineContext.plus(context)
         return withContext(context2) {

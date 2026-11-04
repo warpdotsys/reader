@@ -3242,3 +3242,61 @@ $1, $2, $3, $exceptionHandler$1
 
 这是 3a-54「IR 优化」和 3a-68「suspend 参数溢出」之外的**第四类编译器版本差异**：
 **inline lambda 的编号占用策略**。
+
+### 3a-70 `executeBlock` 去掉 `inline`：消掉 2 个多出的 `$$inlined$` 类（推翻 3a-51 的一半）
+
+#### 现象
+
+本地多出两个类：
+
+```
+Coroutine$executeInternal$1$invokeSuspend$$inlined$executeBlock$1
+Coroutine$executeInternal$1$invokeSuspend$$inlined$executeBlock$1$1
+```
+
+制品里没有。
+
+#### 根因
+
+我们写的是：
+
+```kotlin
+private inline suspend fun executeBlock(
+    scope: CoroutineScope,
+    context: CoroutineContext,
+    timeMillis: Long,
+    crossinline block: suspend CoroutineScope.() -> T
+): T
+```
+
+`crossinline` 会为 `block` 生成一个包装 lambda 类，被内联进 `executeInternal` 的续体后
+就变成了 `$$inlined$executeBlock$1`。
+
+#### 修法
+
+**去掉 `inline` 和 `crossinline`，保留 `suspend`**：
+
+```kotlin
+private suspend fun executeBlock(
+    scope: CoroutineScope,
+    context: CoroutineContext,
+    timeMillis: Long,
+    block: suspend CoroutineScope.() -> T
+): T
+```
+
+编译直接通过（2m03s），多出的两个类消失，同时生成了与制品同名的
+`Coroutine$executeBlock$2` 和 `Coroutine$executeBlock$2$1`。
+
+#### 这条推翻了 3a-51 的一半
+
+3a-51 当时的结论是「`block` 在 `withContext`/`withTimeout` 里调用，必须 `crossinline`」。
+**那是因为当时保留了 `inline`**。去掉 `inline` 之后普通 lambda 参数照样能编，
+反而与制品一致 —— **制品根本不是 inline 函数**（虽然 CFR 里有个 `$i$f$executeBlock = false`
+的局部变量，那是 CFR 反编译残留，不能当作 inline 的证据）。
+
+**教训：`$i$f$xxx` 局部变量不是判断 inline 的可靠依据，类名才是。**
+
+#### 净结果
+
+多出的类从 5 降到 3，缺的仍是 6。本地 933 / 制品 936。
