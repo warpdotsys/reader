@@ -2420,3 +2420,46 @@ ABI 差异里出现带 `$$` 的成员（`$$forInline`、`$$inlined$`、`access$`
 | `access$getXxx$cp` 顺序不同 | 成员顺序 | 语义无关，可忽略 |
 | `$$inlined$xxx$1` 类名 | 内联展开形态 | 追 lambda 序列，成本极高 |
 | `invokeSuspend$$forInline` | **编译器版本产物** | **无解，登记即可** |
+
+### 3a-52 剩余 10 个 ABI 不一致的最终分类
+
+| 类 | 差异 | 性质 |
+| --- | --- | --- |
+| `Book` | 私有字段 `inShelf` vs `isInShelf` | IR 崩溃（3a-46） |
+| `Coroutine$executeBlock$2` / `$2$1` | 多 `invokeSuspend$$forInline` | 1.5.21 特有（3a-51） |
+| `AnalyzeRule$ajax$1` | 多 `L$0` | 1.5.21 IR |
+| `JsExtensions$ajaxAll$1` | 多 `I$3` | 1.5.21 IR |
+| `JsExtensions$connect$1` / `$2` | 少 `L$0` | 1.5.21 IR |
+| `JsExtensions$queryTTF$font$1` | `CacheManager` vs `Ref$ObjectRef<CacheManager>` | **1.5.21 用 Ref 捕获 val** |
+| `RemoteWebview$getStrResponse$strResponse$1` | `String` vs `Ref$ObjectRef<String>` | 同上 |
+| `AnalyzeUrl$UrlOption$getHeaderMap$$inlined$fromJsonObject$1` | 内联展开 | 追 lambda 序列（成本极高） |
+
+#### 新发现：1.5.21 会拿 `Ref$ObjectRef` 捕获 `val`
+
+`JsExtensions.queryTTF` 里：
+
+```kotlin
+val cacheInstance = CacheManager(userNameSpace)   // 是 val
+val font = if (str.isAbsUrl()) {
+    runBlocking {
+        var x = cacheInstance.getByteArray(key)   // 在 lambda 里读 cacheInstance
+        ...
+    }
+} else { ... }
+```
+
+制品：`$cacheInstance: CacheManager`（**直接捕获**）
+我们：`$cacheInstance: Ref$ObjectRef<CacheManager>`（**包了一层**）
+
+`RemoteWebview.getStrResponse` 的 `$remoteUrl` / `$requestBody` 同理（`val String` 被包成 `Ref`）。
+
+**这是 1.5.21 的 IR 生成策略差异**，源码层面控制不了——把 `val` 改成 `var` 只会让
+1.5.21 更确定地用 `Ref`，不会变回直接捕获。**无解。**
+
+#### 结论：10 是当前工具链的极限
+
+10 个里 **9 个是编译器版本差异**（1.5.21 vs 1.5.1 的 IR），只有 `Book`（IR 崩溃）
+和 `AnalyzeUrl$UrlOption…`（内联序列）是另外两类无解问题。
+
+上 Kotlin 1.6+ 或换 1.5.1 编译器理论上能全部收敛，但那会破坏大量已验收的字节码
+（3a-41 已经证明过改编译器参数会让 17/18 掉到 3/20）。**不值得。**
