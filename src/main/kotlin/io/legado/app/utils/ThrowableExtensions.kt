@@ -5,5 +5,5 @@ val Throwable.msg: String
     get() {
         val stackTrace = stackTraceToString()
         val lMsg = localizedMessage ?: "noErrorMsg"
-        return if (stackTrace.length > 0) stackTrace else lMsg
+        return if (stackTrace.isNotEmpty()) stackTrace else lMsg
     }

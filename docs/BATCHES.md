@@ -4156,3 +4156,66 @@ suspend fun exportBook(context: RoutingContext) {
 两边的 API 契约根本不同——不是"实现细节差异"，是**接口不兼容**。
 
 这种错误 delta 特别大（473），因为整个参数解析段都不同。
+
+### 3a-88 统计器第三个假阳性：跳转目标偏移 + 2 个真修
+
+#### 统计器修正（第三次）
+
+`getMsg` 显示 31/31 完全一样，却仍被判为"不同"，原因是：
+
+```
+制品 22: ifle 49        ← 跳转到字节偏移 49
+本地 22: ifle 48        ← 跳转到字节偏移 48
+```
+
+**指令序列完全相同，只是跳转目标差了 1 字节**（前面的指令长度不同导致了整体偏移）。
+
+`norm()` 加一条：
+
+```python
+s = re.sub(r'\b(if\w+|goto|jsr|ret)\s+\d+\b', r'\1', s)
+```
+
+**影响**：930 个类里只多判出 3 个一致（720 → 723），说明**大部分差异不是跳转偏移**，
+之前的结果基本可信。但这 3 个是纯假阳性，必须修掉。
+
+#### 真修的两个
+
+**1. `DB$Companion.table`（delta 19 → 0）**
+
+制品：`aload_3 / astore 4 / aload 4 / ldc "SQL" / areEqual`
+本地：`aload_3 / ldc "SQL" / areEqual`
+
+制品先把 `driver` 存到局部变量 4 再取出比较 —— 这是 **`when (driver)` 的编译形态**
+（`when` 多分支时 subject 只求值一次，编译器先 `astore` 再 `aload`）。
+
+```kotlin
+// 改前
+return if (driver == "SQL") { SQLTable(...) } else { JSONTable(...) }
+// 改后
+return when (driver) {
+    "SQL" -> SQLTable(userNameSpace, name)
+    else -> JSONTable(userNameSpace, name)
+}
+```
+
+**新判据：`aload_n` → `astore m` → `aload m` → 比较，这是 `when` 不是 `if`。**
+
+**2. `ThrowableExtensionsKt.getMsg`（delta 4 → 0）**
+
+`stackTrace.length > 0` → `stackTrace.isNotEmpty()`（3a-63 判据复用）。
+
+#### 当前数字
+
+```
+v3: 720/930 = 77.4%
+v4: 723/930 = 77.7%（跳转归一化 + 2 个真修）
+```
+
+#### 附带：D 盘又满了，这次找到真凶
+
+`No space left on device` 再次出现。找到 `D:\Projects\handwriting-yolo-cache\uv`
+——**uv 的包缓存，90G**（不是统计显示的 3.27G，`Measure-Object` 算错了）。
+删掉后可用空间 0 → **92G**。
+
+**这条要记住：`handwriting-yolo-cache/uv` 是 uv 缓存，可随时删，不要把它当成项目数据。**
