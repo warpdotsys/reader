@@ -3346,3 +3346,35 @@ private suspend fun executeBlock(
 
 剩下 213 个「结构与调用不同」是下一阶段的主战场（23%）。
 另有 3 个「无法比对」必须查清 —— 脚本自己就写了「不能默认它没问题」。
+
+### 3a-73 `JsExtensions$DefaultImpls` 修掉 5 个方法：try/catch、isNullOrBlank、hutool 直接用
+
+这类「结构差异 40 / 方法差异 40」的接口默认实现，逐个对 `javap -c` 反而比读 CFR 快
+（CFR 对 `DefaultImpls` 只给了接口声明，没给实现体）。
+
+#### 已修（delta 从 1504 降到 1338）
+
+| 方法 | 制品 | 我们（原） | 差异根因 |
+| --- | --- | --- | --- |
+| `aesBase64DecodeToByteArray` | 47 条 | 25 条 | 制品有 `try/catch` + `log(e.localizedMessage ?: "aesDecodeToByteArrayERROR")` |
+| `base64DecodeToByteArray`（两个重载） | 50 / 19 条 | 19 / 17 条 | 制品用 `isNullOrBlank()` 检查，且**不转发**到另一个重载 |
+| `aesDecodeArgsBase64Str` | 32 条 | 59 条 | 制品用 `AES(mode, padding, key, iv).decryptStr(data)`，我们用 `EncoderUtils.decryptAES(...)?: ""` |
+| `aesEncodeArgsBase64Str` | 32 条 | 59 条 | 同上，`.encryptBase64(data)` |
+| `tripleDESDecodeArgsBase64Str` | 32 条 | 59 条 | 改用 `DESede(mode, padding, key, iv).decryptStr(data)` |
+| `tripleDESEncodeArgsBase64Str` | 32 条 | 59 条 | `DESede(...).encryptBase64(data)` |
+
+#### 三条可复用判据
+
+1. **制品字节码比我们多 20+ 条且出现 `astore` / `goto` / `LogUtils`** → 制品有 `try/catch`，
+   我们没写。补上后 delta 直接归零。
+2. **制品调用 `StringsKt.isBlank`** → 源码是 `isNullOrBlank()` 而不是 `== null`。
+   这两个的字节码完全不是一个形状（`isBlank` 是 `ifnull` + `invokestatic`，`== null` 只有 `ifnonnull`）。
+3. **制品出现 `new cn/hutool/crypto/symmetric/AES` 或 `DESede`** → 源码直接用 hutool，
+   不是包一层的 `EncoderUtils.decryptAES/encryptAES2Base64`。`AES(mode, padding, keyBytes, ivBytes)`
+   这个四参构造器接受的 `mode`/`padding` 是字符串（不是枚举），`decryptStr`/`encryptBase64` 的返回值非空，
+   所以不需要 `?: ""` 兜底。
+
+#### 剩余（按 delta 排序）
+
+`queryTTF` 83、`getTxtInFolder` 77、`utf8ToGbk` 76、`getZipByteArrayContent` 72、
+`downloadFile` 59、`post`/`get`/`head` 55-57、`importScript` 49、`tripleDESDecodeStr` 44。

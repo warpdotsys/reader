@@ -41,6 +41,8 @@ import java.util.UUID
 import java.util.zip.ZipInputStream
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonObject
+import cn.hutool.crypto.symmetric.AES
+import cn.hutool.crypto.symmetric.DESede
 
 interface JsExtensions {
 
@@ -227,11 +229,12 @@ interface JsExtensions {
     }
 
     fun base64DecodeToByteArray(str: String?): ByteArray? {
-        return base64DecodeToByteArray(str, 2)
+        if (str.isNullOrBlank()) return null
+        return io.legado.app.utils.Base64.decode(str, 2)
     }
 
     fun base64DecodeToByteArray(str: String?, flags: Int): ByteArray? {
-        if (str == null) return null
+        if (str.isNullOrBlank()) return null
         return io.legado.app.utils.Base64.decode(str, flags)
     }
 
@@ -508,12 +511,17 @@ interface JsExtensions {
         transformation: String,
         iv: String
     ): ByteArray? {
-        return EncoderUtils.decryptBase64AES(
-            str.encodeToByteArray(),
-            key.encodeToByteArray(),
-            transformation,
-            iv.encodeToByteArray()
-        )
+        return try {
+            EncoderUtils.decryptBase64AES(
+                str.encodeToByteArray(),
+                key.encodeToByteArray(),
+                transformation,
+                iv.encodeToByteArray()
+            )
+        } catch (e: Exception) {
+            log(e.localizedMessage ?: "aesDecodeToByteArrayERROR")
+            null
+        }
     }
 
     fun aesBase64DecodeToString(
@@ -582,12 +590,11 @@ interface JsExtensions {
         padding: String,
         iv: String
     ): String {
-        return EncoderUtils.decryptAES(
-            data.encodeToByteArray(),
+        return AES(
+            mode, padding,
             io.legado.app.utils.Base64.decode(key, 2),
-            "${mode}/${padding}",
             io.legado.app.utils.Base64.decode(iv, 2)
-        )?.toString(Charsets.UTF_8) ?: ""
+        ).decryptStr(data)
     }
 
     fun tripleDESDecodeStr(
@@ -612,12 +619,11 @@ interface JsExtensions {
         padding: String,
         iv: String
     ): String {
-        return EncoderUtils.decryptBase64DES(
-            data.encodeToByteArray(),
+        return DESede(
+            mode, padding,
             io.legado.app.utils.Base64.decode(key, 2),
-            "${mode}/${padding}",
             io.legado.app.utils.Base64.decode(iv, 2)
-        )?.toString(Charsets.UTF_8) ?: ""
+        ).decryptStr(data)
     }
 
     fun aesEncodeArgsBase64Str(
@@ -627,12 +633,11 @@ interface JsExtensions {
         padding: String,
         iv: String
     ): String {
-        return EncoderUtils.encryptAES2Base64(
-            data.encodeToByteArray(),
+        return AES(
+            mode, padding,
             io.legado.app.utils.Base64.decode(key, 2),
-            "${mode}/${padding}",
             io.legado.app.utils.Base64.decode(iv, 2)
-        )?.toString(Charsets.UTF_8) ?: ""
+        ).encryptBase64(data)
     }
 
     fun desDecodeToString(
@@ -713,12 +718,11 @@ interface JsExtensions {
         padding: String,
         iv: String
     ): String {
-        return EncoderUtils.encryptDES2Base64(
-            data.encodeToByteArray(),
+        return DESede(
+            mode, padding,
             io.legado.app.utils.Base64.decode(key, 2),
-            "${mode}/${padding}",
             io.legado.app.utils.Base64.decode(iv, 2)
-        )?.toString(Charsets.UTF_8) ?: ""
+        ).encryptBase64(data)
     }
 
     fun digestHex(data: String, algorithm: String): String {
