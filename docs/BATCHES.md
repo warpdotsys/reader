@@ -4282,3 +4282,67 @@ ResourceUtil : 10/10 方法一致
 查 `EpubReader` 时全显示本地「<缺>」，因为脚本只查了 `build/classes/kotlin/main`，
 而这几个类是 `src/main/java` 编到 `build/classes/java/main`。
 **`bytecode-diff.py` 支持多个 `--local-dir` 是有原因的，临时脚本也要传两个。**
+
+### 3a-90 CFR 的 `continue` 模式：一次清掉 5 个 Java 类
+
+#### 模式
+
+CFR 把「循环里找到一个满足条件的元素就返回/跳出」反编译成：
+
+```java
+for (X x : xs) {
+    if (!cond(x)) continue;   // ← 取反 + continue
+    return x;
+}
+```
+
+字节码：`ifne <跳过>` + `goto <循环头>`。
+
+而制品是**正向 if**：
+
+```java
+for (X x : xs) {
+    if (cond(x)) {            // ← 正向
+        return x;
+    }
+}
+```
+
+字节码：`ifeq <跳到循环尾>`。
+
+#### 一次改 5 个，全部归零
+
+| 类 | 方法 | delta |
+| --- | --- | --- |
+| `epublib.domain.Identifier` | `getBookIdIdentifier` | 4 → 0 |
+| `epublib.domain.MediaTypes` | `determineMediaType` | 4 → 0 |
+| `epublib.domain.Metadata` | `getFirstTitle` | 4 → 0 |
+| `epublib.domain.Date$Event` | `fromValue` | 8 → 0 |
+| `epublib.util.commons.io.ByteOrderMark` | `equals` | 8 → 0 |
+
+验证：`compared 5 / exact 5 / different 0`。
+
+#### 判据（通用的，不止这 5 个）
+
+**看到 `ifne` + `goto` 回循环头，而制品是 `ifeq` 跳过——这是 `continue` 和正向 `if` 的区别。**
+CFR 特别喜欢生成 `if (!x) continue;`，但原始 Java 源码几乎总是正向 `if (x) { ... }`。
+
+改写方向：**`if (!cond) continue; <body>` → `if (cond) { <body> }`**。
+
+注意 `ByteOrderMark.equals` 是循环里的 `continue`（不是 `if` 里的），改成：
+
+```java
+// 改前
+for (int i = 0; i < this.bytes.length; ++i) {
+    if (this.bytes[i] == bom.get(i)) continue;
+    return false;
+}
+// 改后
+for (int i = 0; i < this.bytes.length; ++i) {
+    if (this.bytes[i] != bom.get(i)) {
+        return false;
+    }
+}
+```
+
+**这条规律对所有 CFR 反编译出来的 Java 类都适用**，epublib / umdlib / kxml2 三个包还有一批可以这么扫。

@@ -117,8 +117,9 @@ implements Serializable {
             return "";
         }
         for (String title : this.titles) {
-            if (!StringUtil.isNotBlank(title)) continue;
-            return title;
+            if (StringUtil.isNotBlank(title)) {
+                return title;
+            }
         }
         return "";
     }

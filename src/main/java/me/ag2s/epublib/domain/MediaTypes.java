@@ -37,8 +37,9 @@ public class MediaTypes {
     public static MediaType determineMediaType(String filename) {
         for (MediaType mediaType : mediaTypesByName.values()) {
             for (String extension : mediaType.getExtensions()) {
-                if (!StringUtil.endsWithIgnoreCase(filename, extension)) continue;
-                return mediaType;
+                if (StringUtil.endsWithIgnoreCase(filename, extension)) {
+                    return mediaType;
+                }
             }
         }
         return null;

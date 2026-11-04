@@ -83,8 +83,9 @@ implements Serializable {
 
         public static Event fromValue(String v) {
             for (Event c : Event.values()) {
-                if (!c.value.equals(v)) continue;
-                return c;
+                if (c.value.equals(v)) {
+                    return c;
+                }
             }
             return null;
         }

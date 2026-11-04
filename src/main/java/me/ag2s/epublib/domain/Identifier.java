@@ -31,9 +31,10 @@ implements Serializable {
         }
         Identifier result2 = null;
         for (Identifier identifier : identifiers) {
-            if (!identifier.isBookId()) continue;
-            result2 = identifier;
-            break;
+            if (identifier.isBookId()) {
+                result2 = identifier;
+                break;
+            }
         }
         if (result2 == null) {
             result2 = identifiers.get(0);

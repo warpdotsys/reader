@@ -60,8 +60,9 @@ implements Serializable {
             return false;
         }
         for (int i = 0; i < this.bytes.length; ++i) {
-            if (this.bytes[i] == bom.get(i)) continue;
-            return false;
+            if (this.bytes[i] != bom.get(i)) {
+                return false;
+            }
         }
         return true;
     }
