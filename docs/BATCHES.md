@@ -3643,3 +3643,47 @@ delta 22 → 25（条数从 24 涨到 27，接近制品的 29，但仍有 2 条�
 
 **四条方法都还差 2 条未归零**，说明方向对但收尾细节没到位。继续调需要多轮全量编译，
 先记录，转向别的类。
+
+### 3a-79 101-300 段剩余三处的结论：都是编译器形态，不是实现缺失
+
+#### `JsoupExtensionsKt.textArray`（99/37，本地少 62）
+
+**根因是 `CharSequence.trim()` 的内联策略不同。**
+
+制品把 `StringUtil.releaseBuilder(sb).trim()` 里的 `trim()` **整个展开**了 60 多条指令：
+
+```
+CharSequence.length → 循环比较 charAt / Intrinsics.compare(c, 32)
+→ ifne/ifgt 分支 → subSequence(start, end+1).toString()
+```
+
+我们这边只有一条：
+
+```
+invokestatic kotlin/text/StringsKt.trim:(Ljava/lang/CharSequence;)Ljava/lang/CharSequence;
+```
+
+**Kotlin 1.5.1 里 `trim()` 是 `@InlineOnly` 内联扩展，1.5.21 不是**。源码层面无法干预
+（除非手写整个 trim 逻辑，那就变成"为了字节码一样而故意不用标准库"，不可取）。
+
+#### `LocalBook.analyzeNameAuthor`（149/105，本地少 44）
+
+制品的 `for (pattern in nameAuthorPatterns)` 循环被展开成了带多个临时槽位的形式：
+
+```
+astore 10   // matcher
+iconst_0 / istore 11, istore 12   // 两个额外初始化
+```
+
+我们的编译结果直接内联 `matcher.find()` 判断。**这是增强 for 的展开差异**，
+不是我们少了逻辑（源码 `val matcher = pattern.matcher(...); if (!matcher.find()) continue`
+跟 CFR 一致）。
+
+#### 本轮的判断
+
+101-300 段按「条目数差 ≥ 20」筛出 13 处，**真正是「data class vs 手写」搞反的只有
+`BookSource` 和 `RssArticle` 两个**（3a-78 已修），其余多数是编译器形态差异。
+
+**筛法本身的局限**：`条目数差大` 只能说明"两边编译结果差得远"，可能是缺逻辑，
+也可能是编译器把一个内联函数展开了。要区分必须看第一条差异指令是什么——
+如果是 `invokestatic StringsKt.xxx` vs 一串 `CharSequence.charAt`，就是内联差异，跳过。
