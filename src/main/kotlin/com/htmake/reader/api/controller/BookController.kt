@@ -94,6 +94,7 @@ import com.fasterxml.jackson.core.JsonParser
 import com.fasterxml.jackson.core.JsonToken
 import com.fasterxml.jackson.databind.JsonNode
 import kotlin.io.use
+import io.legado.app.model.analyzeRule.AnalyzeRule
 
 private val logger: KLogger = KotlinLogging.logger { }
 
@@ -1926,37 +1927,79 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
     suspend fun getLocalChapterList(
         book: Book,
         bookSource: String? = null,
-        useCache: Boolean = false,
-        userNameSpace: String,
         refresh: Boolean = false,
+        userNameSpace: String,
+        debugLog: Boolean = true,
         mutex: Mutex? = null
     ): List<BookChapter> {
         if (mutex != null) {
             mutex.lock()
         }
         try {
+            val md5Encode = MD5Utils.md5Encode(book.bookUrl).toString()
+            val bookChaptersCache = getBookChaptersCache(userNameSpace)
+            val cached = if (book.inShelf) {
+                asJsonArray(getUserStorage(userNameSpace, "${book.name}_${book.author}", md5Encode))
+            } else {
+                asJsonArray(bookChaptersCache.getAsString("${book.name}_${book.author}$md5Encode"))
+            }
+            if (cached != null && !refresh) {
+                val cachedList = GSON.fromJsonArray<BookChapter>(cached.toString()).getOrNull()
+                if (!cachedList.isNullOrEmpty()) {
+                    return cachedList
+                }
+            }
+            book.setRootDir(getWorkDir())
+            book.setUserNameSpace(userNameSpace)
             if (book.isLocalBook()) {
                 book.setRootDir(getWorkDir())
                 book.setUserNameSpace(userNameSpace)
-                val cacheFile = File(getChapterCacheDir(book, userNameSpace), "chapterList.json")
-                if (useCache && !refresh && cacheFile.exists()) {
-                    val cache = GSON.fromJsonArray<BookChapter>(cacheFile.readText()).getOrNull()
-                    if (!cache.isNullOrEmpty()) {
-                        return cache
+                if (book.isEpub() && !extractEpub(book, refresh)) {
+                    throw Exception("Epub书籍解压失败")
+                }
+                if (book.isCbz() && !extractCbz(book, refresh)) {
+                    throw Exception("CBZ书籍解压失败")
+                }
+                if (book.isPdf() && !convertPdfToImage(book, refresh)) {
+                    throw Exception("PDF书籍转换失败")
+                }
+                return LocalBook.getChapterList(book)
+            }
+            if (!bookSource.isNullOrEmpty()) {
+                val bookSourceObject = BookSource.fromJson(bookSource).getOrNull()
+                bookSourceObject?.ruleToc?.preUpdateJs?.let {
+                    AnalyzeRule(book, bookSourceObject).evalJS(it)
+                }
+            }
+            if (book.tocUrl.isBlank()) {
+                WebBook(bookSource ?: "", debugLog, null, userNameSpace).getBookInfo(book)
+            }
+            try {
+                return WebBook(bookSource ?: "", debugLog, null, userNameSpace).getChapterList(book)
+            } catch (e: Exception) {
+                if (!bookSource.isNullOrEmpty()) {
+                    val bookSourceObject = BookSource.fromJson(bookSource).getOrNull()
+                    if (bookSourceObject != null) {
+                        val info = mutableMapOf(
+                            "sourceUrl" to bookSourceObject.bookSourceUrl,
+                            "time" to System.currentTimeMillis(),
+                            "error" to e.toString()
+                        )
+                        addInvalidBookSource(bookSourceObject.bookSourceUrl, info, userNameSpace)
                     }
                 }
-                val chapterList = LocalBook.getChapterList(book)
-                if (cacheFile.parentFile.exists() || cacheFile.parentFile.mkdirs()) {
-                    cacheFile.writeText(GSON.toJson(chapterList))
+                book.lastCheckError = e.toString()
+                editShelfBook(book, userNameSpace) { existBook ->
+                    existBook.lastCheckError = e.toString()
+                    existBook
                 }
-                return chapterList
+                throw e
             }
         } finally {
             if (mutex != null) {
                 mutex.unlock()
             }
         }
-        return arrayListOf()
     }
 
     suspend fun getBookSourceString(
