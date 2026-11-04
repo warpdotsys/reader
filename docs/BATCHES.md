@@ -2463,3 +2463,40 @@ val font = if (str.isAbsUrl()) {
 
 上 Kotlin 1.6+ 或换 1.5.1 编译器理论上能全部收敛，但那会破坏大量已验收的字节码
 （3a-41 已经证明过改编译器参数会让 17/18 掉到 3/20）。**不值得。**
+
+### 3a-53 `BookSourceController.updateRemoteSourceSub` 的真 bug + 一个无解差异
+
+#### 真 bug（已修）
+
+```kotlin
+// 错：把一段 JS 代码字符串写成了 Kotlin 表达式
+saveUserStorage(
+    userNameSpace, "remoteBookSourceSub",
+    remoteBookSourceList.set(i, remoteBookSource.put("lastSyncTime", System.currentTimeMillis()))
+)
+
+// 对：制品是 ldc 一个字符串常量
+saveUserStorage(
+    userNameSpace, "remoteBookSourceSub",
+    "remoteBookSourceList.set(i, remoteBookSource.put(\"lastSyncTime\", System.currentTimeMillis()))"
+)
+```
+
+制品 `ldc #182 // String remoteBookSourceList.set(i, remoteBookSource.put("lastSyncTime", System.currentTimeMillis()))`
+是**硬证据**。这不是 loose，是**语义错误**——原来的代码会在 Kotlin 层调用 `JsonArray.set()`
+并把返回值当成 storage 值传进去，跟制品行为完全不同。
+
+#### 无解差异：`$2` 的捕获字段
+
+制品 `updateRemoteSourceSub$2` 有 7 个字段，我们只有 4 个（少 `$remoteBookSourceList` /
+`$i` / `$remoteBookSource`）。
+
+原因：`webClient...send { res -> }` 的回调用 **indy**（`invokedynamic`）生成 `Handler`，
+**Kotlin 1.5.1 把外层全部局部变量都塞进去，1.5.21 只塞内层实际用到的**。
+修好那个字符串后，`i` / `remoteBookSource` 在内层确实不再被引用 → 1.5.21 就不传了。
+**编译器版本差异，源码层面无解**（同 3a-52）。
+
+#### 教训：`delta = 0` 不等于「只差局部变量」
+
+这个类的 delta 是 0（指令数完全相同），却藏着一个真 bug。
+**按 delta 排序找 loose 时，必须逐条看内容，不能只看条数。**

@@ -391,13 +391,7 @@ class BookSourceController(coroutineContext: CoroutineContext) : BaseController(
                             saveUserStorage(
                                 userNameSpace,
                                 "remoteBookSourceSub",
-                                remoteBookSourceList.set(
-                                    i,
-                                    remoteBookSource.put(
-                                        "lastSyncTime",
-                                        System.currentTimeMillis()
-                                    )
-                                )
+                                "remoteBookSourceList.set(i, remoteBookSource.put(\"lastSyncTime\", System.currentTimeMillis()))"
                             )
                         } catch (e: Exception) {
                             logger.error(e) { "更新远程书源失败" }
