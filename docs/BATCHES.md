@@ -3119,3 +3119,81 @@ listOf(Unit).also { }
 - `if (x == null) return` → 制品可能是 `?: return`
 
 **这四条是可复用的判据**，比逐个对 CFR 快得多。
+
+### 3a-67 负结果：`-Xsam-conversions=class` 救不了 `sam$BiConsumer$0`
+
+#### 实验
+
+制品有 `BookControllerKt$sam$java_util_function_BiConsumer$0`，我们没有。第一反应是
+`-Xsam-conversions` 的差异，因为 build.gradle.kts 里本来就写着 `-Xsam-conversions=indy`。
+
+把 `indy` 改成 `class`，全量重编（耗时 5 分钟，比平时 1.5 分钟长得多）：
+
+```
+制品 936 / 本地 934 → 969 / 缺 7 → 6 / 多 5 → 39
+```
+
+**多出 33 个类**（`YueduApi$initRouter$2..5`、`RestVerticle$coroutineHandler$1`、
+`WebdavController$1`、`VertExtKt$globalHandler$1` 等），而**目标 `sam$BiConsumer$0` 依旧没生成**。
+
+已回滚到 `-Xsam-conversions=indy`（备份在 scratch/build.gradle.kts.bak-sam）。
+
+**结论：`sam$BiConsumer$0` 不是 `-Xsam-conversions` 开关能造出来的，这条线走不通。**
+
+#### 顺带测出的维度：indy 数 ≠ lambda 编号
+
+用 `javap -c` 统计每个方法的 `invokedynamic` 条数，制品 7 条、本地 5 条：
+
+| 方法 | 制品 | 本地 |
+| --- | --- | --- |
+| `bookSourceDebugSSE` | 1 | **0** |
+| `cacheBookSSE` | 1 | **0** |
+| `searchBookContent` | 1 | **0** |
+| `ttsByTextToSpeechCn` | 0 | **1** |
+
+**但 `lambda-N` 我们是 18、制品是 16（我们多 2），indy 我们少 2。两个数方向相反。**
+
+原因是 **`lambda-N` 数的是所有 lambda 表达式（含 inline，不生成 indy 也不生成类），
+indy 数只数真正生成 lambda 对象的那些**。这两个指标必须分开看：
+
+- 想对齐 `lambda-N` 类名 → 数 **inline lambda**（`let` / `forEach` / `runCatching` / `also`）
+- 想对齐 `invokedynamic` 指令 → 数 **非 inline lambda**
+
+上一轮修 `deleteBook` / `deleteBooks` 时把 `forEach`/`firstOrNull` 换成 `for` 循环，
+`lambda-21` 降到 `lambda-18` —— 就是减少了 inline lambda 的数量（不是 indy）。
+
+#### 当前剩余（6 缺 5 多）
+
+缺：`$cacheBookOnServer$2`、`$cacheBookSSE$3`、`$cacheBookSSE$4`、`$getLastBackFileFromWebdav$lambda-16`、
+`BookControllerKt$sam$java_util_function_BiConsumer$0`、`BaseSource$DefaultImpls$getHeaderMap$lambda-4$lambda-2`
+
+多：`$cacheBookOnServer$4`、`$getLastBackFileFromWebdav$lambda-18`、`BaseSource$lambda-2`、
+`Coroutine$executeInternal$1$invokeSuspend$$inlined$executeBlock$1` × 2
+
+### 3a-68 `cacheBookSSE` 按 CFR 重写：补出 `$3`，`$4` 仍缺
+
+#### 改了什么
+
+原实现是**同步 for 循环**（52 行），CFR 是 **SSE + 并发 + 连接关闭检测**（102 行）。重写要点：
+
+- `checkAuth` 失败时用 `jsonEncode(ReturnData(...))` 而不是手拼 JSON
+- 支持 POST（`url`/`bookUrl`/`refresh`/`concurrentCount`）和 GET（queryParam）两种入参
+- 本地书直接报「本地书籍无需缓存」返回
+- `context.request().connection().closeHandler { isEnd.element = true }` ← **这个补出了 `$3`**
+- `limitConcurrent(count, 0, chapterList.size) { i -> ... }` 并发缓存
+- 结束时 `if (!isEnd.element)` 才写 `event: end`
+
+编译通过，`$cacheBookSSE$3` 已生成。
+
+#### `$4` 为什么没生成
+
+`limitConcurrent(count, 0, size) { i -> ... }` 传入的是 suspend lambda
+（签名 `suspend CoroutineScope.(Int) -> Any?`），但编译后**没有生成 `BookController$cacheBookSSE$4`**。
+
+本地实际生成的是 `$1`（续体）和 `$3`（closeHandler），**`$2` 两边都没有**（大概是 `checkAuth` 的参数位置）。
+
+判断是 Kotlin 1.5.21 对 suspend lambda 的编译策略与 1.5.1 不同（挂起点被提升进外层续体的 switch，
+而不是生成独立的 `$4$invokeSuspend`）。这与 3a-54 记的「suspend 参数溢出策略」是同一类问题。
+
+**没有继续追这个方向** —— 需要反汇编 `limitConcurrent` 的 `invokeSuspend` 状态机才能确认，
+而每轮全量编译 1.5 分钟，收益不足以覆盖。

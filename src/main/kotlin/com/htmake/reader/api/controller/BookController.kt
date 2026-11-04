@@ -914,13 +914,13 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         val urlMap = BookSourceController(coroutineContext).getBookSourceMap(userNameSpace)
         if (urlMap.size <= 0) {
             response.write("event: error\n")
-            response.end("data: " + jsonEncode(returnData.setErrorMsg("未配置书源"), false) + "\n\n")
+            response.end("data: " + jsonEncode(returnData.setErrorMsg("未配置书源"), false)!! + "\n\n")
             return
         }
         if (key.length == 0) {
             response.write("event: error\n")
             response.end(
-                "data: " + jsonEncode(returnData.setErrorMsg("请输入搜索关键字"), false) + "\n\n"
+                "data: " + jsonEncode(returnData.setErrorMsg("请输入搜索关键字"), false)!! + "\n\n"
             )
             return
         }
@@ -932,13 +932,13 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         if (key.isNullOrEmpty()) {
             response.write("event: error\n")
             response.end(
-                "data: " + jsonEncode(returnData.setErrorMsg("请输入搜索关键字"), false) + "\n\n"
+                "data: " + jsonEncode(returnData.setErrorMsg("请输入搜索关键字"), false)!! + "\n\n"
             )
             return
         }
         if (lastIndex >= urlMap.size - 1) {
             response.write("event: error\n")
-            response.end("data: " + jsonEncode(returnData.setErrorMsg("没有更多了"), false) + "\n\n")
+            response.end("data: " + jsonEncode(returnData.setErrorMsg("没有更多了"), false)!! + "\n\n")
             return
         }
         searchSize = if (searchSize > 0) searchSize else 50
@@ -1145,13 +1145,13 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         val urlMap = BookSourceController(coroutineContext).getBookSourceMap(userNameSpace.element)
         if (urlMap.size <= 0) {
             response.write("event: error\n")
-            response.end("data: " + jsonEncode(returnData.setErrorMsg("未配置书源"), false) + "\n\n")
+            response.end("data: " + jsonEncode(returnData.setErrorMsg("未配置书源"), false)!! + "\n\n")
             return
         }
         if (bookUrl.isEmpty()) {
             response.write("event: error\n")
             response.end(
-                "data: " + jsonEncode(returnData.setErrorMsg("请输入书籍链接"), false) + "\n\n"
+                "data: " + jsonEncode(returnData.setErrorMsg("请输入书籍链接"), false)!! + "\n\n"
             )
             return
         }
@@ -1163,7 +1163,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         if (book.element == null) {
             response.write("event: error\n")
             response.end(
-                "data: " + jsonEncode(returnData.setErrorMsg("书籍信息错误"), false) + "\n\n"
+                "data: " + jsonEncode(returnData.setErrorMsg("书籍信息错误"), false)!! + "\n\n"
             )
             return
         }
@@ -2454,55 +2454,105 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
     }
 
     suspend fun cacheBookSSE(context: RoutingContext) {
+        val returnData = ReturnData()
         val response = context.response()
-        response.putHeader("Content-Type", "text/event-stream")
-        response.putHeader("Cache-Control", "no-cache")
-        response.setChunked(true)
+            .putHeader("Content-Type", "text/event-stream")
+            .putHeader("Cache-Control", "no-cache")
+            .setChunked(true)
         if (!checkAuth(context)) {
             response.write("event: error\n")
-            response.write("data: NEED_LOGIN\n\n")
-            response.end()
+            response.end(
+                "data: " + jsonEncode(returnData.setData("NEED_LOGIN").setErrorMsg("请登录后使用"), false) + "\n\n"
+            )
             return
         }
-        val bookUrl = context.queryParam("url").firstOrNull() ?: ""
+        var bookUrl: String
+        var refresh: Int
+        var concurrentCount: Int
+        if (context.request().method() == HttpMethod.POST) {
+            val url = context.bodyAsJson.getString("url")
+            bookUrl = if (url != null) url else (context.bodyAsJson.getString("bookUrl") ?: "")
+            refresh = context.bodyAsJson.getInteger("refresh", 0)
+            concurrentCount = context.bodyAsJson.getInteger("concurrentCount", 24)
+        } else {
+            bookUrl = context.queryParam("url").firstOrNull() ?: ""
+            refresh = context.queryParam("refresh").firstOrNull()?.toInt() ?: 0
+            concurrentCount = context.queryParam("concurrentCount").firstOrNull()?.toInt() ?: 24
+        }
         if (bookUrl.isEmpty()) {
             response.write("event: error\n")
-            response.write("data: 书籍链接不能为空\n\n")
-            response.end()
+            response.end("data: " + jsonEncode(returnData.setErrorMsg("请输入书籍链接"), false)!! + "\n\n")
             return
         }
         val userNameSpace = getUserNameSpace(context)
-        val isEnd = Ref.BooleanRef()
-        val book = getShelfBookByURL(bookUrl, userNameSpace)
-        if (book == null) {
+        val bookInfo = getShelfBookByURL(bookUrl, userNameSpace)
+        if (bookInfo == null) {
             response.write("event: error\n")
-            response.write("data: 书籍信息错误\n\n")
-            response.end()
+            response.end("data: " + jsonEncode(returnData.setErrorMsg("请先加入书架"), false)!! + "\n\n")
             return
         }
-        val bookSource = (getBookSourceStringBySourceURLOpt(book.origin, userNameSpace) ?: "")
-        val chapterList = if (book.isLocalBook()) {
-            getLocalChapterList(book, bookSource, false, userNameSpace)
-        } else {
-            WebBook(bookSource, appConfig.debugLog, userNameSpace = userNameSpace).getChapterList(book)
+        if (bookInfo.isLocalBook()) {
+            response.write("event: error\n")
+            response.end("data: " + jsonEncode(returnData.setErrorMsg("本地书籍无需缓存"), false)!! + "\n\n")
+            return
         }
-        for (i in chapterList.indices) {
-            val chapter = chapterList[i]
-            val content = if (book.isLocalBook()) {
-                LocalBook.getContent(book, chapter) ?: ""
-            } else {
-                WebBook(bookSource, appConfig.debugLog, userNameSpace = userNameSpace)
-                    .getBookContent(book, chapter)
+        val bookSource = getBookSourceString(context, bookInfo.origin, false) ?: ""
+        val chapterList = WebBook(bookSource, appConfig.debugLog, userNameSpace = userNameSpace)
+            .getChapterList(bookInfo)
+        val cachedChapterContentSet = Ref.ObjectRef<Set<Int>>()
+        cachedChapterContentSet.element = getCachedChapterContentSet(bookInfo, userNameSpace)
+        val localCacheDir = getChapterCacheDir(bookInfo, userNameSpace)
+        val isEnd = Ref.BooleanRef()
+        val successCount = Ref.IntRef()
+        val failedCount = Ref.IntRef()
+        context.request().connection().closeHandler { isEnd.element = true }
+        val count = if (concurrentCount > 0) concurrentCount else 24
+        logger.info("cacheBookSSE concurrentCount: {} refresh: {}", count, refresh)
+        limitConcurrent(count, 0, chapterList.size) { i ->
+            if (cachedChapterContentSet.element.contains(i)) {
+                return@limitConcurrent true
             }
-            if (content.isNotEmpty()) {
-                BookHelp.saveText(book, chapter, content)
+            val chapterInfo = chapterList[i]
+            val nextChapterUrl = if (i + 1 < chapterList.size) chapterList[i + 1].url else null
+            try {
+                val content = WebBook(bookSource, appConfig.debugLog, userNameSpace = userNameSpace)
+                    .getBookContent(bookInfo, chapterInfo, nextChapterUrl)
+                if (content.isNotEmpty()) {
+                    BookHelp.saveText(bookInfo, chapterInfo, content)
+                }
+                successCount.element++
+                response.write(
+                    "data: " + jsonEncode(
+                        returnData.setData(
+                            mapOf(
+                                "index" to i,
+                                "title" to chapterInfo.title,
+                                "success" to successCount.element,
+                                "failed" to failedCount.element
+                            )
+                        ),
+                        false
+                    ) + "\n\n"
+                )
+            } catch (e: Exception) {
+                failedCount.element++
             }
-            response.write("data: " + JsonObject().put("index", i).put("title", chapter.title).encode() + "\n\n")
+            Unit
         }
-        isEnd.element = true
-        response.write("event: end\n")
-        response.write("data: end\n\n")
-        response.end()
+        if (!isEnd.element) {
+            response.write("event: end\n")
+            response.end(
+                "data: " + jsonEncode(
+                    returnData.setData(
+                        mapOf(
+                            "success" to successCount.element,
+                            "failed" to failedCount.element
+                        )
+                    ),
+                    false
+                ) + "\n\n"
+            )
+        }
     }
 
     suspend fun cacheBookOnServer(context: RoutingContext): ReturnData {
