@@ -2599,3 +2599,54 @@ ABI 保持 811 / 785 / 10 / 16。备份分支 `backup/before-kotlin-switch`（�
 「936 个类全部有源码」的目标，**换编译器帮不上忙**——编译器只影响已有源码编译出的字节码形态，
 不影响「哪些类有源码」。缺的 141 个类（`BookController` 114 + 零散 27）需要的是
 **逐个把源码写出来**，跟编译器是 1.5.20 还是 1.5.21 毫无关系。
+
+### 3a-57 BookController 突破：106/114 类名对上（ABI 约束放开后）
+
+用户明确要求「不计代价要百分百源码」，**ABI 恶化的硬约束解除**。
+之前四次回滚都是因为死守「ABI 不能涨」——**放开后一次就推到了 106/114**。
+
+#### 关键机制：占位方法不生成续体类
+
+之前 `BookController.kt` 里 51 个方法是这种占位：
+
+```kotlin
+suspend fun getBookshelf(context: RoutingContext): ReturnData {
+    return ReturnData().setErrorMsg("未恢复")
+}
+```
+
+没有任何 suspend 调用 → **编译器不给它生成 `$getBookshelf$1` 续体类** → 52 个类名永远缺着。
+
+把方法体按 CFR 写成真实实现（带 `checkAuth()` / `getBookShelfBooks()` 这类 suspend 调用）后，
+续体类**自动出现**。这不是「造类名」，是「写实现」的副产品——**这也是为什么前三次尝试
+在类名上卡住：我们在试图用占位代码骗出合成类，而合成类本来就只认真实挂起点**。
+
+#### 本轮结果
+
+```
+BookController* 类数: 73 -> 112 / 制品 114
+实际上对        : 106 / 114（本地 112 里 6 个名字不对）
+编译            : BUILD SUCCESSFUL
+```
+
+#### 还差 8 个
+
+| 缺的 | 性质 |
+| --- | --- |
+| `$cacheBookOnServer$2` / `$cacheBookSSE$3` / `$cacheBookSSE$4` | 状态机编号错位（我们多出 `$cacheBookOnServer$4`） |
+| `$getBookSourceStringBySourceURLOpt$2` | 编号 |
+| `$getLocalChapterList$3` | 编号 |
+| `$ttsByTextToSpeechCn$2` | 编号 |
+| `$getLastBackFileFromWebdav$lambda-16$$inlined$sortByDescending$1` | **文件级 lambda 编号差 3**（我们 19） |
+| `BookControllerKt$sam$java_util_function_BiConsumer$0` | SAM 转换 |
+
+**多的 6 个**：`$cacheBookOnServer$4` / `$deleteBook$2` / `$deleteBooks$2$1` /
+`$getSpeakStream$inputStream$1` / `$setCover$result$1` / `$getLastBackFileFromWebdav$lambda-19$…`
+
+**共同根因**：文件级 lambda 计数器偏移。我们文件里 lambda 的数量/顺序与制品不一致 →
+后续所有 `$lambda-N` 全部错位。这需要逐方法对齐 lambda 顺序，工作量大但**方向明确**。
+
+#### 最重要的结论
+
+**「类名对不对」和「实现真不真」是同一件事。** 前三次尝试想用骨架/占位做类名，
+结果 ABI 和类名双输；这次老老实实按 CFR 写实现，类名一次推到 93%，ABI 的代价另算。
