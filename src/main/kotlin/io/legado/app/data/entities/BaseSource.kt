@@ -77,11 +77,12 @@ interface BaseSource : JsExtensions {
     val loginInfo: String?
         get() {
             return try {
-            val key = AppConst.userAgent.encodeToByteArray()
-            val cache = CacheManager(userNameSpace).get("userInfo_$key") ?: return null
-            val encodeBytes = EncoderUtils.base64Decode(cache, 0).toByteArray(Charsets.UTF_8)
-            val decodeBytes = EncoderUtils.decryptAES(encodeBytes, key) ?: return null
-            String(decodeBytes, Charsets.UTF_8)
+                val key = AppConst.userAgent.encodeToByteArray()
+                val cache = CacheManager(userNameSpace)
+                val raw = cache.get("userInfo_$key") ?: return null
+                val encodeBytes = EncoderUtils.base64Decode(raw, 0).toByteArray(Charsets.UTF_8)
+                val decodeBytes = EncoderUtils.decryptAES(encodeBytes, key) ?: return null
+                String(decodeBytes, Charsets.UTF_8)
             } catch (e: Exception) {
                 log("获取登陆信息出错 ${e.localizedMessage}")
                 null
@@ -96,7 +97,8 @@ interface BaseSource : JsExtensions {
             val key = AppConst.userAgent.encodeToByteArray()
             val encodeBytes = EncoderUtils.encryptAES(info.toByteArray(Charsets.UTF_8), key)!!
             val encodeStr = Base64.encodeToString(encodeBytes, 0)
-            CacheManager(userNameSpace).put("userInfo_$key", encodeStr)
+            val cache = CacheManager(userNameSpace)
+            cache.put("userInfo_$key", encodeStr)
             true
         } catch (e: Exception) {
             log("保存登陆信息出错 ${e.localizedMessage}")
