@@ -4026,3 +4026,66 @@ map.forEach(BiConsumer { key, value -> add(multiMap, key, value) })
 ```
 
 **方法数已经全部对齐**（除 2 个编译器桥），剩余差异都在方法体内。
+
+### 3a-86 负结果：3 个 TypeAdapter 的 `deserialize` 试了两种写法都不对
+
+#### 已知
+
+```
+制品 29 条 / 本地 29 条，delta 6
+关键差异：
+  制品 20-22: aconst_null / areturn                     ← 直接返回，3 条
+  本地 20-22: aconst_null / checkcast Integer / areturn  ← 多一个 checkcast
+  制品 6 是 ifeq 49，本地是 ifeq 48（差 4 字节）
+  制品 3 是 nop，本地 3 是 aload_1
+```
+
+#### 试过的两种写法（都不对）
+
+**写法 A：`if/else` 表达式**
+
+```kotlin
+return if (json.isJsonPrimitive) {
+    val prim = json.asJsonPrimitive
+    if (prim.isNumber) prim.asNumber.toInt() else null
+} else {
+    null
+}
+```
+
+→ 生成的 `else` 分支是 `aconst_null / checkcast Integer / areturn`（多一个 checkcast），delta 6。
+
+**写法 B：早退**
+
+```kotlin
+if (!json.isJsonPrimitive) {
+    return null
+}
+val prim = json.asJsonPrimitive
+return if (prim.isNumber) prim.asNumber.toInt() else null
+```
+
+→ 编译通过，但 delta 仍是 6（3 个类都不对）。
+
+#### 判断
+
+制品在 `else` 分支是 **`aconst_null` + `areturn`，没有 `checkcast`**，
+而 Kotlin 在 `if/else` 表达式里对 `null` 会插 `checkcast`。
+
+**这说明制品的 `else` 分支不是「返回 null 的表达式」，而是「直接 return」。**
+但早退写法（写法 B）也没对上，说明我猜的具体形式不对——可能是：
+
+- `when` 表达式
+- 提前 `return null` 但放在别的层级
+- 或者 `json.isJsonPrimitive` 前面还有一层判断
+
+**delta 只有 6，三个类合计 18，继续穷举不划算。停在这里。**
+
+#### 但记一条新判据
+
+**`aconst_null` 后面有没有 `checkcast`，可以区分「表达式返回 null」和「语句 return null」**：
+
+```
+aconst_null / checkcast X / areturn   → if-else 表达式分支
+aconst_null / areturn                 → 语句级 return
+```
