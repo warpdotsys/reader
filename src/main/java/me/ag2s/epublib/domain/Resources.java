@@ -34,7 +34,8 @@ implements Serializable {
             resourceId = StringUtil.substringBeforeLast(resource.getHref(), '.');
             resourceId = StringUtil.substringAfterLast(resourceId, '/');
         }
-        if (StringUtil.isBlank(resourceId = this.makeValidId(resourceId, resource)) || this.containsId(resourceId)) {
+        resourceId = this.makeValidId(resourceId, resource);
+        if (StringUtil.isBlank(resourceId) || this.containsId(resourceId)) {
             resourceId = this.createUniqueResourceId(resource);
         }
         resource.setId(resourceId);
@@ -48,7 +49,12 @@ implements Serializable {
     }
 
     private String getResourceItemPrefix(Resource resource) {
-        String result2 = MediaTypes.isBitmapImage(resource.getMediaType()) ? IMAGE_PREFIX : ITEM_PREFIX;
+        String result2;
+        if (MediaTypes.isBitmapImage(resource.getMediaType())) {
+            result2 = IMAGE_PREFIX;
+        } else {
+            result2 = ITEM_PREFIX;
+        }
         return result2;
     }
 
@@ -74,8 +80,9 @@ implements Serializable {
             return false;
         }
         for (Resource resource : this.resources.values()) {
-            if (!id.equals(resource.getId())) continue;
-            return true;
+            if (id.equals(resource.getId())) {
+                return true;
+            }
         }
         return false;
     }
@@ -85,8 +92,9 @@ implements Serializable {
             return null;
         }
         for (Resource resource : this.resources.values()) {
-            if (!id.equals(resource.getId())) continue;
-            return resource;
+            if (id.equals(resource.getId())) {
+                return resource;
+            }
         }
         return null;
     }
@@ -96,8 +104,9 @@ implements Serializable {
             return null;
         }
         for (Resource resource : this.resources.values()) {
-            if (!properties.equals(resource.getProperties())) continue;
-            return resource;
+            if (properties.equals(resource.getProperties())) {
+                return resource;
+            }
         }
         return null;
     }
@@ -195,33 +204,36 @@ implements Serializable {
 
     public static Resource findFirstResourceByMediaType(Collection<Resource> resources, MediaType mediaType) {
         for (Resource resource : resources) {
-            if (resource.getMediaType() != mediaType) continue;
-            return resource;
+            if (resource.getMediaType() == mediaType) {
+                return resource;
+            }
         }
         return null;
     }
 
     public List<Resource> getResourcesByMediaType(MediaType mediaType) {
-        ArrayList<Resource> result2 = new ArrayList<Resource>();
+        List<Resource> result2 = new ArrayList<Resource>();
         if (mediaType == null) {
             return result2;
         }
         for (Resource resource : this.getAll()) {
-            if (resource.getMediaType() != mediaType) continue;
-            result2.add(resource);
+            if (resource.getMediaType() == mediaType) {
+                result2.add(resource);
+            }
         }
         return result2;
     }
 
     public List<Resource> getResourcesByMediaTypes(MediaType[] mediaTypes) {
-        ArrayList<Resource> result2 = new ArrayList<Resource>();
+        List<Resource> result2 = new ArrayList<Resource>();
         if (mediaTypes == null) {
             return result2;
         }
         List<MediaType> mediaTypesList = Arrays.asList(mediaTypes);
         for (Resource resource : this.getAll()) {
-            if (!mediaTypesList.contains(resource.getMediaType())) continue;
-            result2.add(resource);
+            if (mediaTypesList.contains(resource.getMediaType())) {
+                result2.add(resource);
+            }
         }
         return result2;
     }

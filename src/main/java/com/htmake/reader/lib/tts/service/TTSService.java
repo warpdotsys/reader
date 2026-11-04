@@ -125,8 +125,8 @@ public class TTSService {
     }
 
     private synchronized WebSocket getOrCreateWs() {
-        String origin;
         String url2;
+        String origin;
         if (Objects.nonNull(this.ws)) {
             return this.ws;
         }

@@ -5083,3 +5083,48 @@ s = s.replace('ldc_w ', 'ldc ').replace('ldc2_w ', 'ldc2 ')
 #### 结果
 
 `BookSource` 类 **全清**（`equal` 154/154、`getSource` 3/3、`setUserNameSpace` 7/7）。
+
+### 3a-105 TTSService 全清：局部变量声明顺序决定槽位
+
+```java
+// 改前
+String origin;
+String url2;
+// 改后
+String url2;
+String origin;
+```
+
+字节码里 `astore_1` 和 `astore_2` 对调——**制品的 `url2` 在槽位 1、`origin` 在槽位 2**。
+局部变量槽位按**声明顺序**分配，声明反了整段都错位。
+
+`TTSService.getOrCreateWs` 61/61 归零。
+
+#### 同类未修
+
+`ReaderApplication$Companion.getVertx`（8/13）：本地多 `checkNotNullExpressionValue`，
+是 1.5.21 给 `by lazy` getter 加的检查，1.5.1 没有。**编译器版本差异，无解。**
+
+### 3a-106 Resources 全清：8 个方法，两条判据批量套用
+
+#### 改动
+
+| 方法 | 修法 |
+| --- | --- |
+| `containsId` / `getById` / `getByProperties` | `if (!x) continue; return y;` → 正向 `if` |
+| `findFirstResourceByMediaType` | 同 |
+| `getResourcesByMediaType` / `getResourcesByMediaTypes` | 同 + `ArrayList` → `List` |
+| `fixResourceId` | 赋值表达式 `resourceId = makeValidId(...)` 从条件里拆出来 |
+| `getResourceItemPrefix` | 三元 → if/else 语句 |
+
+一共 6 处 `continue`、2 处 `ArrayList`、1 处赋值表达式、1 处三元。
+
+#### 两个判据复用
+
+1. **`continue` 改正向 `if`**：制品 `ifeq`（跳到循环尾）vs 本地 `ifne + goto`（跳回循环头）。
+2. **三元 → if/else 语句**：制品在 `ldc IMAGE_PREFIX` 之后多一条 `astore_2`，
+   说明源码是 if/else 语句（每个分支赋值给局部变量），不是三元。
+
+#### 结果
+
+`compared 1 / exact 1 / different 0`。
