@@ -14,6 +14,7 @@ import kotlinx.coroutines.ensureActive
 
 object BookInfo {
 
+    @Throws(Exception::class)
     suspend fun analyzeBookInfo(
         book: Book,
         body: String?,
@@ -36,7 +37,8 @@ object BookInfo {
         )
     }
 
-    private suspend fun analyzeBookInfo(
+    @Throws(Exception::class)
+    suspend fun analyzeBookInfo(
         book: Book,
         body: String?,
         analyzeRule: AnalyzeRule,
