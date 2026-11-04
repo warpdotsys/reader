@@ -58,9 +58,10 @@ implements Serializable {
         int result2 = -1;
         for (int i = 0; i < this.references.size(); ++i) {
             GuideReference guideReference = this.references.get(i);
-            if (!guideReference.getType().equals(DEFAULT_COVER_TITLE)) continue;
-            result2 = i;
-            break;
+            if (guideReference.getType().equals(DEFAULT_COVER_TITLE)) {
+                result2 = i;
+                break;
+            }
         }
         this.coverPageIndex = result2;
     }
@@ -85,10 +86,11 @@ implements Serializable {
     }
 
     public List<GuideReference> getGuideReferencesByType(String referenceTypeName) {
-        ArrayList<GuideReference> result2 = new ArrayList<GuideReference>();
+        List<GuideReference> result2 = new ArrayList<GuideReference>();
         for (GuideReference guideReference : this.references) {
-            if (!referenceTypeName.equalsIgnoreCase(guideReference.getType())) continue;
-            result2.add(guideReference);
+            if (referenceTypeName.equalsIgnoreCase(guideReference.getType())) {
+                result2.add(guideReference);
+            }
         }
         return result2;
     }

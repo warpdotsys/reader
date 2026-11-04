@@ -4742,3 +4742,37 @@ delete      85/84   块=14 规模=26  制品 iconst_0/istore 4（var 占位）+ 
 javap 拿不到本地类文件。
 
 **教训：全量对比期间绝不能动 build 目录。** 要么等它跑完，要么先编译再跑。
+
+### 3a-98 Guide / Spine / NGramParser 全清（3a-91 的反例修正）
+
+#### 三个类
+
+| 类 | delta | 修法 |
+| --- | --- | --- |
+| `CharsetRecog_sbcs$NGramParser` | 21 | 两个 `parseCharacters` 的 `continue` 改正向 `if` |
+| `epublib.domain.Guide` | 20 | `initCoverPage` + `getGuideReferencesByType` 的 `continue` 改正向；后者顺带 `ArrayList`→`List` |
+| `epublib.domain.Spine` | 18 | `findFirstResourceById` + `getResourceIndex` 的 `continue` 改正向；`createSpineReferences` 的 `ArrayList`→`List` |
+
+验证：`compared 2 / exact 2 / different 0`（Guide + Spine），NGramParser 单独已清。
+
+#### 这是 3a-91 的翻案
+
+3a-91 当时我在 `Guide` 上也改过这两处 `continue`，结果「5 个类全变差，已回滚」。
+**那次失败的原因不是我改错了地方，是我没先看字节码就批量改。**
+
+这次的流程：
+1. 用 difflib 扫出「差异块规模 = 2~3」的类
+2. **逐个看差异块第一条是什么指令**（`ifeq` 还是 `ifne`+`goto`）
+3. 确认制品是 `ifeq` 才动手
+
+同样的代码改动，这次全部归零。
+
+**结论：`continue` ⇄ 正向 `if` 的判据只有一条 —— 制品字节码是 `ifeq`（跳转到循环尾）
+还是 `ifne` + `goto`（跳回循环头）。源码文本长什么样、`continue` 后面跟的是
+`return` 还是赋值，都不能作为判据。**
+
+#### 顺带修正 3a-91 的记录
+
+3a-91 写的「`continue` 后跟 return/break 的才该改，跟赋值的不该改」**是错的**。
+`CharsetRecog_8859_1`（continue 后跟赋值）改了也能归零（3a-95）。
+真正的判据就是字节码。

@@ -510,11 +510,12 @@ extends CharsetRecognizer {
                     }
                     boolean bl = ignoreSpace = mb == this.spaceChar;
                 }
-                if (this.alef == 0 || (mb = this.byteMap[this.alef & 0xFF]) == 0) continue;
-                if (mb != this.spaceChar || !ignoreSpace) {
-                    this.addByte(mb);
+                if (this.alef != 0 && (mb = this.byteMap[this.alef & 0xFF]) != 0) {
+                    if (mb != this.spaceChar || !ignoreSpace) {
+                        this.addByte(mb);
+                    }
+                    ignoreSpace = mb == this.spaceChar;
                 }
-                ignoreSpace = mb == this.spaceChar;
             }
         }
     }
@@ -590,11 +591,12 @@ extends CharsetRecognizer {
             boolean ignoreSpace = false;
             while ((b = this.nextByte(det)) >= 0) {
                 byte mb = this.byteMap[b];
-                if (mb == 0) continue;
-                if (mb != this.spaceChar || !ignoreSpace) {
-                    this.addByte(mb);
+                if (mb != 0) {
+                    if (mb != this.spaceChar || !ignoreSpace) {
+                        this.addByte(mb);
+                    }
+                    ignoreSpace = mb == this.spaceChar;
                 }
-                ignoreSpace = mb == this.spaceChar;
             }
         }
 

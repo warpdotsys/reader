@@ -29,7 +29,7 @@ implements Serializable {
     }
 
     public static List<SpineReference> createSpineReferences(Collection<Resource> resources) {
-        ArrayList<SpineReference> result2 = new ArrayList<SpineReference>(resources.size());
+        List<SpineReference> result2 = new ArrayList<SpineReference>(resources.size());
         for (Resource resource : resources) {
             result2.add(new SpineReference(resource));
         }
@@ -57,8 +57,9 @@ implements Serializable {
         }
         for (int i = 0; i < this.spineReferences.size(); ++i) {
             SpineReference spineReference = this.spineReferences.get(i);
-            if (!resourceId.equals(spineReference.getResourceId())) continue;
-            return i;
+            if (resourceId.equals(spineReference.getResourceId())) {
+                return i;
+            }
         }
         return -1;
     }
@@ -100,9 +101,10 @@ implements Serializable {
             return result2;
         }
         for (int i = 0; i < this.spineReferences.size(); ++i) {
-            if (!resourceHref.equals(this.spineReferences.get(i).getResource().getHref())) continue;
-            result2 = i;
-            break;
+            if (resourceHref.equals(this.spineReferences.get(i).getResource().getHref())) {
+                result2 = i;
+                break;
+            }
         }
         return result2;
     }
