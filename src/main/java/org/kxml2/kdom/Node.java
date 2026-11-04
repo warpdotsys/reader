@@ -88,8 +88,9 @@ public class Node {
         int len = this.getChildCount();
         for (int i = startIndex; i < len; ++i) {
             Element child = this.getElement(i);
-            if (child == null || !name.equals(child.getName()) || namespace != null && !namespace.equals(child.getNamespace())) continue;
-            return i;
+            if (child != null && name.equals(child.getName()) && (namespace == null || namespace.equals(child.getNamespace()))) {
+                return i;
+            }
         }
         return -1;
     }

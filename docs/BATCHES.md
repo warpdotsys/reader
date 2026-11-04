@@ -4594,3 +4594,47 @@ for (Relator relator : Relator.values()) {
 - 差异块规模（`sum(max(len_a, len_b) for 每个块)`）才是有意义的「差多少」
 
 **这个判据能救很多之前判为「无从下手」的大 delta 类。**
+
+### 3a-95 difflib 差异块筛法一次清 7 个类（591 delta）
+
+扫描 198 个差异类，按「差异块规模」排序（不是 delta），前 22 名里挑出可修的，**7 个全部归零**：
+
+| 类 | delta | 差异块规模 | 原因 |
+| --- | --- | --- | --- |
+| `VoiceEnum` | 506 | 2 | `continue` 改正向 if |
+| `CharsetRecog_8859_1` | 22 | 2 | `continue` 改正向 if |
+| `CharsetRecog_8859_2` | 22 | 2 | 同 |
+| `JsoupExtensionsKt$textArray$1` | 20 | 2 | `node.tagName()` → `node.tag().name` |
+| `DOMUtil` | 11 | 3 | `continue` 改正向 if（+ `ArrayList`→`List`）|
+| `kdom.Node` | 8 | 2 | `continue` 改正向 if（De Morgan）|
+| `UmdChapters` | 2 | 2 | `ArrayList` → `List` |
+
+验证：`compared 7 / exact 7 / different 0`。
+
+#### 核心方法论：用差异块规模排序，不要用 delta
+
+`delta = sum(1 for x,y in zip(a,b) if x!=y) + abs(len(a)-len(b))`
+—— **一条指令的插入/删除会让后面全部平移，delta 立刻变成「方法总量级」的虚高数字。**
+
+`VoiceEnum.fromSortName` 就是典型：523 条指令，delta 506，
+看起来是整个方法完全不同，**真实差异只有 1 处、2 条指令**。
+
+改用 `difflib.SequenceMatcher(None, a, b, autojunk=False).get_opcodes()`，
+每块规模取 `max(len_a, len_b)`，求和才是真实差异量。
+
+**扫描脚本：`…/scratch/bc/scan_blocks2.py`（每类只跑 2 次 javap，一次解析全部方法；
+按方法逐个 dump 会慢到 5 分钟超时）。**
+
+#### 本轮新增判据
+
+1. **`Element.tagName()` → `Element.tag().name`**
+   字节码 `invokevirtual Element.tagName()` vs `invokevirtual Element.tag()` + `Tag.getName()`。
+   两者语义相同，但 jsoup 的 `tagName()` 是 `tag().getName()` 的便捷方法，制品用的是后者。
+
+2. **`ArrayList` 局部变量声明 → `List`**
+   `invokevirtual ArrayList.add` vs `invokeinterface List.add`（3a-76 判据复用）。
+   这回一次命中两个类（`UmdChapters`、`DOMUtil`）。
+
+3. **`continue` 判据再确认**：`continue` 后跟**赋值**的也可能该改
+   （`CharsetRecog_8859_1` 的 `if (confidence <= best) continue; best = ...; lang = ...`）。
+   3a-91 说「跟赋值的一般不该改」**不成立**——**最终只看字节码是 `ifeq` 还是 `ifne+goto`**。

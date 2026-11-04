@@ -407,9 +407,13 @@ extends CharsetRecognizer {
             String lang = null;
             for (NGramsPlusLang ngl : ngrams_8859_2) {
                 int confidence = this.match(det, ngl.fNGrams, byteMap);
-                if (confidence <= bestConfidenceSoFar) continue;
-                bestConfidenceSoFar = confidence;
-                lang = ngl.fLang;
+                if (confidence > bestConfidenceSoFar) {
+
+                    bestConfidenceSoFar = confidence;
+
+                    lang = ngl.fLang;
+
+                }
             }
             return bestConfidenceSoFar <= 0 ? null : new CharsetMatch(det, this, bestConfidenceSoFar, name, lang);
         }
@@ -435,9 +439,13 @@ extends CharsetRecognizer {
             String lang = null;
             for (NGramsPlusLang ngl : ngrams_8859_1) {
                 int confidence = this.match(det, ngl.fNGrams, byteMap);
-                if (confidence <= bestConfidenceSoFar) continue;
-                bestConfidenceSoFar = confidence;
-                lang = ngl.fLang;
+                if (confidence > bestConfidenceSoFar) {
+
+                    bestConfidenceSoFar = confidence;
+
+                    lang = ngl.fLang;
+
+                }
             }
             return bestConfidenceSoFar <= 0 ? null : new CharsetMatch(det, this, bestConfidenceSoFar, name, lang);
         }

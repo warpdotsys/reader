@@ -113,7 +113,7 @@ public class UmdChapters {
         int left = 0;
         int chunkCnt = 0;
         ByteArrayOutputStream bos = new ByteArrayOutputStream(33024);
-        ArrayList<byte[]> chunkRbList = new ArrayList<byte[]>();
+        List<byte[]> chunkRbList = new ArrayList<byte[]>();
         while (startPos < allContents.length) {
             left = allContents.length - startPos;
             len = 32768 < left ? 32768 : left;

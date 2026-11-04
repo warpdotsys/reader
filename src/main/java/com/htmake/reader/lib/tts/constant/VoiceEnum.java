@@ -68,8 +68,9 @@ public enum VoiceEnum {
 
     public static VoiceEnum fromSortName(String shortName) {
         for (VoiceEnum eVoiceEnum : VoiceEnum.values()) {
-            if (!eVoiceEnum.getShortName().equals(shortName)) continue;
-            return eVoiceEnum;
+            if (eVoiceEnum.getShortName().equals(shortName)) {
+                return eVoiceEnum;
+            }
         }
         return null;
     }

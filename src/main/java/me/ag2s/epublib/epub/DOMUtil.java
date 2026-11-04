@@ -27,7 +27,7 @@ class DOMUtil {
 
     public static List<String> getElementsTextChild(Element parentElement, String namespace, String tagName) {
         NodeList elements = parentElement.getElementsByTagNameNS(namespace, tagName);
-        ArrayList<String> result2 = new ArrayList<String>(elements.getLength());
+        List<String> result2 = new ArrayList<String>(elements.getLength());
         for (int i = 0; i < elements.getLength(); ++i) {
             result2.add(DOMUtil.getTextChildrenContent((Element)elements.item(i)));
         }
@@ -38,8 +38,9 @@ class DOMUtil {
         NodeList metaTags = document.getElementsByTagNameNS(namespace, elementName);
         for (int i = 0; i < metaTags.getLength(); ++i) {
             Element metaElement = (Element)metaTags.item(i);
-            if (!findAttributeValue.equalsIgnoreCase(metaElement.getAttribute(findAttributeName)) || !StringUtil.isNotBlank(metaElement.getAttribute(resultAttributeName))) continue;
-            return metaElement.getAttribute(resultAttributeName);
+            if (findAttributeValue.equalsIgnoreCase(metaElement.getAttribute(findAttributeName)) && StringUtil.isNotBlank(metaElement.getAttribute(resultAttributeName))) {
+                return metaElement.getAttribute(resultAttributeName);
+            }
         }
         return null;
     }

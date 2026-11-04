@@ -16,7 +16,7 @@ fun Element.textArray(): Array<String> {
             if (node is TextNode) {
                 appendNormalisedText(sb, node)
             } else if (node is Element) {
-                if (sb.isNotEmpty() && (node.isBlock || node.tagName() == "br")) {
+                if (sb.isNotEmpty() && (node.isBlock || node.tag().name == "br")) {
                     if (!lastCharIsWhitespace(sb)) {
                         sb.append("\n")
                     }
