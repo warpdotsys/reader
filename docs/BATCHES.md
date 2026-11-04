@@ -4346,3 +4346,57 @@ for (int i = 0; i < this.bytes.length; ++i) {
 ```
 
 **这条规律对所有 CFR 反编译出来的 Java 类都适用**，epublib / umdlib / kxml2 三个包还有一批可以这么扫。
+
+### 3a-91 反例：`continue` 不能一概改（5 个类全部变差，已回滚）
+
+3a-90 发现 5 个类的 `if (!x) continue;` 改成正向 if 后归零，我顺势推了一条
+「对所有 CFR 反编译的 Java 类都适用」。**这条推得太宽，已证伪。**
+
+#### 试了 7 处 continue，5 个类全部没有改善
+
+| 类 | 原 delta | 改后 |
+| --- | --- | --- |
+| `epublib.domain.Guide`（2 处） | 20 | 仍不同 |
+| `epublib.domain.Spine`（2 处） | 18 | 仍不同 |
+| `epublib.domain.TableOfContents` | 41 | 仍不同 |
+| `epublib.epub.DOMUtil` | 11 | 仍不同 |
+| `epublib.util.commons.io.BOMInputStream` | 51 | 仍不同 |
+
+验证：`compared 5 / exact 0 / different 5`。**已全部 `git checkout` 回滚。**
+
+#### 为什么 3a-90 那 5 个对了、这 5 个不对
+
+3a-90 那 5 个的共同点：`continue` 后面**紧跟 `return` 或 `break`**：
+
+```java
+if (!cond) continue;
+return x;             // ← 或 result2 = x; break;
+```
+
+编译器对「循环里找到就退出」有专门的图化简，CFR 反出来的 `continue` 和
+原始的正向 `if` 在这类结构上会生成不同字节码。
+
+而这批不对的，`continue` 后面跟的是**累加/赋值**：
+
+```java
+if (!cond) continue;
+result2.add(x);       // ← 继续循环
+```
+
+这种结构两个编译器都倾向于保留 `continue` 形态，改成正向 if 反而引入了额外的
+`goto`。
+
+#### 真正的判据
+
+**别按源码文本模式批量改，按字节码判**：
+
+```
+制品 ifeq <跳过>            → 正向 if
+制品 ifne <跳过> + goto 回循环头 → continue
+```
+
+改之前先 `javap` 看一眼这个方法的条件跳转是 `ifeq` 还是 `ifne`，
+只有制品明确是 `ifeq` 且本地是 `ifne` 时才改。
+
+**3a-90 那 5 个是这么判出来的（先看字节码才动手），3a-91 这 5 个是我看到文本
+模式就直接批量改的——差别就在这里。**
