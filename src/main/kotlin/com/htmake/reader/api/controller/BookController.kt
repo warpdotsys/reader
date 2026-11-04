@@ -95,6 +95,13 @@ import com.fasterxml.jackson.core.JsonToken
 import com.fasterxml.jackson.databind.JsonNode
 import kotlin.io.use
 import io.legado.app.model.analyzeRule.AnalyzeRule
+import kotlinx.coroutines.ensureActive
+import okhttp3.Response
+import java.net.ConnectException
+import java.net.SocketTimeoutException
+import javax.script.ScriptException
+import kotlinx.coroutines.CancellationException
+import io.legado.app.exception.NoStackTraceException
 
 private val logger: KLogger = KotlinLogging.logger { }
 
@@ -2650,15 +2657,65 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         }
         val inputStream = getSpeakStream(httpTTS, text, 0)
         response.putHeader("Content-Type", "audio/mpeg")
-        response.end(Buffer.buffer(inputStream.readBytes()))
+        response.end(Buffer.buffer(inputStream?.readBytes() ?: ByteArray(0)))
     }
 
-    suspend fun getSpeakStream(httpTTS: HttpTTS, text: String, speakSpeed: Int): InputStream {
-        val url = httpTTS.url.replace("{{speakText}}", text)
-        val inputStream = awaitResult<HttpResponse<Buffer>> { handler ->
-            webClient.getAbs(url).timeout(10000L).send(handler)
-        }.bodyAsBuffer()?.bytes?.inputStream()
-        return inputStream ?: ByteArray(0).inputStream()
+    suspend fun getSpeakStream(httpTts: HttpTTS, speakText: String, speechRate: Int): InputStream? {
+        val downloadErrorNo = Ref.IntRef()
+        while (true) {
+            val analyzeUrl = AnalyzeUrl(
+                httpTts.url,
+                speakText = speakText,
+                speakSpeed = speechRate,
+                source = httpTts,
+                headerMapF = httpTts.getHeaderMap(true),
+                debugLog = Debug
+            )
+            val response = Ref.ObjectRef<Response>()
+            try {
+                response.element = analyzeUrl.getResponseAwait()
+                ensureActive()
+                val checkJs = httpTts.loginCheckJs
+                if (!checkJs.isNullOrBlank()) {
+                    response.element = analyzeUrl.evalJS(checkJs, response.element) as Response
+                }
+                response.element?.headers?.get("Content-Type")?.let { contentType ->
+                    val ct = httpTts.contentType
+                    if (contentType == "application/json") {
+                        throw NoStackTraceException(response.element!!.body!!.string())
+                    }
+                    if (!ct.isNullOrBlank() && !Regex(ct).matches(contentType)) {
+                        throw NoStackTraceException(
+                            "TTS服务器返回错误：" + response.element!!.body!!.string()
+                        )
+                    }
+                }
+                ensureActive()
+                val stream = response.element!!.body!!.byteStream()
+                downloadErrorNo.element = 0
+                return stream
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                if (e is ScriptException) {
+                    logger.error("js错误\n" + e.localizedMessage, e)
+                    throw e
+                }
+                if (e is SocketTimeoutException || e is ConnectException) {
+                    downloadErrorNo.element++
+                    if (downloadErrorNo.element <= 5) continue
+                    logger.error("tts超时或连接错误超过5次\n" + e.localizedMessage, e)
+                    throw e
+                }
+                downloadErrorNo.element++
+                logger.error("tts下载错误\n" + e.localizedMessage, e)
+                if (downloadErrorNo.element > 5) {
+                    logger.error("TTS服务器连续5次错误，已暂停阅读。", e)
+                    throw e
+                }
+                logger.error("TTS下载音频出错，使用无声音频代替。\n朗读文本：$speakText")
+                return null
+            }
+        }
     }
 
     suspend fun ttsByTextToSpeechCn(
@@ -2872,7 +2929,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             }
             setEpubContent(chapter.title, book, epubBook, content, userNameSpace)
         }
-        setCover(book, epubBook, bookSource, userNameSpace)
+        setCover(book, epubBook, bookSource)
         val file = File(exportDir, book.name + ".epub")
         val outputStream = FileOutputStream(file)
         try {
@@ -2889,23 +2946,32 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         return ""
     }
 
-    private suspend fun setCover(
-        book: Book,
-        epubBook: EpubBook,
-        bookSourceString: String,
-        userNameSpace: String
-    ) {
-        val coverUrl = book.coverUrl ?: return
-        if (coverUrl.isEmpty()) {
-            return
+    private suspend fun setCover(book: Book, epubBook: EpubBook, bookSourceString: String?) {
+        val coverUrl = book.getDisplayCover() ?: return
+        if (coverUrl.startsWith("/")) {
+            val coverFile = File(getWorkDir("storage", coverUrl.replace("/", File.separator).substring(1)))
+            val byteArray = coverFile.readBytes()
+            epubBook.coverImage = Resource(byteArray, "Images/cover.jpg")
+        } else if (bookSourceString != null) {
+            val ext = getFileExt(coverUrl, "jpg")
+            val md5Encode = MD5Utils.md5Encode(coverUrl).toString()
+            val cachePath = getWorkDir("storage", "cache", "$md5Encode.$ext")
+            val cacheFile = File(cachePath)
+            if (cacheFile.exists()) {
+                val byteArray = cacheFile.readBytes()
+                epubBook.coverImage = Resource(byteArray, "Images/cover.jpg")
+                return
+            }
+            val bookSource = BookSource.fromJson(bookSourceString).getOrNull()
+            val analyzeUrl = AnalyzeUrl(coverUrl, source = bookSource)
+            try {
+                analyzeUrl.getByteArrayAwait()?.let {
+                    epubBook.coverImage = Resource(it, "Images/cover.jpg")
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
-        val result = awaitResult<HttpResponse<Buffer>> { handler ->
-            webClient.getAbs(coverUrl).timeout(10000L).send(handler)
-        }
-        val bytes = result.bodyAsBuffer()?.bytes ?: return
-        val resource = Resource(bytes, MediaTypes.JPG)
-        resource.href = "Images/cover.jpg"
-        epubBook.coverImage = resource
     }
 
     private suspend fun setEpubContent(

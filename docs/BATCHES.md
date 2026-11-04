@@ -3078,3 +3078,44 @@ listOf(Unit).also { }
 **929/936 = 99.25% 的类已适配**，剩余 7 个缺、9 个多，全都集中在 `BookController` 的 5 个方法
 （`cacheBookOnServer` / `cacheBookSSE` / `getLastBackFileFromWebdav` / `ttsByTextToSpeechCn`）
 和 `BaseSource.getHeaderMap` 上。
+
+### 3a-66 消掉 6 个多出的 lambda 类：统一规律是「制品用显式循环 + await 变体」
+
+本轮把多出的 9 个 lambda 类消到 2 个，缺的 7 个降到 6 个。
+
+#### 已修（每个都是按 CFR 重写，不是打补丁）
+
+| 方法 | 原来的写法 | CFR 的写法 | 消掉的类 |
+| --- | --- | --- | --- |
+| `deleteBook` | `firstOrNull {}` + `removeAll {}` | `for` 循环 + `bookshelf.remove(i)` | `$deleteBook$2` |
+| `deleteBooks` | `forEach {}` + `firstOrNull {}` + `removeAll {}` | `for` + `while (iterator.hasNext())` | `$deleteBooks$2$1` |
+| `getSpeakStream` | `awaitResult { handler -> }` | `analyzeUrl.getResponseAwait()` + `while(true)` 重试 | `$getSpeakStream$inputStream$1` |
+| `setCover` | `awaitResult { handler -> }` | `analyzeUrl.getByteArrayAwait()` | `$setCover$result$1` |
+
+#### 顺带修正的语义错误
+
+- `deleteBook` 原实现走 `bookList` + `LocalBook.deleteBook`，CFR 是直接操作 `bookshelf` JSON、
+  `bookshelf.remove(existIndex)`、再用 `FileUtils.deleteFile` 清封面。**行为不等价**，已改回。
+- `deleteBooks` 原实现同样走 `bookList`，CFR 用的是 `infoMap`（bookUrl 和 name_author 两种键）+ 迭代器删除。
+- `getSpeakStream` 原来是 6 行 `awaitResult`，CFR 是 150 行（`while(true)` 重试、`loginCheckJs` 求值、
+  Content-Type 校验、SocketTimeout/Connect/其他异常三条分支）。
+- `setCover` 参数从 4 个减到 3 个（`bookSourceString: String?`），且封面取的是 `getDisplayCover()`
+  不是 `coverUrl`；本地封面走 `File.readBytes()`，远程走 `getByteArrayAwait()` 且带文件缓存。
+
+#### 剩下的 2 多 6 缺
+
+多：`BookController$cacheBookOnServer$4`（制品是 `$2`）、`BookController$getLastBackFileFromWebdav$lambda-18`（制品是 16）。
+缺：`$cacheBookOnServer$2`、`$cacheBookSSE$3`、`$cacheBookSSE$4`、`$ttsByTextToSpeechCn$2`、
+`BookControllerKt$sam$java_util_function_BiConsumer$0`、`$getLastBackFileFromWebdav$lambda-16`，
+外加 `BaseSource.getHeaderMap` 的两层嵌套。
+
+#### 规律总结（对后续有用）
+
+**「多出一个 lambda 类」几乎总是同一类原因：制品用显式循环或 await 变体，我们用了集合操作符或 `awaitResult`。**
+
+- `forEach` / `firstOrNull` / `removeAll` / `any` / `map` → 制品多半是 `for` / `while (iterator.hasNext())`
+- `awaitResult { handler -> client.send(handler) }` → 制品多半是 `analyzeUrl.getResponseAwait()` /
+  `getByteArrayAwait()` / `getStrResponseAwait()`
+- `if (x == null) return` → 制品可能是 `?: return`
+
+**这四条是可复用的判据**，比逐个对 CFR 快得多。
