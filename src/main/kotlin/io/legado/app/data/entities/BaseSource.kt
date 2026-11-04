@@ -52,7 +52,7 @@ interface BaseSource : JsExtensions {
             GSON.fromJsonObject<Map<String, String>>(headerStr).getOrNull()?.let { map.putAll(it) }
         }
         if (hasLoginHeader) {
-            loginHeaderMap?.let { map.putAll(it) }
+            getLoginHeaderMap()?.let { map.putAll(it) }
         }
         return map
     }
@@ -60,8 +60,8 @@ interface BaseSource : JsExtensions {
     val loginHeader: String?
         get() = CacheManager(userNameSpace).get("loginHeader_$key")
 
-    val loginHeaderMap: Map<String, String>?
-        get() = GSON.fromJsonObject<Map<String, String>>(loginHeader).getOrNull()
+    fun getLoginHeaderMap(): Map<String, String>? =
+        GSON.fromJsonObject<Map<String, String>>(loginHeader).getOrNull()
 
     fun putLoginHeader(header: String) {
         CacheManager(userNameSpace).put("loginHeader_$key", header)
@@ -85,8 +85,8 @@ interface BaseSource : JsExtensions {
             }
         }
 
-    val loginInfoMap: Map<String, String>?
-        get() = GSON.fromJsonObject<Map<String, String>>(loginInfo).getOrNull()
+    fun getLoginInfoMap(): Map<String, String>? =
+        GSON.fromJsonObject<Map<String, String>>(loginInfo).getOrNull()
 
     fun putLoginInfo(info: String): Boolean {
         return try {
