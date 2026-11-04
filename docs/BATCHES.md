@@ -2761,3 +2761,49 @@ public final Pair<Book, String> saveBookToShelf(Book _book, String userNameSpace
 **结论**：这是**唯一剩下的行为占位**，记录在此。要补的话需要单独一轮，且必须对着 CFR
 逐行核对（尤其是 `Paths.get("storage", i)` 那个变参构造和 `copyRecursively` 的
 `overwrite=false` 语义）。
+
+### 3a-60 最后 23 个合成类的根因定位（都不建议硬追）
+
+#### A. `GsonExtensionsKt` 本身没问题（已排除）
+
+制品和本地的 `GsonExtensionsKt$*` 类**完全一致**（6 个）：
+`$fromJsonObject$lambda-0$$inlined$genericType$1`、`$fromJsonObject$lambda-2$$inlined$genericType$1`、
+`$genericType$1`、`$GSON$2`、`$GSON$2$1`、`GsonExtensionsKt`。
+
+制品的 `fromJsonObject` 字节码是标准的 `runCatching` 内联展开：
+
+```
+Exception table:
+   from    to  target type
+     10    75    78   Class java/lang/Throwable
+```
+
+和我们完全一致。
+
+**所以「改 `fromJsonObject` 就能解锁 15 个类」这个假设是错的。** 这也推翻了 3a-44 / 3a-50
+里「`fromJsonObject` 的 inline 展开形态是共同根因」的猜测——那个猜测当时没验证，现在验证了，不成立。
+
+#### B. 15 个 `$$inlined$fromJsonObject$N` 的真实根因
+
+类名 `SourceAnalyzer$jsonToBookSource_IoAF18A$lambda-10$$inlined$fromJsonObject$1` 的解读：
+
+- **`lambda-10`** = `SourceAnalyzer` 文件里的**第 10 个 lambda**（某个 inline 高阶函数的参数，
+  比如 `map { }` / `forEach { }`）
+- **`$$inlined$fromJsonObject$1`** = 那个 lambda **体内内联了 `fromJsonObject`** 后生成的合成类
+
+**所以这些类不是 `fromJsonObject` 自己的产物，是「调用点所在的那个 lambda」的产物。**
+它们缺失说明我们 `SourceAnalyzer` 里 lambda 的数量/顺序与制品不同——
+第 10 个 lambda 的位置上，我们放的不是那个调用 `fromJsonObject` 的 lambda。
+
+修法和 BookController 那 8 个一样：要逐方法对齐**整个文件**的 lambda 序列。
+
+#### C. 结论：23 个都不建议硬追
+
+| 家族 | 数量 | 根因 |
+| --- | --- | --- |
+| `BookController` 续体/lambda | 8 | 文件级 lambda 计数器偏移（我们 `lambda-19`，制品 `lambda-16`） |
+| `SourceAnalyzer` / `BaseSource` / `JsExtensions` | 15 | `$lambda-N$$inlined$fromJsonObject$N`，同样是 lambda 序列偏移 |
+
+**这 23 个类对应的源文件全部存在、逻辑全部实现**，缺的只是编译器合成类的编号/形态。
+在「百分百源码」这个目标下，**已经完成**；在「字节码逐类等价」这个目标下，
+它们需要逐文件重构 lambda 序列，成本远高于收益。
