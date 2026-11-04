@@ -2500,3 +2500,35 @@ saveUserStorage(
 
 这个类的 delta 是 0（指令数完全相同），却藏着一个真 bug。
 **按 delta 排序找 loose 时，必须逐条看内容，不能只看条数。**
+
+### 3a-54 字节码层收尾：19 个类修到完全一致 + 三类编译器差异
+
+判据：**去掉常量池号 `#NN` 和指令偏移后逐行比**（只比指令条数会漏掉「条数相同、
+常量不同」的情况）。扫 795 个可比类，从 217 个有差异修到 **198**，**19 个类**做到
+`verify-bytecode` 指令序列完全一致。
+
+#### 修好的（都是真问题，ABI 闸门看不见）
+
+| 类 | 问题 | 判据 |
+| --- | --- | --- |
+| `BookSourceController` | JS 代码字符串写成 Kotlin 表达式 | `ldc` 内容 |
+| `ReaderApplication` | `vertx` 属性访问 vs 函数；`checkNotNullExpressionValue` 消息 | 方法名 / 消息文本 |
+| `Rss` | `AnalyzeUrl` 默认参数 mask 314 vs 312 | `sipush` 数字 |
+| `AppConst` | lazy delegate 字段顺序 | `javap -p` 字段顺序 |
+| `VertExtKt` | `error` 求值顺序；`success` 缺 `!!` | 指令顺序 |
+| `CompositeCoroutine` | 早退 if vs 正向 if | `ifne`（回边）vs `ifeq`（跳出） |
+| `JsonExtensionsKt` | 3 个多余的 `!!` | 多出的 `checkNotNull` |
+| `IntTypeAdapter` 等 3 个 | 早退 if vs 三元表达式 | `ifeq` 跳过整块 |
+| `UTF8BOMFighter` 等 2 个 | 单 `return if/else` vs 双 `return` | 末尾 `goto` vs `areturn` |
+
+#### 三类编译器差异（无解，登记）
+
+1. **IR 优化策略**：1.5.21 会做 CSE（把 `Charsets.UTF_8` 这种重复引用存进局部变量）、
+   提取 `when` 的 subject、生成 `invokeSuspend$$forInline`；1.5.1 都不做。
+   **方向和我们直觉相反：1.5.21 优化得更多**，所以「我们多几条指令」有些不是源码错。
+2. **indy lambda 捕获**：1.5.1 把外层**全部**局部变量塞进 `invokedynamic` 的 lambda，
+   1.5.21 **只塞内层实际用到的**。表现为我们的合成类少几个 `$xxx` 字段。
+3. **suspend 参数溢出**：1.5.1 把 suspend 函数参数存到局部变量（跨挂起点恢复），
+   1.5.21 直接用参数槽位。表现为 `astore 9; aload 9` 的冗余存取。
+
+**这三类覆盖了剩余 198 个差异的绝大多数。**
