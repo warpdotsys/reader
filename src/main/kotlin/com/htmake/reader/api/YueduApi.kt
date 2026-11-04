@@ -124,10 +124,9 @@ open class YueduApi : RestVerticle() {
             }
         }
         router.route("/simple-web/*").handler { it ->
-            // 制品用 license.validHost(host)：Kotlin 1.5.21 与本文件同批编译会崩（BATCHES 3a-8），暂缓
             val license = getInstalledLicense()
             var simpleWebExpiredAt = 0L
-            if (license.type == it.request().host()) {
+            if (license.validHost(it.request().host())) {
                 simpleWebExpiredAt = license.simpleWebExpiredAt
             }
             if (simpleWebExpiredAt != 0L && simpleWebExpiredAt < System.currentTimeMillis()) {

@@ -2,6 +2,7 @@
 package com.htmake.reader.api.controller
 
 import com.htmake.reader.api.ReturnData
+import com.htmake.reader.utils.getInstalledLicense
 import com.htmake.reader.entity.User
 import com.htmake.reader.utils.asJsonObject
 import com.htmake.reader.utils.deleteRecursively
@@ -35,11 +36,11 @@ class UserController(coroutineContext: CoroutineContext) : BaseController(corout
 
     val userMaxCount: Int = 15
 
-    // 制品此处为：val license = getInstalledLicense(); if (license.validHost(host)) { … license.userMaxLimit … }
-    // Kotlin 1.5.21 在「License.kt 与它的调用点同批编译」时会在 psi2ir / IR lowering 阶段崩溃
-    // （Undefined parameter referenced: value-parameter queryHost / No mapping for symbol: License），
-    // 只读属性访问同样会崩，因此这里不引用 License，按无许可分支取值。
     private fun getUserLimit(context: RoutingContext): Int {
+        val license = getInstalledLicense()
+        if (license.validHost(context.request().host())) {
+            return min(max(appConfig.userLimit, 1), license.userMaxLimit)
+        }
         return min(max(appConfig.userLimit, 1), userMaxCount)
     }
 

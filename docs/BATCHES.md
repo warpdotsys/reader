@@ -2807,3 +2807,48 @@ Exception table:
 **这 23 个类对应的源文件全部存在、逻辑全部实现**，缺的只是编译器合成类的编号/形态。
 在「百分百源码」这个目标下，**已经完成**；在「字节码逐类等价」这个目标下，
 它们需要逐文件重构 lambda 序列，成本远高于收益。
+
+### 3a-61 【重要修正】`License.validHost` 的编译崩溃消失了，两处降级已回填
+
+3a-8 记录的「`License.validHost` 与调用点同批编译必崩」**不再成立**。
+
+#### 证据
+
+`LicenseController.kt` 里两处 `license.validHost(host)` 直接编译通过，
+而且 **`isHostValid` 方法的字节码与制品完全一致**——不是「能编但形态不对」。
+
+回填 `UserController`（3a-8 时降级的）和 `YueduApi`（3a-42 时降级的）之后：
+
+```
+BUILD SUCCESSFUL in 2m 46s
+```
+
+#### 回填的两处
+
+1. **`UserController.getUserLimit`**（之前是「按无许可分支取值」的降级）：
+   ```kotlin
+   private fun getUserLimit(context: RoutingContext): Int {
+       val license = getInstalledLicense()
+       if (license.validHost(context.request().host())) {
+           return min(max(appConfig.userLimit, 1), license.userMaxLimit)
+       }
+       return min(max(appConfig.userLimit, 1), userMaxCount)
+   }
+   ```
+2. **`YueduApi` 的 `/simple-web/*`**：`license.type == host` → `license.validHost(host)`
+
+#### 为什么消失了
+
+推测是 `LicenseController.kt` 存在之后，`License.kt` 的编译顺序/上下文变了：
+`LicenseController` 是 `License` 的主要消费者，之前它不存在时 `License` 可能被当作
+「仅被二进制签名引用」的类处理，从而触发那个 psi2ir / IR lowering bug（3a-10 的三件套）。
+
+没有深究机制——**结论是现在能编，而且字节码对得上**。
+
+#### 教训
+
+**「编译器崩」这种结论必须带上当时的仓库状态。** 3a-8 时 `LicenseController` 和
+`BookController` 都不存在，全工程只有 600 多个类；现在 935 个类，编译上下文完全不同。
+**同一段源码在不同仓库状态下，可能一个崩、一个不崩。**
+
+所以凡是登记为「编译器 bug，无解」的结论，**当仓库结构发生大变化时都应重新验证一次**。
