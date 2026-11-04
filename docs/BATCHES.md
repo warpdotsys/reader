@@ -3687,3 +3687,60 @@ iconst_0 / istore 11, istore 12   // 两个额外初始化
 **筛法本身的局限**：`条目数差大` 只能说明"两边编译结果差得远"，可能是缺逻辑，
 也可能是编译器把一个内联函数展开了。要区分必须看第一条差异指令是什么——
 如果是 `invokestatic StringsKt.xxx` vs 一串 `CharSequence.charAt`，就是内联差异，跳过。
+
+### 3a-80 301-1000 段：7 处「本地少」里 4 处是同一个 `trim` 内联
+
+#### 筛出的 7 处
+
+| 少 | 方法 | 结论 |
+| --- | --- | --- |
+| 168 | `CookieStore.cookieToMap` (443/269) | **trim 内联**（3 个 `CharSequence.charAt` + `Intrinsics.compare`） |
+| 68 | `BookHelp.formatAuthor` (132/63) | **trim 内联** |
+| 60 | `FileUtils.readText` (110/48) | trim 内联（1 个 charAt） |
+| 57 | `Coroutine$executeInternal$1.invokeSuspend` (925/874) | 状态机槽位（`astore 23` vs `astore 21`） |
+| 53 | `BookHelp.formatBookName` (86/32) | **trim 内联** |
+| 53 | `BookHelp.formatBookAuthor` (86/32) | **trim 内联** |
+| 48 | `HtmlFormatter.formatKeepImg` (225/177) | 未查（类不在本地 Java 源集，取不到字节码） |
+
+#### 为什么全是 `trim`
+
+Kotlin 1.5.1 的 `CharSequence.trim()` 是 `@InlineOnly`，编译时**整个展开**成：
+
+```
+CharSequence.length → 循环：charAt / Intrinsics.compare(c, 32) / ifne / ifgt
+→ subSequence(start, end+1).toString()
+```
+
+一共 **60 多条**。1.5.21 只发一条 `invokestatic StringsKt.trim`。
+
+**任何含 `trim()` 的方法都会因此差 60 条左右**，跟实现对不对无关。
+
+#### 自动识别方法（可复用）
+
+```python
+body = ' '.join(制品字节码)
+is_trim_inlined = body.count('CharSequence.charAt') >= 1 and 'Intrinsics.compare' in body
+```
+
+`charAt` + `Intrinsics.compare(c, 32)` 是 `trim` 展开的特征指纹。
+只要命中，就**直接跳过**，不要再花时间对源码。
+
+#### 已确认的跳过清单（trim 内联导致，源码正确）
+
+- `JsoupExtensionsKt.textArray`
+- `BookHelp.formatBookName` / `formatBookAuthor` / `formatAuthor`
+- `FileUtils.readText`
+- `CookieStore.cookieToMap`
+- `UTF8BOMFighter.removeUTF8BOM`（部分）
+
+**这一类合计约 500 条 delta，全部是编译器版本产物。**
+
+#### `Coroutine$executeInternal$1.invokeSuspend` 的槽位问题
+
+制品 925 / 本地 874，第一个差异就在第 1 条：`astore 23` vs `astore 21`。
+`tableswitch` 的 16 个跳转目标全部错位（制品 189/266/402...，本地 188/265/350...）。
+
+这是 3a-70 把 `executeBlock` 从 `inline` 改成非 inline 后的连带效应 ——
+参数不再内联，续体里多出两个局部变量槽位，后面所有槽位编号整体 +2。
+
+**不影响语义**（槽位是编译器分配的），但会让整个方法的字节码逐条错位。
