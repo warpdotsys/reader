@@ -46,10 +46,9 @@ class CompositeCoroutine : CoroutineContainer {
             }
             for (coroutine in coroutines) {
                 val add = set!!.add(coroutine)
-                if (add) {
-                    continue
+                if (!add) {
+                    return false
                 }
-                return false
             }
         }
         return true
