@@ -1,4 +1,4 @@
-# 续接说明（2026-11-05 08:00）
+# 续接说明（2026-11-05 17:45）
 
 ## 用户目标（明确、无妥协）
 
@@ -9,11 +9,15 @@ ABI 一致性已经不重要，类名和字节码三重对齐才是目标。
 
 ```
 制品应用类   : 936
-本仓库已编译 : 933
 已适配       : 930  (99.36%)   还缺 6 / 多出 3
-字节码完全一致: 720 / 930 (77.4%)   有差异 210 个类
-HEAD         : bde56ef (restore/core)
+字节码完全一致: 723 / 930 (77.7%)   有差异 207 个类
+HEAD         : 9fecbb3 (restore/core)
+D 盘可用     : 92G（清掉 handwriting-yolo-cache/uv 的 90G uv 缓存后）
 ```
+
+**注意：D 盘曾两次写满导致编译失败。** 真凶是 `D:/Projects/handwriting-yolo-cache/uv`
+（uv 包缓存，实际 90G，PowerShell 的 Measure-Object 会算成 3.27G）。
+它可随时删，不是项目数据。**不要碰** `xwechat_files`（微信数据，用户明确要求保留）。
 
 ## 三层验收脚本
 
@@ -55,11 +59,20 @@ powershell -NoProfile -Command "& { $env:JAVA_HOME='D:\Tools\java\jdk-11.0.8+10'
 8. **`data class` 自动生成 vs 手写**：比对方法条目数，182 条 = 自动生成全字段，
    4/29 条 = 手写只比部分字段。**两个方向都可能错**（BookSource 该删手写，
    RssArticle 该加手写）
+9. **`aload_n` → `astore m` → `aload m` → 比较** = `when` 多分支（subject 只求值一次），
+   不是 `if`。`DB$Companion.table` 就是这条，改成 `when` 后归零。
+10. **`aconst_null` 后有无 `checkcast`**：有 = if-else 表达式分支返回 null；
+    无 = 语句级 `return null`。
+11. **跳转目标偏移不是差异**：`ifle 49` vs `ifle 48` 只是字节偏移不同。
+    `norm()` 已归一化，别再手工判。
+12. **参数名和类型是硬信息**：`exportBook` 的 `isEpub: Int` 被我们写成
+    `type: String`，不是实现差异而是**接口不兼容**，delta 473 全在参数解析段。
+    **比方法体之前先核对参数名/类型/返回方式。**
 
 ## 剩余 210 个有差异的类（按 delta 降序）
 
 ```
-18441  com.htmake.reader.api.controller.BookController     ← 12 个方法，已在啃
+17918  com.htmake.reader.api.controller.BookController     ← exportBook 已归零，10 个方法待修
  2691  com.htmake.reader.api.YueduApi
  2653  me.ag2s.epublib.domain.Relator
  2275  io.legado.app.utils.Base64$Decoder
@@ -95,7 +108,7 @@ searchBookMultiSSE    564   796/794
 searchBookMulti       533   661/651
 searchBookSource      514   616/645
 exportToEpub          482   → 已归零（3a-81）
-exportBook            473   499/308    ← 本地少 191
+exportBook            473   → 已归零（3a-87，参数应是 isEpub: Int 不是 type: String）
 ```
 
 ## 工作方法（已验证有效）
