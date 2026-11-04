@@ -604,12 +604,11 @@ interface JsExtensions {
         padding: String,
         iv: String
     ): String {
-        return EncoderUtils.decryptDES(
-            data.encodeToByteArray(),
-            key.encodeToByteArray(),
-            "${mode}/${padding}",
-            iv.encodeToByteArray()
-        )?.toString(Charsets.UTF_8) ?: ""
+        return DESede(
+            mode, padding,
+            key.toByteArray(Charsets.UTF_8),
+            iv.toByteArray(Charsets.UTF_8)
+        ).decryptStr(data)
     }
 
     fun tripleDESDecodeArgsBase64Str(
@@ -703,12 +702,11 @@ interface JsExtensions {
         padding: String,
         iv: String
     ): String {
-        return EncoderUtils.encryptDES2Base64(
-            data.encodeToByteArray(),
-            key.encodeToByteArray(),
-            "${mode}/${padding}",
-            iv.encodeToByteArray()
-        )?.toString(Charsets.UTF_8) ?: ""
+        return DESede(
+            mode, padding,
+            key.toByteArray(Charsets.UTF_8),
+            iv.toByteArray(Charsets.UTF_8)
+        ).encryptBase64(data)
     }
 
     fun tripleDESEncodeArgsBase64Str(

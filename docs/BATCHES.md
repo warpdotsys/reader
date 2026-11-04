@@ -3378,3 +3378,25 @@ private suspend fun executeBlock(
 
 `queryTTF` 83、`getTxtInFolder` 77、`utf8ToGbk` 76、`getZipByteArrayContent` 72、
 `downloadFile` 59、`post`/`get`/`head` 55-57、`importScript` 49、`tripleDESDecodeStr` 44。
+
+### 3a-74 `JsExtensions$DefaultImpls` 差异方法 53 → 12
+
+新增两个方法，delta 1338 → 1306：
+
+| 方法 | 制品 | 我们（原） | 修法 |
+| --- | --- | --- | --- |
+| `tripleDESDecodeStr` | 50 条 | 57 条 | `DESede(mode, padding, key.toByteArray(UTF_8), iv.toByteArray(UTF_8)).decryptStr(data)` |
+| `tripleDESEncodeBase64Str` | 50 条 | 57 条 | 同上，`.encryptBase64(data)` |
+
+**注意 `tripleDESDecodeStr` 的 key/iv 不是 Base64 解码，是 UTF-8 字节**——
+这和 `tripleDESDecodeArgsBase64Str`（走 Base64.decode）不同，两个方法名字很像但用法不一样：
+
+- `tripleDESDecodeStr(data, key, mode, padding, iv)` → `key.getBytes(UTF_8)`、`iv.getBytes(UTF_8)`
+- `tripleDESDecodeArgsBase64Str(data, key, mode, padding, iv)` → `Base64.decode(key, 2)`、`Base64.decode(iv, 2)`
+
+**名字里带 `Args`/`Base64` 的那个才走 Base64。**
+
+#### 剩余 12 个方法
+
+`queryTTF` 83、`getTxtInFolder` 77、`utf8ToGbk` 76、`getZipByteArrayContent` 72、
+`downloadFile` 59、`post` 57、`get` 55、`head` 55、`importScript` 49，另 3 个 delta < 45。
