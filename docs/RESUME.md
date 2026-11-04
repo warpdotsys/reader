@@ -1,4 +1,4 @@
-# 续接说明（2026-11-06 01:50）
+# 续接说明（2026-11-06 04:50）
 
 ## 用户目标（明确、无妥协）
 
@@ -10,7 +10,7 @@ ABI 一致性已经不重要，类名和字节码三重对齐才是目标。
 ```
 制品应用类   : 936
 已适配       : 930  (99.36%)   还缺 6 / 多出 3
-字节码完全一致: 740 / 930 (79.6%)   有差异 190 个类
+字节码完全一致: 744 / 930 (80.0%)   有差异 186 个类
 HEAD         : 见 git log（本轮最后提交在 3a-97 之后）
 D 盘可用     : 92G（清掉 handwriting-yolo-cache/uv 的 90G uv 缓存后）
 ```
@@ -69,7 +69,13 @@ powershell -NoProfile -Command "& { $env:JAVA_HOME='D:\Tools\java\jdk-11.0.8+10'
     delta 立刻虚高到「方法总量级」。`Relator.byCode` 2669 条指令 delta 2652，
     真实差异只有 1 处 2 条。**必须用 `difflib.SequenceMatcher` 对齐后看差异块规模。**
     扫描脚本 `…/scratch/bc/scan_blocks2.py`（每类只跑 2 次 javap）。
-13. **`const val TAG` 不发 static 字段**：`const` 是编译期常量会内联，
+13. **本地槽位号整体比制品大 N → 先找「多出来的局部变量」**：
+    最常见是链式调用存了中间对象。`val res = f(); res.body` 改成
+    `val body = f().body`（只存最终结果），槽位就少一个，后面全部对齐。
+14. **三元表达式 vs if/else 语句**：三元结果压栈（无 `astore`），
+    if/else 语句每个分支都要 `astore`。制品在 `ldc ""` 后多一条 `astore_3`
+    → 源码是 if/else 不是三元。
+15. **`const val TAG` 不发 static 字段**：`const` 是编译期常量会内联，
     制品有 `<clinit>` 里的 `putstatic TAG` 就说明是普通 `val`。
     **`javap -p` 只比方法名集合，查不出缺字段。**
 14. **`while (i < n)` vs `for (i in 0 until n)`**：前者 `goto` 回循环头，
