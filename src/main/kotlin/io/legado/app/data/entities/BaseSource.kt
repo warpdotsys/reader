@@ -58,7 +58,10 @@ interface BaseSource : JsExtensions {
     }
 
     val loginHeader: String?
-        get() = CacheManager(userNameSpace).get("loginHeader_$key")
+        get() {
+            val cache = CacheManager(userNameSpace)
+            return cache.get("loginHeader_$key")
+        }
 
     fun getLoginHeaderMap(): Map<String, String>? {
         val header = loginHeader ?: return null
@@ -71,7 +74,8 @@ interface BaseSource : JsExtensions {
     }
 
     fun removeLoginHeader() {
-        CacheManager(userNameSpace).delete("loginHeader_$key")
+        val cache = CacheManager(userNameSpace)
+        cache.delete("loginHeader_$key")
     }
 
     val loginInfo: String?
@@ -112,7 +116,10 @@ interface BaseSource : JsExtensions {
     }
 
     var variable: String?
-        get() = CacheManager(userNameSpace).get("sourceVariable_$key")
+        get() {
+            val cache = CacheManager(userNameSpace)
+            return cache.get("sourceVariable_$key")
+        }
         set(variable) {
             val cache = CacheManager(userNameSpace)
             if (variable != null) {

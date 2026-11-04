@@ -57,8 +57,16 @@ def dump(cp, cls):
 
 
 def norm(seq):
-    """去掉纯 goto/label 差异以外的空白噪声。"""
-    return [re.sub(r'\s+', ' ', s).strip() for s in seq]
+    """归一化：
+    - 折叠空白
+    - 把常量池编号 #123 统一成 #（编号分配不同不代表语义不同）
+    """
+    out = []
+    for s in seq:
+        s = re.sub(r'\s+', ' ', s).strip()
+        s = re.sub(r'#\d+', '#', s)
+        out.append(s)
+    return out
 
 
 def scan(root):
