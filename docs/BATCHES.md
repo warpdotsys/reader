@@ -4686,3 +4686,59 @@ open fun <P : Any> findBy(field: String, value: P, clazz: Class<T>): T? {
 `JSONTable` / `SQLTable` 的 `findBy` 还有 44/44 的差异（同长度不同内容），
 以及 `save`（106/119）、`saveMulti`（91/94）、`delete`（85/85）都有差异。
 这些是另一个问题，留待后续。
+
+### 3a-97 JSONTable / SQLTable：三个真判据，但没啃下来（部分改善）
+
+#### 试过的三处
+
+**1. `while (index < size) { val i = index++ }` → `for (i in 0 until size)`（判据成立）**
+
+改前 `findBy` 是 `while + 后置递增`，字节码 `iload/istore/iconst_1/iadd/istore`；
+制品是 `iinc` —— `for (i in 0 until size)` 的特征（3a-93 判据）。
+
+两处 `defineBy`/`save`/`saveMulti` 里同形态的 `while` 都换了 `for`。
+
+**2. `value == objValue` → `objValue.equals(value)`（判据成立）**
+
+```
+制品  invokevirtual java/lang/Object.equals
+本地  invokestatic kotlin/jvm/internal/Intrinsics.areEqual
+```
+→ 制品是显式 `.equals()`，不是 Kotlin 的 `==`。
+
+**且求值顺序是「值在左」**：制品先 `json.getValue(field)` 再 `aload value`，
+所以源码是 `json.getValue(field).equals(value)`，不是 `value.equals(...)`。
+
+**3. `getJsonObject(i)` 只调一次、存变量**
+
+```kotlin
+// 改前：调两次
+val objValue = dataList.getJsonObject(i).getValue(field)
+return dataList.getJsonObject(i).mapTo(clazz)
+// 改后：存变量
+val json = dataList.getJsonObject(i)
+return json.mapTo(clazz)
+```
+
+#### 结果：`findBy` 规模 11 → 7，但没归零
+
+剩余差异：
+```
+save       106/119  块=5 规模=18   制品有 aload_3（checker），本地没有
+saveMulti   91/94   块=4 规模=8    同
+delete      85/84   块=14 规模=26  制品 iconst_0/istore 4（var 占位）+ checkcast List
+```
+
+`save` / `saveMulti` 的 `aload_3` 差异是「制品在某处复用了 `checker` 参数，
+我们重新取了字段」——需要逐段看 106 条指令，成本高。
+`delete` 的 `checkcast List` 说明制品有一处把 `ArrayList` 当 `List` 用。
+
+**投入 4 轮编译（约 5 分钟）没归零，先停在这里，记下来留给下次。**
+
+#### 顺带：v6 全量数据作废
+
+`bcdiff_v6.json` 显示 `514/930`，但 `514 + 99 ≠ 930`——有 317 个类
+`uncomparable`。原因是**跑全量时我同时 `rm -rf build` 在编译**，
+javap 拿不到本地类文件。
+
+**教训：全量对比期间绝不能动 build 目录。** 要么等它跑完，要么先编译再跑。

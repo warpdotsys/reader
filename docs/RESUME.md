@@ -1,4 +1,4 @@
-# 续接说明（2026-11-05 17:45）
+# 续接说明（2026-11-06 01:50）
 
 ## 用户目标（明确、无妥协）
 
@@ -10,8 +10,8 @@ ABI 一致性已经不重要，类名和字节码三重对齐才是目标。
 ```
 制品应用类   : 936
 已适配       : 930  (99.36%)   还缺 6 / 多出 3
-字节码完全一致: 723 / 930 (77.7%)   有差异 207 个类
-HEAD         : 9fecbb3 (restore/core)
+字节码完全一致: 740 / 930 (79.6%)   有差异 190 个类
+HEAD         : 见 git log（本轮最后提交在 3a-97 之后）
 D 盘可用     : 92G（清掉 handwriting-yolo-cache/uv 的 90G uv 缓存后）
 ```
 
@@ -65,7 +65,21 @@ powershell -NoProfile -Command "& { $env:JAVA_HOME='D:\Tools\java\jdk-11.0.8+10'
     无 = 语句级 `return null`。
 11. **跳转目标偏移不是差异**：`ifle 49` vs `ifle 48` 只是字节偏移不同。
     `norm()` 已归一化，别再手工判。
-12. **参数名和类型是硬信息**：`exportBook` 的 `isEpub: Int` 被我们写成
+12. **`delta` 大不等于差异多**：一条指令插入/删除会让后面全部平移，
+    delta 立刻虚高到「方法总量级」。`Relator.byCode` 2669 条指令 delta 2652，
+    真实差异只有 1 处 2 条。**必须用 `difflib.SequenceMatcher` 对齐后看差异块规模。**
+    扫描脚本 `…/scratch/bc/scan_blocks2.py`（每类只跑 2 次 javap）。
+13. **`const val TAG` 不发 static 字段**：`const` 是编译期常量会内联，
+    制品有 `<clinit>` 里的 `putstatic TAG` 就说明是普通 `val`。
+    **`javap -p` 只比方法名集合，查不出缺字段。**
+14. **`while (i < n)` vs `for (i in 0 until n)`**：前者 `goto` 回循环头，
+    后者 `if_icmpge` 前置 + `iinc` + `if_icmplt` 回跳。
+15. **`checkNotNullParameter` 数量对不上 → 查类型参数上界**：
+    `<P>`（可空）不检查，`<P : Any>`（非空）检查。这是 API 契约差异。
+16. **`Object.equals` vs `Intrinsics.areEqual`**：显式 `.equals()` 前者，
+    Kotlin 的 `==` 后者。**且看求值顺序判断谁是左操作数**。
+17. **`Element.tagName()` vs `Element.tag().name`**：语义相同，字节码不同。
+18. **参数名和类型是硬信息**：`exportBook` 的 `isEpub: Int` 被我们写成
     `type: String`，不是实现差异而是**接口不兼容**，delta 473 全在参数解析段。
     **比方法体之前先核对参数名/类型/返回方式。**
 

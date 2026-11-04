@@ -25,12 +25,10 @@ class SQLTable<T>(userNameSpace: String, name: String) : DB<T>(userNameSpace, na
 
     override fun <P : Any> findBy(field: String, value: P, clazz: Class<T>): T? {
         val dataList = readAll()
-        var index = 0
-        while (index < dataList.size()) {
-            val i = index++
-            val objValue = dataList.getJsonObject(i).getValue(field)
-            if (value == objValue) {
-                return dataList.getJsonObject(i).mapTo(clazz)
+        for (i in 0 until dataList.size()) {
+            val json = dataList.getJsonObject(i)
+            if (json.getValue(field).equals(value)) {
+                return json.mapTo(clazz)
             }
         }
         return null
@@ -43,9 +41,7 @@ class SQLTable<T>(userNameSpace: String, name: String) : DB<T>(userNameSpace, na
     ) {
         var dataList = readAll()
         var existIndex = -1
-        var index = 0
-        while (index < dataList.size()) {
-            val i = index++
+        for (i in 0 until dataList.size()) {
             val jsonObject = dataList.getJsonObject(i)
             if (checker(jsonObject, value)) {
                 existIndex = i
@@ -73,9 +69,7 @@ class SQLTable<T>(userNameSpace: String, name: String) : DB<T>(userNameSpace, na
         var dataList = readAll()
         var existIndex = -1
         for (j in value) {
-            var index = 0
-            while (index < dataList.size()) {
-                val i = index++
+            for (i in 0 until dataList.size()) {
                 val jsonObject = dataList.getJsonObject(i)
                 if (checker(jsonObject, j)) {
                     existIndex = i
@@ -98,10 +92,8 @@ class SQLTable<T>(userNameSpace: String, name: String) : DB<T>(userNameSpace, na
 
     override fun delete(checker: (JsonObject) -> Boolean) {
         var dataList = readAll()
-        var index = 0
         val removeIndexList = ArrayList<Any>()
-        while (index < dataList.size()) {
-            val i = index++
+        for (i in 0 until dataList.size()) {
             val jsonObject = dataList.getJsonObject(i)
             if (checker(jsonObject)) {
                 removeIndexList.add(i)
