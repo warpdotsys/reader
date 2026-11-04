@@ -66,7 +66,8 @@ interface BaseSource : JsExtensions {
     }
 
     fun putLoginHeader(header: String) {
-        CacheManager(userNameSpace).put("loginHeader_$key", header)
+        val cache = CacheManager(userNameSpace)
+        cache.put("loginHeader_$key", header)
     }
 
     fun removeLoginHeader() {
@@ -104,7 +105,8 @@ interface BaseSource : JsExtensions {
     }
 
     fun removeLoginInfo() {
-        CacheManager(userNameSpace).delete("userInfo_$key")
+        val cache = CacheManager(userNameSpace)
+        cache.delete("userInfo_$key")
     }
 
     var variable: String?
