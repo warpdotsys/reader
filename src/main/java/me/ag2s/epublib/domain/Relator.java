@@ -244,8 +244,9 @@ public enum Relator {
 
     public static Relator byCode(String code) {
         for (Relator relator : Relator.values()) {
-            if (!relator.getCode().equalsIgnoreCase(code)) continue;
-            return relator;
+            if (relator.getCode().equalsIgnoreCase(code)) {
+                return relator;
+            }
         }
         return null;
     }

@@ -4543,3 +4543,54 @@ repeat          19 -> 0
 wordCountFormat 42 -> 16
 StringUtils 合计 1118 -> 1093
 ```
+
+### 3a-94 Relator 归零：2669 条指令只差 1 个差异块（delta 2652 → 0）
+
+#### 现象：delta 2652，但指令总数只差 1
+
+```
+byCode  2669/2670
+```
+
+逐行比较几乎全不等，看起来像「两个完全不同的方法」。**这是整体错位的假象**：
+从第一个真实差异点开始，后面所有指令的字节偏移都平移了，逐行比对就全错位。
+
+用 `difflib.SequenceMatcher` 做序列对齐，**真相是只有 1 个差异块**：
+
+```
+=== replace  制品[18:19] 本地[18:20] ===
+   制品 ifeq
+   本地 ifne
+   本地 goto
+```
+
+就是 3a-90 的 `continue` 模式：
+
+```java
+// 改前（本地）
+for (Relator relator : Relator.values()) {
+    if (!relator.getCode().equalsIgnoreCase(code)) continue;
+    return relator;
+}
+// 改后（制品）
+for (Relator relator : Relator.values()) {
+    if (relator.getCode().equalsIgnoreCase(code)) {
+        return relator;
+    }
+}
+```
+
+改完 `compared 1 / exact 1 / different 0`。
+
+#### 关键方法论：difflib 序列对齐 > 逐行 delta
+
+**delta 大不等于差异多。** 一条指令的插入/删除会让后面全部平移，
+逐行 delta 就变成「总数级」的虚高数字（这里 2652，真实差异只有 1 处 3 条指令）。
+
+判据：
+- `delta` 接近 `方法指令总数` → **先怀疑整体错位**，别当成「完全不同」
+- 用 `difflib.SequenceMatcher(None, a, b, autojunk=False).get_opcodes()`
+  过滤掉 `equal`，剩下的 `replace`/`insert`/`delete` 才是真实差异
+- 差异块规模（`sum(max(len_a, len_b) for 每个块)`）才是有意义的「差多少」
+
+**这个判据能救很多之前判为「无从下手」的大 delta 类。**
