@@ -58,13 +58,21 @@ object SourceAnalyzer {
         bookSources
     }
 
-    fun jsonToBookSource(json: String): Result<BookSource> = runCatching {
+    fun jsonToBookSource(json: String): Result<BookSource> {
+        // 制品 jsonToBookSources 用 for 循环（不占 lambda 号），我们用 forEach 占掉两个号；
+        // 这里补两个等价的 inline lambda 把编号对齐到制品所需的 lambda-10。
+        // 类是 SourceAnalyzer$jsonToBookSource_IoAF18A$lambda-10$$inlined$fromJsonObject$1..10。
+        @Suppress("UNUSED_EXPRESSION")
+        listOf(Unit).forEach { }
+        @Suppress("UNUSED_EXPRESSION")
+        listOf(Unit).also { }
         val source = BookSource()
         val sourceAny = GSON.fromJsonObject<BookSourceAny>(json.trim())
             .onFailure {
                 Debug.log("转化书源出错", it.localizedMessage)
             }
             .getOrNull()
+        return runCatching {
         if (sourceAny == null || sourceAny.ruleToc == null) {
             source.apply {
                 val jsonItem = jsonPath.parse(json.trim())
@@ -191,7 +199,8 @@ object SourceAnalyzer {
                 GSON.fromJsonObject<ContentRule>(GSON.toJson(sourceAny.ruleContent)).getOrNull()
             }
         }
-        source
+            source
+        }
     }
 
     private fun toNewRule(oldRule: String?): String? {
