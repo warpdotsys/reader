@@ -3469,3 +3469,42 @@ fun removeLoginInfo() {
 `loginInfo` 里的 `key` 是局部变量（`ByteArray`），`removeLoginInfo` 里的 `key` 是
 `BaseSource` 的 `key: String` 属性 —— **两者拼出来的存储键不同**，`removeLoginInfo` 删不掉
 `loginInfo` 写进去的那条。需要对照制品字节码确认原始写法，暂未改动。
+
+### 3a-76 统计器的假阳性修正（-352）+ 4 个小类归零
+
+#### 最重要的一件事：`bytecode-diff.py` 之前把常量池编号算成差异
+
+`norm()` 只折叠了空白，没处理 `#123` 这种常量池索引。`ldc #10 // String this` 和
+`ldc #9 // String this` 是同一个字符串，但编号不同，之前被逐条算成 delta。
+
+补上 `re.sub(r'#\d+', '#', s)` 之后：
+
+| | 修正前 | 修正后 |
+| --- | --- | --- |
+| 完全一致 | 672 (72.3%) | **718 (77.2%)** |
+| 有差异 | 258 | 212 |
+| `BaseSource$DefaultImpls` delta | 965 | **613** |
+
+**之前那份 delta 排行整体虚高约 20%**，需要以 `bcdiff_v2.json` 为准。
+
+#### 新修的 4 个小类
+
+| 类 / 方法 | 制品 | 我们（原） | 修法 |
+| --- | --- | --- | --- |
+| `me.ag2s.epublib.domain.EpubBook.getContents` | `Map.values`（`invokeinterface`） | `LinkedHashMap.values`（`invokevirtual`） | 局部变量 `result2` 声明成 `Map<String, Resource>` 而不是 `LinkedHashMap` |
+| `ExtKt$sendEmail$sendCommand$1` | `String.valueOf` | `String.toString` | `writer.write(cmd.toString())` → `writer.write("$cmd")` |
+| `me.ag2s.epublib.epub.EpubReader.getPackageResourceHref` | `astore_2` + `aload_2` | `dup` + `astore_2` | 制品先把值存进局部变量再复用，我们直接 `dup` 栈顶 |
+| `me.ag2s.epublib.util.ResourceUtil.createChapterResource` | `astore_0` + `aload_0` | `dup` + `astore_0` | 同上 |
+
+#### 两条新判据
+
+1. **`invokeinterface Map.xxx` vs `invokevirtual LinkedHashMap.xxx`** → 局部变量的**声明类型**不同。
+   `val m = LinkedHashMap<K,V>()` 会编成 `invokevirtual`，写成 `val m: Map<K,V> = LinkedHashMap()` 才是
+   `invokeinterface`。
+2. **`String.valueOf(x)` vs `x.toString()`** → 前者是字符串模板 `"$x"`，后者是显式调用。
+
+#### 第三个模式：`dup` vs `astore`+`aload`
+
+制品在「构造一个对象、保存到局部变量、再使用」这种序列里，会老老实实
+`astore_n` / `aload_n`；我们写的链式表达式会被编译成 `dup` 复用栈顶。
+这不是语义差异，纯粹是**变量声明形状**。要贴近制品，就得把中间结果显式命名。

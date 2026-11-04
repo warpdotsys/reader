@@ -143,7 +143,7 @@ implements Serializable {
     }
 
     public List<Resource> getContents() {
-        LinkedHashMap<String, Resource> result2 = new LinkedHashMap<String, Resource>();
+        Map<String, Resource> result2 = new LinkedHashMap<String, Resource>();
         EpubBook.addToContentsResult(this.getCoverPage(), result2);
         for (SpineReference spineReference : this.getSpine().getSpineReferences()) {
             EpubBook.addToContentsResult(spineReference.getResource(), result2);

@@ -764,7 +764,7 @@ fun sendEmail(toEmail: String, subject: String, body: String): Boolean {
         val cmd = command.first
         val expectCode = command.second
         logger.debug("Send command {}, expect code {}", cmd.trim(), expectCode)
-        writer.write(cmd.toString())
+        writer.write("$cmd")
         writer.flush()
         val response = reader.readLine()
         logger.debug("Response {}", response)
