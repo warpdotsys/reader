@@ -5037,3 +5037,49 @@ Decoder.process  2402/2407  9 块 23 条
 这类「超长方法 + 差异分布在 switch/case 里」的情况，即使 difflib 给出了精确的差异块，
 **改动仍然要逐 case 对照字节码验证**，一轮编译 70 秒，试错成本高。
 **优先做「差异块少且集中在方法头部」的类**（像 `NGramParser_IBM420` 那样 5 条全在开头的）。
+
+### 3a-104 BookSource 全清：三处独立修复 + 统计器第四次假阳性
+
+#### 1. `getSource`：删掉多余的 `override`
+
+```
+制品  aload_0 / invokestatic BaseSource$DefaultImpls.getSource(BaseSource) / areturn
+本地  aload_0 / checkcast BaseSource / areturn
+```
+
+`BaseSource` 接口里已有默认实现 `override val source: BaseSource get() = this`，
+`BookSource` 又写了一遍 `override val source get() = this`。
+
+**删掉 `BookSource` 里的 override**，就退回接口默认实现，字节码变成
+`invokestatic DefaultImpls.getSource`。
+
+#### 2. `setUserNameSpace`：`ldc_w` 是假阳性
+
+```
+制品  ldc_w "nameSpace"
+本地  ldc   "nameSpace"
+```
+
+`ldc_w` 只是**常量池索引宽度**不同（编号 > 255 时用宽指令），语义完全一样。
+**统计器第四次假阳性**，`norm()` 已加：
+
+```python
+s = s.replace('ldc_w ', 'ldc ').replace('ldc2_w ', 'ldc2 ')
+```
+
+#### 3. `equal(String?, String?)`：写成单表达式
+
+试了三种：
+
+| 写法 | 结果 |
+| --- | --- |
+| `if (a == b) return true; if (a.isNullOrEmpty() && b.isNullOrEmpty()) return true; return false` | 154/156，2 块 |
+| `if (a != b) return a.isNullOrEmpty() && b.isNullOrEmpty(); return true` | 154/156，只差末尾 `iconst_1/ireturn` |
+| `return a == b \|\| (a.isNullOrEmpty() && b.isNullOrEmpty())` | **154/154，归零** |
+
+**判据：方法末尾多出 `iconst_1 / ireturn`，说明本地写成了「末尾 return true」；
+制品是单表达式，只有一个 return 点。**
+
+#### 结果
+
+`BookSource` 类 **全清**（`equal` 154/154、`getSource` 3/3、`setUserNameSpace` 7/7）。

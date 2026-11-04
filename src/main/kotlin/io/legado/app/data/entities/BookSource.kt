@@ -60,9 +60,6 @@ data class BookSource(
     @Transient
     private var debugLog: DebugLog? = null
 
-    override val source: BaseSource
-        get() = this
-
     override val key: String
         get() = bookSourceUrl
 
@@ -119,13 +116,7 @@ data class BookSource(
     }
 
     private fun equal(a: String?, b: String?): Boolean {
-        if (a == b) {
-            return true
-        }
-        if (a.isNullOrEmpty() && b.isNullOrEmpty()) {
-            return true
-        }
-        return false
+        return a == b || (a.isNullOrEmpty() && b.isNullOrEmpty())
     }
 
     override fun equals(other: Any?): Boolean {

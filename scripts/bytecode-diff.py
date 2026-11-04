@@ -64,6 +64,8 @@ def norm(seq):
     out = []
     for s in seq:
         s = re.sub(r'\s+', ' ', s).strip()
+        # ldc_w / ldc2_w 只是常量池索引宽度不同（编号 > 255 时用宽指令），不是语义差异
+        s = s.replace('ldc_w ', 'ldc ').replace('ldc2_w ', 'ldc2 ')
         s = re.sub(r'#\d+', '#', s)
         # 跳转目标偏移：ifle 49 vs ifle 48 只是字节偏移不同，指令序列相同不代表语义不同
         s = re.sub(r'\b(if\w+|goto|jsr|ret)\s+\d+\b', r'\1', s)
