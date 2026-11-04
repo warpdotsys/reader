@@ -2390,3 +2390,33 @@ CFR 里 **105 次**。但这不是「补调用」就行——`$lambda-10` 这个
 成本远高于收益，且 BookController 已经证明这条路在当前工具链下走不通。
 
 **全工程可交付状态**：`800 + 11 = 811` 个类，缺 141。
+
+### 3a-51 【负结果】`invokeSuspend$$forInline` 是 Kotlin 1.5.21 特有，无法消除
+
+`Coroutine$executeBlock$2` / `$2$1` 的 ABI 差异只有一条：
+我们多 `public final Object invokeSuspend$$forInline(Object)`，制品没有。
+
+**试过两种写法，都不行**：
+
+1. **去掉 `crossinline`** → 编译直接拒绝：
+   `Can't inline 'block' here: it may contain non-local returns`
+   （`block` 在 `withContext` / `withTimeout` 的 lambda 里调用，必须 `crossinline`）
+2. **`block.invoke(this)` → `block()`** → `$$forInline` 仍在。
+   而且这个改动方向是**错的**：CFR 578 / 614 行明确是
+   `this.$block.invoke($this$withTimeout, this)` —— 制品源码就是 `block.invoke(this)`。
+
+**结论**：`invokeSuspend$$forInline` 是 **Kotlin 1.5.21 为 inline 函数里的 suspend lambda
+额外生成的**，1.5.1（制品用的版本）不生成。编译器版本差异，**源码层面无解**。
+
+**影响**：`Coroutine$executeBlock$2` / `$2$1` 两个类永远留在 ABI 不一致清单里。
+它们都是 `private inline suspend fun` 的合成 lambda，不暴露给外部，无 API 影响。
+
+#### 同类的判断法则
+
+ABI 差异里出现带 `$$` 的成员（`$$forInline`、`$$inlined$`、`access$`），先分三类：
+
+| 形态 | 性质 | 处理 |
+|---|---|---|
+| `access$getXxx$cp` 顺序不同 | 成员顺序 | 语义无关，可忽略 |
+| `$$inlined$xxx$1` 类名 | 内联展开形态 | 追 lambda 序列，成本极高 |
+| `invokeSuspend$$forInline` | **编译器版本产物** | **无解，登记即可** |
