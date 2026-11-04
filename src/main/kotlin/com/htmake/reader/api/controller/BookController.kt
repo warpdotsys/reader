@@ -2596,6 +2596,11 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                 }
                 if (content.isNotEmpty()) {
                     BookHelp.saveText(book, chapter, content)
+                    BookHelp.saveImages(
+                        this,
+                        BookSource.fromJson(bookSource).getOrNull() ?: BookSource(),
+                        book, chapter, content
+                    )
                 }
             }
         }
