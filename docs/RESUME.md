@@ -1,4 +1,4 @@
-# 续接说明（2026-11-06 07:15）
+# 续接说明（2026-11-06 09:05）
 
 ## 用户目标（明确、无妥协）
 
@@ -10,7 +10,7 @@ ABI 一致性已经不重要，类名和字节码三重对齐才是目标。
 ```
 制品应用类   : 936
 已适配       : 930  (99.36%)   还缺 6 / 多出 3
-字节码完全一致: 752 / 930 (80.9%)   有差异 178 个类
+字节码完全一致: 753 / 930 (81.0%)   有差异 177 个类
 HEAD         : 见 git log（本轮最后提交在 3a-97 之后）
 D 盘可用     : 92G（清掉 handwriting-yolo-cache/uv 的 90G uv 缓存后）
 ```
@@ -79,7 +79,11 @@ powershell -NoProfile -Command "& { $env:JAVA_HOME='D:\Tools\java\jdk-11.0.8+10'
     `!!` 不产生 `ifnull`（走 `dup` + `checkNotNull` + NPE）。
 16. **`dup_x1` 紧跟 `putfield` = 赋值表达式**（`a.field = value` 的结果被继续使用）。
     如果 `putfield` 后又 `aload/getfield` 读同一字段，说明该合并成赋值表达式。
-17. **`const val TAG` 不发 static 字段**：`const` 是编译期常量会内联，
+17. **CFR 生成的「未使用局部变量」是 `dup` 的元凶**：
+    `boolean bl = ignoreSpace = mb == x;`（`bl` 后面从不用）会多一条 `dup`。
+    制品没有 `dup` → 原始源码就是单赋值 `ignoreSpace = mb == x;`。
+    **看到未使用变量 + `dup`，优先怀疑 CFR 产物。**
+18. **`const val TAG` 不发 static 字段**：`const` 是编译期常量会内联，
     制品有 `<clinit>` 里的 `putstatic TAG` 就说明是普通 `val`。
     **`javap -p` 只比方法名集合，查不出缺字段。**
 14. **`while (i < n)` vs `for (i in 0 until n)`**：前者 `goto` 回循环头，
