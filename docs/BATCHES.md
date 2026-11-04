@@ -3508,3 +3508,61 @@ fun removeLoginInfo() {
 制品在「构造一个对象、保存到局部变量、再使用」这种序列里，会老老实实
 `astore_n` / `aload_n`；我们写的链式表达式会被编译成 `dup` 复用栈顶。
 这不是语义差异，纯粹是**变量声明形状**。要贴近制品，就得把中间结果显式命名。
+
+### 3a-77 第三版基线（77.4%）+ `saveShelfBookLatestChapter` 参数名修复
+
+#### 统计器第三次修正：过滤 `nop`
+
+`nop` 是编译器为行号/调试插入的占位，两个编译器插入点不同。`norm()` 过滤掉纯 `nop` 行后：
+
+| 版本 | 修正内容 | 完全一致 |
+| --- | --- | --- |
+| v1 | 无（原始） | 672 / 930 = 72.3% |
+| v2 | `#\d+` 常量池编号归一化 | 718 / 930 = 77.2% |
+| v3 | 再过滤 `nop` | **720 / 930 = 77.4%** |
+
+**教训：统计器本身的准确性比修代码更关键。** v1 到 v3 修的都是统计口径，代码一行没动，
+数字却差了 48 个类。
+
+#### delta 分布（v3，210 个有差异的类）
+
+```
+   1-10  :  17 个
+  11-30  :  23 个
+  31-100 :  69 个
+ 101-300 :  48 个
+ 301-1000:  35 个
+   >1000 :  18 个
+```
+
+#### 修好的：`saveShelfBookLatestChapter` 参数名（delta 5 → 0）
+
+制品 lambda 捕获的字段名是 `$bookChapterList`，我们的是 `$chapterList`。
+
+**这是熟面孔**：3a-63 已经记过「参数名进 lambda 捕获字段，也算 ABI，描述符相同时
+ABI 闸门查不出来」。这次是字节码层面直接暴露（`getfield $bookChapterList` vs
+`getfield $chapterList`），比 3a-63 那次好查。
+
+改法：方法参数 `chapterList` → `bookChapterList`，方法体内 6 处引用同步改。
+
+#### delta ≤10 那 17 个类的共性（暂未动）
+
+| 类型 | 例子 | 差异形态 |
+| --- | --- | --- |
+| `if/else` 结构 | `MediaTypes.determineMediaType`、`Metadata.getFirstTitle`、`Identifier.getBookIdIdentifier`、`Date$Event.fromValue` | 制品 `ifeq`，我们 `ifne`（早退 vs 正向） |
+| 控制流偏移 | `IntTypeAdapter`、`LongTypeAdapter`、`IntJsonDeserializer` | 都是 `ifeq`，但跳转目标差 4 字节 |
+| 局部变量槽位顺序 | `TTSService.getOrCreateWs`、`ReaderApplication$Companion.getVertx` | `astore_1`/`astore_2` 互换 |
+| `dup` vs `astore`+`aload` | `CharsetRecog_UTF_16_BE/LE`、`EpubReader`、`ResourceUtil` | 同 3a-76 第三条 |
+| 集合类型声明 | `UmdChapters.writeChaptersChunks` | `invokeinterface List.add` vs `invokevirtual ArrayList.add` |
+
+**这类差异每试一次都要全量编译 1.5 分钟，17 个逐个试的期望收益不抵成本。**
+先把 delta 中断层（11-100）里成片同源的先解决，回过来再扫这批。
+
+#### 另记：`BookController$saveShelfBookLatestChapter$2` 的捕获字段
+
+```
+制品: getfield $bookChapterList:Ljava/util/List;
+本地: getfield $chapterList:Ljava/util/List;
+```
+
+**参数名不仅进 ABI，还直接出现在字节码指令里**，是比 ABI 描述符更强的证据。

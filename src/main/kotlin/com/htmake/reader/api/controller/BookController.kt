@@ -2126,7 +2126,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
 
     suspend fun saveShelfBookLatestChapter(
         book: Book,
-        chapterList: List<BookChapter>,
+        bookChapterList: List<BookChapter>,
         userNameSpace: String,
         mutex: Mutex? = null
     ) {
@@ -2135,16 +2135,16 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         }
         try {
             editShelfBook(book, userNameSpace) { existBook ->
-                if (chapterList.size > 0) {
-                    val latestChapter = chapterList.last()
+                if (bookChapterList.size > 0) {
+                    val latestChapter = bookChapterList.last()
                     existBook.latestChapterTitle = latestChapter.title
                 }
-                if (chapterList.size - existBook.totalChapterNum > 0) {
-                    existBook.lastCheckCount = chapterList.size - existBook.totalChapterNum
+                if (bookChapterList.size - existBook.totalChapterNum > 0) {
+                    existBook.lastCheckCount = bookChapterList.size - existBook.totalChapterNum
                     existBook.lastCheckTime = System.currentTimeMillis()
                 }
                 existBook.lastCheckError = null
-                existBook.totalChapterNum = chapterList.size
+                existBook.totalChapterNum = bookChapterList.size
                 book.latestChapterTitle = existBook.latestChapterTitle
                 book.lastCheckCount = existBook.lastCheckCount
                 book.lastCheckTime = existBook.lastCheckTime

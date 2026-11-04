@@ -65,6 +65,9 @@ def norm(seq):
     for s in seq:
         s = re.sub(r'\s+', ' ', s).strip()
         s = re.sub(r'#\d+', '#', s)
+        # nop 是编译器为行号/调试插入的占位，两个编译器的插入点不同，不代表语义
+        if s == 'nop':
+            continue
         out.append(s)
     return out
 
