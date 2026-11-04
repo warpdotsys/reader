@@ -2532,3 +2532,44 @@ saveUserStorage(
    1.5.21 直接用参数槽位。表现为 `astore 9; aload 9` 的冗余存取。
 
 **这三类覆盖了剩余 198 个差异的绝大多数。**
+
+### 3a-55 【负结果】换 Kotlin 1.5.10 编译器：它自己崩在 Book 上
+
+3a-52 判断剩余 198 个字节码差异和 10 个 ABI 不一致都是编译器版本差异，所以试了换编译器。
+**结论：换不了。**
+
+#### 先纠正一个常见误解
+
+制品 `@Metadata(mv = {1, 5, 1})` 里的 `1` 是 **metadata 版本**，不是编译器版本。
+整个 Kotlin 1.5.x 线的 `mv` 都是 `{1, 5, 1}`，所以制品可能是 1.5.0 / 1.5.10 / 1.5.20 / 1.5.21
+中的任何一个——**1.5.1 这个编译器版本根本不存在**（Kotlin 跳过了）。
+
+#### 试 1.5.10 的结果
+
+改 `build.gradle.kts` 的 Kotlin 插件与四个 stdlib 坐标到 1.5.10，全量重编：
+
+```
+e: org.jetbrains.kotlin.backend.common.BackendException:
+   Backend Internal error: Exception during code generation
+Caused by: java.lang.IllegalStateException: Function has no body:
+   FUN name:<get-_userNameSpace> visibility:private modality:FINAL
+     ($this:io.legado.app.data.entities.Book) returnType:kotlin.String
+```
+
+崩的是 `Book.kt:219`：
+
+```kotlin
+@Transient
+private var _userNameSpace: String = ""
+```
+
+`@Transient` 加在 private 属性上，1.5.10 的 JVM codegen 生成不出 getter 的 body。
+**这是 1.5.10 自己的 bug**，不是我们的源码问题（1.5.21 编同一份代码毫无问题）。
+
+要绕过就得改 `Book.kt`（去掉 `@Transient` 或换写法），但那会破坏已通过的 ABI 验证
+（`Book` 本来就在 10 个不一致清单里，动它只会更糟）。
+
+#### 结论
+
+**换编译器这条路堵死了。** 已回滚到 1.5.21，`BUILD SUCCESSFUL`，
+ABI 保持 811 / 785 / 10 / 16。备份分支 `backup/before-kotlin-switch`（指向 `b96654c`）保留。
