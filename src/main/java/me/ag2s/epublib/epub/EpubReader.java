@@ -102,8 +102,8 @@ public class EpubReader {
     }
 
     private String getPackageResourceHref(Resources resources) {
-        String defaultResult;
-        String result2 = defaultResult = "OEBPS/content.opf";
+        String defaultResult = "OEBPS/content.opf";
+        String result2 = defaultResult;
         Resource containerResource = resources.remove("META-INF/container.xml");
         if (containerResource == null) {
             return result2;

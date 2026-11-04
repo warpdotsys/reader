@@ -4219,3 +4219,66 @@ v4: 723/930 = 77.7%（跳转归一化 + 2 个真修）
 删掉后可用空间 0 → **92G**。
 
 **这条要记住：`handwriting-yolo-cache/uv` 是 uv 缓存，可随时删，不要把它当成项目数据。**
+
+### 3a-89 两个 Java 类全清：EpubReader、ResourceUtil
+
+#### 1. `EpubReader.getPackageResourceHref`（delta 2 → 0）
+
+```java
+// 改前（CFR 反编译产物，链式赋值）
+String defaultResult;
+String result2 = defaultResult = "OEBPS/content.opf";
+```
+
+字节码：`ldc / dup / astore_2` —— **`dup` 复用栈顶**。
+
+```java
+// 改后（两行独立赋值）
+String defaultResult = "OEBPS/content.opf";
+String result2 = defaultResult;
+```
+
+**第一版改错了顺序**：写成 `result2` 先、`defaultResult` 后，字节码变成
+`ldc / astore_2 / aload_2 / astore_3`，结果还是差 6 条——**槽位对调了**：
+
+```
+制品：aload_3(10) / astore_3(31) / aload_3(36) / aload_2(39)
+本地：aload_2(10) / astore_2(31) / aload_2(36) / aload_3(39)
+```
+
+把 `defaultResult` 放前面才对上。**局部变量槽位号是 ABI 的一部分，声明顺序决定槽位。**
+
+#### 2. `ResourceUtil.createChapterResource`（delta 2 → 0）
+
+```java
+// 改前：赋值表达式嵌在 if 条件里
+} else if ((title = title.replaceFirst("\\s+", "</span><br />")).contains("</span>")) {
+```
+
+字节码：`astore_0`（制品）/ `dup`（本地）——链式赋值让编译器复用栈顶。
+
+```java
+// 改后：拆成独立语句
+} else {
+    title = title.replaceFirst("\\s+", "</span><br />");
+    if (title.contains("</span>")) {
+        title = "<span class=\"chapter-sequence-number\">" + title;
+    }
+}
+```
+
+**判据：`(x = expr).method()` 这种赋值表达式会编成 `dup`，
+制品一律是「先赋值语句，再用变量」的形式。**
+
+#### 结果
+
+```
+EpubReader   : 15/15 方法一致
+ResourceUtil : 10/10 方法一致
+```
+
+#### 附带教训：我的临时对比脚本漏了 java 目录
+
+查 `EpubReader` 时全显示本地「<缺>」，因为脚本只查了 `build/classes/kotlin/main`，
+而这几个类是 `src/main/java` 编到 `build/classes/java/main`。
+**`bytecode-diff.py` 支持多个 `--local-dir` 是有原因的，临时脚本也要传两个。**

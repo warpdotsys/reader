@@ -25,8 +25,11 @@ public class ResourceUtil {
     public static Resource createChapterResource(String title, String txt, String model, String href) {
         if (title.contains("\n")) {
             title = "<span class=\"chapter-sequence-number\">" + title.replaceFirst("\\s*\\n\\s*", "</span><br />");
-        } else if ((title = title.replaceFirst("\\s+", "</span><br />")).contains("</span>")) {
-            title = "<span class=\"chapter-sequence-number\">" + title;
+        } else {
+            title = title.replaceFirst("\\s+", "</span><br />");
+            if (title.contains("</span>")) {
+                title = "<span class=\"chapter-sequence-number\">" + title;
+            }
         }
         String html = model.replace("{title}", title).replace("{content}", StringUtil.formatHtml(txt));
         return new Resource(html.getBytes(), href);
