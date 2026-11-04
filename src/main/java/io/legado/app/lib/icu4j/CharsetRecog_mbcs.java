@@ -74,8 +74,7 @@ extends CharsetRecognizer {
         @Override
         boolean nextChar(iteratedChar it, CharsetDetector det) {
             it.error = false;
-            it.charValue = it.nextByte(det);
-            int firstByte = it.charValue;
+            int firstByte = it.charValue = it.nextByte(det);
             if (firstByte < 0) {
                 it.done = true;
             } else if (firstByte > 128) {
@@ -119,8 +118,7 @@ extends CharsetRecognizer {
         @Override
         boolean nextChar(iteratedChar it, CharsetDetector det) {
             it.error = false;
-            it.charValue = it.nextByte(det);
-            int firstByte = it.charValue;
+            int firstByte = it.charValue = it.nextByte(det);
             if (firstByte < 0) {
                 it.done = true;
             } else if (firstByte > 141) {
@@ -204,8 +202,7 @@ extends CharsetRecognizer {
         @Override
         boolean nextChar(iteratedChar it, CharsetDetector det) {
             it.error = false;
-            it.charValue = it.nextByte(det);
-            int firstByte = it.charValue;
+            int firstByte = it.charValue = it.nextByte(det);
             if (firstByte < 0) {
                 return false;
             }
@@ -250,8 +247,7 @@ extends CharsetRecognizer {
         @Override
         boolean nextChar(iteratedChar it, CharsetDetector det) {
             it.error = false;
-            it.charValue = it.nextByte(det);
-            int firstByte = it.charValue;
+            int firstByte = it.charValue = it.nextByte(det);
             if (firstByte < 0) {
                 return false;
             }

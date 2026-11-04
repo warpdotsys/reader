@@ -134,7 +134,8 @@ extends CharsetRecognizer {
                     confidence = 100;
                     break;
                 }
-                if ((confidence = CharsetRecog_UTF_16_LE.adjustConfidence(codeUnit, confidence)) == 0 || confidence == 100) break;
+                confidence = CharsetRecog_UTF_16_LE.adjustConfidence(codeUnit, confidence);
+                if (confidence == 0 || confidence == 100) break;
             }
             if (bytesToCheck < 4 && confidence < 100) {
                 confidence = 0;
@@ -167,7 +168,8 @@ extends CharsetRecognizer {
                     confidence = 100;
                     break;
                 }
-                if ((confidence = CharsetRecog_UTF_16_BE.adjustConfidence(codeUnit, confidence)) == 0 || confidence == 100) break;
+                confidence = CharsetRecog_UTF_16_BE.adjustConfidence(codeUnit, confidence);
+                if (confidence == 0 || confidence == 100) break;
             }
             if (bytesToCheck < 4 && confidence < 100) {
                 confidence = 0;

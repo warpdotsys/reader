@@ -4885,3 +4885,50 @@ if (cFile == null || cFile?.book?.bookUrl != book.bookUrl) {
 `access$getXxx$cp` 桥本身不是问题——**四个类本来都有，我们的源码也是 companion 里访问
 private 属性，桥能正常生成**。43-且 43-之前的记录里把它当成「SAM/indy 无解」是误判，
 真正缺的只是那 2 条 `ifnull`。
+
+### 3a-101 四个 CharsetRecog 类全清：赋值表达式 vs 先赋值再读
+
+#### 修好的 4 个
+
+| 类 | 差异 |
+| --- | --- |
+| `CharsetRecog_UTF_16_BE` | `istore_3/iload_3` vs `dup/istore_3` |
+| `CharsetRecog_UTF_16_LE` | 同 |
+| `CharsetRecog_mbcs$CharsetRecog_big5` | `dup_x1` 在 `putfield` 前 |
+| `CharsetRecog_mbcs$CharsetRecog_sjis` | 同 |
+
+#### 两种改法
+
+**1. `(confidence = adjustConfidence(...)) == 0` 拆成两条语句**
+
+```java
+// 改前
+if ((confidence = checkUnit(codeUnit, confidence)) == 0 || confidence == 100) break;
+// 改后
+confidence = checkUnit(codeUnit, confidence);
+if (confidence == 0 || confidence == 100) break;
+```
+
+字节码：赋值表达式会 `dup` 把值留在栈上（同时用于比较）；
+拆开后是 `istore_3 / iload_3`（先存再取）。
+
+**2. `it.charValue = nextByte(det); int firstByte = it.charValue;`
+   → `int firstByte = it.charValue = nextByte(det);`**
+
+字节码：后者 `dup_x1` + `putfield` + `istore_3`（赋值结果留在栈上给 `firstByte`），
+前者 `putfield` 后要 `aload_1 / getfield` 重新读。
+
+**一次改了 4 处（`CharsetRecog_mbcs.java` 的 4 个 `nextChar`）。**
+
+#### 判据补充
+
+**`dup_x1` 紧跟 `putfield` = `a.field = value` 作为表达式使用**（赋值结果被用于别处）。
+如果看到 `putfield` 后面又 `aload / getfield` 读同一个字段，说明源码是「先赋值，再读字段」，
+应该合并成赋值表达式。
+
+#### 未修
+
+- `CharsetRecog_euc.nextChar`（83/82，规模 2）：`if_icmpgt + goto` vs `if_icmple`，条件取反
+- `CharsetRecog_gb_18030.nextChar`（100/98，规模 12）：同上 + 两处赋值表达式，结构较绕
+
+投入产出比低，先留着。
