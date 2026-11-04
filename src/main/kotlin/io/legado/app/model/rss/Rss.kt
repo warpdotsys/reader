@@ -27,9 +27,9 @@ object Rss {
             headerMapF = rssSource.getHeaderMap(),
             debugLog = debugLog
         )
-        val res = analyzeUrl.getStrResponseAwait()
+        val body = analyzeUrl.getStrResponseAwait().body
         return RssParserByRule.parseXML(
-            sortName, sortUrl, res.body,
+            sortName, sortUrl, body,
             rssSource, ruleData, debugLog
         )
     }
@@ -48,9 +48,9 @@ object Rss {
             headerMapF = rssSource.getHeaderMap(),
             debugLog = debugLog
         )
-        val res = analyzeUrl.getStrResponseAwait()
+        val body = analyzeUrl.getStrResponseAwait().body
         val analyzeRule = AnalyzeRule(rssArticle, rssSource, debugLog)
-        analyzeRule.setContent(res.body).setBaseUrl(
+        analyzeRule.setContent(body).setBaseUrl(
             NetworkUtils.getAbsoluteURL(rssArticle.origin, rssArticle.link)
         )
         return analyzeRule.getString(ruleContent)

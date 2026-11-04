@@ -78,7 +78,11 @@ public class NCXDocumentV2 {
     static TOCReference readTOCReference(Element navpointElement, EpubBook book) {
         String label = NCXDocumentV2.readNavLabel(navpointElement);
         String tocResourceRoot = StringUtil.substringBeforeLast(book.getSpine().getTocResource().getHref(), '/');
-        tocResourceRoot = tocResourceRoot.length() == book.getSpine().getTocResource().getHref().length() ? "" : tocResourceRoot + "/";
+        if (tocResourceRoot.length() == book.getSpine().getTocResource().getHref().length()) {
+            tocResourceRoot = "";
+        } else {
+            tocResourceRoot = tocResourceRoot + "/";
+        }
         String reference = StringUtil.collapsePathDots(tocResourceRoot + NCXDocumentV2.readNavReference(navpointElement));
         String href = StringUtil.substringBefore(reference, '#');
         String fragmentId = StringUtil.substringAfter(reference, '#');

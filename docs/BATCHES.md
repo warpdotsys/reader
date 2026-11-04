@@ -4776,3 +4776,65 @@ javap 拿不到本地类文件。
 3a-91 写的「`continue` 后跟 return/break 的才该改，跟赋值的不该改」**是错的**。
 `CharsetRecog_8859_1`（continue 后跟赋值）改了也能归零（3a-95）。
 真正的判据就是字节码。
+
+### 3a-99 Rss 全清 + NCXDocumentV2.readTOCReference 归零
+
+#### 1. `Rss` 全清（`getArticles` + `getContent`）
+
+一开始的差异：
+
+```
+制品 121 invokevirtual StrResponse.getBody
+制品 122 astore 9                    ← 先取 body，再存
+本地 121 astore 9                    ← 先存 res
+本地 126 invokevirtual StrResponse.getBody   ← 用时才取
+```
+
+试错过程：
+
+| 改法 | getArticles | getContent |
+| --- | --- | --- |
+| 原样（`res.body`） | 规模 2 | 规模 2 |
+| 加 `val body = res.body`（保留 res） | **规模 37（变差）** | **规模 38（变差）** |
+| `val body = analyzeUrl.getStrResponseAwait().body` | **0** | **0** |
+
+**关键**：加 `body` 变量的同时必须**去掉 `res` 变量**。
+两个都留着会多占一个局部变量槽，后面全错位（`astore 11` vs `astore 12`）。
+
+```kotlin
+// 错：两个变量，多占一个槽
+val res = analyzeUrl.getStrResponseAwait()
+val body = res.body
+// 对：链式调用只存最终结果
+val body = analyzeUrl.getStrResponseAwait().body
+```
+
+**新判据：出现「本地槽位号整体比制品大 N」时，先找「多出来的局部变量」，
+而不是去调后面的指令。** 把链式调用的中间对象省掉是最常见的减法。
+
+#### 2. `NCXDocumentV2.readTOCReference` 归零：三元 → if/else 语句
+
+```java
+// 改前（三元表达式，结果压栈）
+tocResourceRoot = cond ? "" : tocResourceRoot + "/";
+
+// 改后（if/else 语句，每个分支 astore_3）
+if (cond) {
+    tocResourceRoot = "";
+} else {
+    tocResourceRoot = tocResourceRoot + "/";
+}
+```
+
+字节码证据：制品在 `ldc ""` 后面多一条 `astore_3`（赋值给局部变量），
+三元表达式不会产生这次赋值。
+
+#### 3. `Rss.getContent` 也有同一个 `getBody()` 问题
+
+一开始只改了 `getArticles`，diff 跑完发现 `getContent` 也差（154/154 规模 2）。
+**一个类里同模式的代码往往不止一处，改完一个方法要全类复查。**
+
+#### 未修（已回滚）
+
+`TextFile$Companion.getContent` 试过把 `Regex("^[\\n\\s]+")` 的字符串先存变量，
+delta 21 → 26 变差，已回滚。制品是把字符串存到槽位 6，我们的中间变量落在别的位置。
