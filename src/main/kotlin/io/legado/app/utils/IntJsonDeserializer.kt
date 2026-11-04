@@ -13,10 +13,11 @@ class IntJsonDeserializer : JsonDeserializer<Int?> {
         typeOfT: Type?,
         context: JsonDeserializationContext?
     ): Int? {
-        if (json.isJsonPrimitive) {
+        return if (json.isJsonPrimitive) {
             val prim = json.asJsonPrimitive
-            return if (prim.isNumber) prim.asNumber.toInt() else null
+            if (prim.isNumber) prim.asNumber.toInt() else null
+        } else {
+            null
         }
-        return null
     }
 }

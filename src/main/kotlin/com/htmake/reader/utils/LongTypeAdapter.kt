@@ -24,10 +24,11 @@ class LongTypeAdapter : JsonSerializer<Long>, JsonDeserializer<Long> {
         typeOfT: Type?,
         context: JsonDeserializationContext?
     ): Long? {
-        if (!json.isJsonPrimitive) {
-            return null
+        return if (json.isJsonPrimitive) {
+            val prim = json.asJsonPrimitive
+            if (prim.isNumber) prim.asNumber.toLong() else null
+        } else {
+            null
         }
-        val prim = json.asJsonPrimitive
-        return if (prim.isNumber) prim.asNumber.toLong() else null
     }
 }
