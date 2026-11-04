@@ -3300,3 +3300,28 @@ private suspend fun executeBlock(
 #### 净结果
 
 多出的类从 5 降到 3，缺的仍是 6。本地 933 / 制品 936。
+
+### 3a-71 负结果：隐式 SAM 在 indy 模式下同样不生成 `sam$` 类
+
+`ttsByTextToSpeechCn` 里制品有 `BookControllerKt$sam$java_util_function_BiConsumer$0`，
+我们没有。试了两种写法：
+
+| 写法 | 结果 |
+| --- | --- |
+| `map.forEach(BiConsumer { key, value -> ... })`（显式 SAM 构造） | 生成 `invokedynamic`，无类 |
+| `map.forEach { key, value -> ... }`（隐式 SAM） | 同样 `invokedynamic`，无类 |
+
+**`-Xsam-conversions=indy` 对所有 SAM 一视同仁**，显式和隐式都走 indy。
+只有 `-Xsam-conversions=class` 才可能生成 `sam$`，但全局改 class 会多出 33 个类
+（3a-67 实测），得不偿失。
+
+**结论：`sam$BiConsumer$0` 无法在不牺牲其他 33 个类的前提下复现。**
+已回滚为显式写法（语义等价，只是编译产物不同）。
+
+至此 6 个缺失类全部经过实测确认属于编译器版本产物：
+
+- `$$inlined$CoroutineExceptionHandler$1` → inline lambda 编号策略（3a-69，与 `$2`/`$3` 互斥）
+- `$cacheBookSSE$4` → suspend lambda 编译策略（3a-68）
+- `lambda-16` → 前面某方法多 2 个 inline lambda（文件级计数）
+- `$ttsByTextToSpeechCn$2` + `sam$BiConsumer$0` → SAM 转换策略（本条）
+- `lambda-4$lambda-2` → 外层 lambda 需为非 inline（成本高，未做）
