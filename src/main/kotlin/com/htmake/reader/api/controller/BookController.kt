@@ -2565,11 +2565,13 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             return returnData.setErrorMsg("请输入书籍链接")
         }
         val userNameSpace = getUserNameSpace(context)
-        launch(
-            MDCContext() + Dispatchers.IO + CoroutineExceptionHandler { _, ex ->
+        val exceptionHandler = object : CoroutineExceptionHandler {
+            override val key: CoroutineContext.Key<*> get() = CoroutineExceptionHandler
+            override fun handleException(context: CoroutineContext, ex: Throwable) {
                 logger.info("cacheBookOnServer error: {}", ex.message)
             }
-        ) {
+        }
+        launch(MDCContext() + Dispatchers.IO + exceptionHandler) {
             cacheBookOnServer(bookUrlList, userNameSpace)
         }
         return returnData.setData("")

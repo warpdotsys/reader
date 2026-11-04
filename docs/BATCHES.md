@@ -3197,3 +3197,48 @@ indy 数只数真正生成 lambda 对象的那些**。这两个指标必须分�
 
 **没有继续追这个方向** —— 需要反汇编 `limitConcurrent` 的 `invokeSuspend` 状态机才能确认，
 而每轮全量编译 1.5 分钟，收益不足以覆盖。
+
+### 3a-69 `cacheBookOnServer` 的 `$2`/`$3` 修好，代价是 handler 类名
+
+#### 制品的真实结构
+
+`javap` 逐个看四个类：
+
+| 类 | 类型 | 内容 |
+| --- | --- | --- |
+| `$1` | `ContinuationImpl` | 外层 suspend 方法的续体 |
+| `$2` | **`SuspendLambda`**（`Function2<CoroutineScope, Continuation, Object>`） | `launch { }` 的 lambda，字段 `this$0`/`$bookUrlList`/`$userNameSpace` |
+| `$3` | `ContinuationImpl` | `$2` 的续体（9 个 `L$` 槽位） |
+| `$$inlined$CoroutineExceptionHandler$1` | `CoroutineExceptionHandler` | handler |
+
+#### 两种写法的对照实验
+
+**A. inline lambda**（`CoroutineExceptionHandler { _, ex -> ... }`）
+
+```
+$1, $$inlined$CoroutineExceptionHandler$1, $3, $4
+```
+
+handler 类名对了，但**它占掉了 `$2` 这个编号**，launch 被顶到 `$3`、续体顶到 `$4`。
+
+**B. 匿名 object**（`object : CoroutineExceptionHandler { ... }`）
+
+```
+$1, $2, $3, $exceptionHandler$1
+```
+
+编号全对（`$2` 是 launch、`$3` 是续体），但 handler 类名变成了变量名派生的 `$exceptionHandler$1`。
+
+#### 结论：两个编号体系不可兼得
+
+**Kotlin 1.5.21 的 inline lambda 占 `$N` 编号**（即使展开成 `$$inlined$X$N` 也照样占用），
+**1.5.1 不占**。所以：
+
+- 想拿 `$$inlined$CoroutineExceptionHandler$1` 这个类名 → 必须牺牲 `$2` 和 `$3`
+- 想拿 `$2` 和 `$3` → 必须牺牲 handler 的类名
+
+**选了 B**：`$2`/`$3` 是方法主干的类（`launch` 的 SuspendLambda 和它的续体，捕获变量最多），
+价值高于一个 handler 适配器。handler 用 `object` 写语义完全等价，只是类名不同。
+
+这是 3a-54「IR 优化」和 3a-68「suspend 参数溢出」之外的**第四类编译器版本差异**：
+**inline lambda 的编号占用策略**。
