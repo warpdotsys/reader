@@ -13,7 +13,7 @@ fun RoutingContext.success(any: Any?) {
     val toJson = when (any) {
         is JsonObject -> any.toString()
         else -> {
-            gson.toJson(any)
+            gson.toJson(any)!!
         }
     }
     response().putHeader("content-type", "application/json; charset=utf-8").end(toJson)
@@ -21,16 +21,15 @@ fun RoutingContext.success(any: Any?) {
 
 fun RoutingContext.error(throwable: Throwable) {
     val path = URLDecoder.decode(request().absoluteURI(), "UTF-8")
-    val errorJson = gson.toJson(
-        BasicError(
-            "Internal Server Error",
-            throwable.toString(),
-            throwable.message.toString(),
-            path,
-            500,
-            System.currentTimeMillis()
-        )
+    val basicError = BasicError(
+        "Internal Server Error",
+        throwable.toString(),
+        throwable.message.toString(),
+        path,
+        500,
+        System.currentTimeMillis()
     )
+    val errorJson = gson.toJson(basicError)
     logger.error("Internal Server Error", throwable)
     logger.error { errorJson }
     response().putHeader("content-type", "application/json; charset=utf-8").setStatusCode(500).end(errorJson)
