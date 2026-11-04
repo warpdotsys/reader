@@ -2707,3 +2707,57 @@ ABI: 935 比对 / 870 一致 / 43 不一致 / 22 制品无此类
 放开来按 CFR 写 51 个方法的真实实现后，类名一次到 106/114，覆盖率从 811 冲到 935。
 
 **「类名对不对」和「实现真不真」是同一件事，没有捷径。**
+
+### 3a-59 BookController 的 28 个方法还原 + 四条可复用规约
+
+（子代理 `deleg_1d96766a` 的产出，已独立验证：112 类 / 106 对上 / BUILD SUCCESSFUL）
+
+#### 四条规约（都是实测）
+
+1. **续体类只认真实 suspend 调用**。`checkAuth` + `editShelfBook` 这类调用就能补回 `$1`。
+   这是 3a-57 那条「类名和实现是同一件事」的具体机制。
+
+2. **lambda 类名取「赋值目标」**：
+   - 赋给具名 `val` → `$变量名$1`（`backupToMongodb$handler$1`、`saveBookConfig$newBook$1`）
+   - 直接用语句调用 → 位置序号 `$2`
+   - `saveBookGroupId` 就是靠去掉 `val newBook =`，才从 `$newBook$1` 变成制品要的 `$2`
+
+3. **`CoroutineExceptionHandler { }` 是 inline 函数**：声明成
+   ```kotlin
+   val exceptionHandler = CoroutineExceptionHandler { _, e -> ... }
+   launch(ctx + exceptionHandler) { ... }
+   ```
+   才会生成 `$$inlined$CoroutineExceptionHandler$1`，**且不占用 launch lambda 的序号**。
+   `textToSpeech` 这样修一次就对齐了。
+
+4. **两个语义修正**（旧实现是错的，已按 CFR 改回）：
+   - `getBookShelfBooks` 的布尔参数实际是 `refresh`（默认 false），内部当 `useCache`
+     传给 `getLocalChapterList`
+   - `saveBookConfig` 原版传的是 `pdfImageWidth`（不是 `ReadConfig`）
+
+#### 遗留：`saveBookToShelf` 仍是占位（已评估，暂不做）
+
+CFR 里它是一个 200+ 行的非 suspend 方法：
+
+```java
+public final Pair<Book, String> saveBookToShelf(Book _book, String userNameSpace, RoutingContext context)
+```
+
+逻辑分五段：
+1. 校验 `origin` / `bookUrl` 非空（两个早退，各带一条中文错误）
+2. 遍历书架按 `name` + `author` 找 `existIndex`（`continue`/`break` 的 do-while）
+3. 查用户书籍上限 `userInfo.book_limit`
+4. 本地书三路分支：
+   - `/assets/` 或 `assets/` 开头 → 拷贝到 `storage/data/{ns}/{name}_{author}/`，
+     再按 epub / cbz / pdf 分别调 `extractEpub` / `extractCbz` / `convertPdfToImage`
+   - 含 `localStore` → 只改 `bookUrl`
+   - webdav → 下载 + 解包
+5. 写入书架
+
+**为什么暂不做**：它是**非 suspend**，还原它**不会增加任何合成类、不改变任何 ABI**，
+纯粹是行为完整性。而它依赖 `extractEpub` / `extractCbz` / `convertPdfToImage` /
+`getUserStorage` / `saveUserStorage` 等一串方法，且本地书三路分支的边界条件容易写错。
+
+**结论**：这是**唯一剩下的行为占位**，记录在此。要补的话需要单独一轮，且必须对着 CFR
+逐行核对（尤其是 `Paths.get("storage", i)` 那个变参构造和 `copyRecursively` 的
+`overwrite=false` 语义）。
