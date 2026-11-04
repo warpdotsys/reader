@@ -4638,3 +4638,51 @@ for (Relator relator : Relator.values()) {
 3. **`continue` 判据再确认**：`continue` 后跟**赋值**的也可能该改
    （`CharsetRecog_8859_1` 的 `if (confidence <= best) continue; best = ...; lang = ...`）。
    3a-91 说「跟赋值的一般不该改」**不成立**——**最终只看字节码是 `ifeq` 还是 `ifne+goto`**。
+
+### 3a-96 DB.findBy 归零：`checkNotNullParameter` 缺失 = 类型参数缺非空上界
+
+#### 现象：制品检查了 `value`，我们没检查
+
+```
+制品                      本地
+0 aload_1                 0 aload_1
+1 ldc "field"             1 ldc "field"
+2 checkNotNullParameter   2 checkNotNullParameter
+3 aload_2                 3 aload_3        ← 跳过 value
+4 ldc "value"             4 ldc "clazz"
+5 checkNotNullParameter   5 checkNotNullParameter
+6 aload_3                 6 aconst_null
+7 ldc "clazz"             7 areturn
+8 checkNotNullParameter
+```
+
+制品对 `field`、`value`、`clazz` 三个参数都做了空检查，我们只检查了 `field` 和 `clazz`。
+
+#### 原因：`P` 的类型参数上界
+
+```kotlin
+// 改前：P 无上界 → 可空 → 编译器不加检查
+open fun <P> findBy(field: String, value: P, clazz: Class<T>): T? {
+// 改后：P : Any → 非空 → 加 checkNotNullParameter(value, "value")
+open fun <P : Any> findBy(field: String, value: P, clazz: Class<T>): T? {
+```
+
+三处都要改（基类 `DB` + 两个 override `JSONTable` / `SQLTable`）。
+
+改完 `DB` 类 **全清**。
+
+#### 新判据
+
+**`checkNotNullParameter` 的数量和位置对不上 → 先看类型参数上界和参数可空性。**
+- 无上界 `<P>` 或 `<P : Any?>` → 可空 → 不检查
+- `<P : Any>` → 非空 → 检查
+- `value: P` vs `value: P?` 同理
+
+**这是 API 契约差异，不只是字节码差异** —— 调用方传 `null` 时的行为完全不同：
+改前能传 null，改后编译期就拒绝。
+
+#### 附带发现
+
+`JSONTable` / `SQLTable` 的 `findBy` 还有 44/44 的差异（同长度不同内容），
+以及 `save`（106/119）、`saveMulti`（91/94）、`delete`（85/85）都有差异。
+这些是另一个问题，留待后续。

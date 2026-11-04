@@ -12,7 +12,7 @@ open class DB<T>(val userNameSpace: String, val name: String) {
         return JsonArray()
     }
 
-    open fun <P> findBy(field: String, value: P, clazz: Class<T>): T? {
+    open fun <P : Any> findBy(field: String, value: P, clazz: Class<T>): T? {
         return null
     }
 

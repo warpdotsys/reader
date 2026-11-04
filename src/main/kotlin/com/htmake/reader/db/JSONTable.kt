@@ -23,7 +23,7 @@ class JSONTable<T>(userNameSpace: String, name: String) : DB<T>(userNameSpace, n
         return dataList
     }
 
-    override fun <P> findBy(field: String, value: P, clazz: Class<T>): T? {
+    override fun <P : Any> findBy(field: String, value: P, clazz: Class<T>): T? {
         val dataList = readAll()
         var index = 0
         while (index < dataList.size()) {
