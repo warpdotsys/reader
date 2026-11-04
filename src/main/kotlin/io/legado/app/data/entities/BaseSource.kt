@@ -60,8 +60,10 @@ interface BaseSource : JsExtensions {
     val loginHeader: String?
         get() = CacheManager(userNameSpace).get("loginHeader_$key")
 
-    fun getLoginHeaderMap(): Map<String, String>? =
-        GSON.fromJsonObject<Map<String, String>>(loginHeader).getOrNull()
+    fun getLoginHeaderMap(): Map<String, String>? {
+        val header = loginHeader ?: return null
+        return GSON.fromJsonObject<Map<String, String>>(header).getOrNull()
+    }
 
     fun putLoginHeader(header: String) {
         CacheManager(userNameSpace).put("loginHeader_$key", header)
@@ -117,9 +119,9 @@ interface BaseSource : JsExtensions {
         }
 
     @Throws(Exception::class)
-    fun evalJS(jsStr: String, bindingsConfig: (SimpleBindings) -> Unit = {}): Any? {
+    fun evalJS(jsStr: String, bindingsConfig: SimpleBindings.() -> Unit = {}): Any? {
         val bindings = SimpleBindings()
-        bindingsConfig(bindings)
+        bindings.bindingsConfig()
         bindings["java"] = this
         bindings["source"] = this
         bindings["baseUrl"] = key

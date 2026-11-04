@@ -3400,3 +3400,72 @@ private suspend fun executeBlock(
 
 `queryTTF` 83、`getTxtInFolder` 77、`utf8ToGbk` 76、`getZipByteArrayContent` 72、
 `downloadFile` 59、`post` 57、`get` 55、`head` 55、`importScript` 49，另 3 个 delta < 45。
+
+### 3a-75 全量差异排行 + `BaseSource` 两处修复 + 一个潜在 bug
+
+#### 全量排行（scripts/bytecode-diff.py，930 个类）
+
+```
+比对 930 / 完全一致 672 (72.3%) / 有差异 258 / 无法比对 0
+```
+
+这个统计器的口径比 PowerShell 版严格（按方法名逐条排，PowerShell 版会把部分等价序列算作一致），
+所以 72.3% 与 76.8% 是两个不同的分母，不要混用。
+
+delta 最大的 10 个：
+
+| delta | 类 |
+| --- | --- |
+| 20564 | `BookController` |
+| 5072 | `BytesEncodingDetect` |
+| 3008 | `YueduApi` |
+| 2653 | `me.ag2s.epublib.domain.Relator` |
+| 2443 | `com.htmake.reader.utils.ExtKt` |
+| 2281 | `io.legado.app.utils.Base64$Decoder` |
+| 2229 | `UserController` |
+| 2135 | `AnalyzeUrl` |
+| 1596 | `AnalyzeRule` |
+| 1511 | `JsExtensions$DefaultImpls` |
+
+delta 最小的那批（1-7）里已经清掉 `BaseSource$evalJS$1`。
+
+#### 修的两处
+
+**`BaseSource$evalJS$1`（delta 1 → 0）**
+
+唯一差异是 `ldc` 的参数字符串：制品 `"$this$null"`，我们 `"it"`。
+
+说明制品的 `bindingsConfig` 是**带接收者的 lambda**：
+
+```kotlin
+fun evalJS(jsStr: String, bindingsConfig: SimpleBindings.() -> Unit = {}): Any?
+```
+
+JVM 层签名 `Function1<SimpleBindings, Unit>` **完全一样**（所以 ABI 闸门和签名比对都查不出来），
+只有 `checkNotNullParameter` 的消息字符串不同。调用点相应改成 `bindings.bindingsConfig()`。
+
+**判据：`ldc` 里出现 `$this$xxx` → 源码是带接收者的 lambda；出现 `it` → 普通单参 lambda。**
+
+**`getLoginHeaderMap`（delta 70 → 59，未归零）**
+
+制品先是 `val header = loginHeader ?: return null`，再解析；我们直接把可能为 null 的
+`loginHeader` 传给 `fromJsonObject`。改成先判空后 delta 从 70 降到 59，还有残余差异待查。
+
+#### 发现一处潜在 bug（未改，先记录）
+
+```kotlin
+val loginInfo: String?
+    get() {
+        val key = AppConst.userAgent.encodeToByteArray()          // 字节数组
+        val cache = CacheManager(userNameSpace).get("userInfo_$key") ?: return null
+        ...
+    }
+
+fun removeLoginInfo() {
+    CacheManager(userNameSpace).delete("userInfo_$key")           // 这里的 key 是 BaseSource.key 属性
+}
+```
+
+`loginInfo` 里的 `key` 是局部变量（`ByteArray`），`removeLoginInfo` 里的 `key` 是
+`BaseSource` 的 `key: String` 属性 —— **两者拼出来的存储键不同**，`removeLoginInfo` 删不掉
+`loginInfo` 写进去的那条。需要对照制品字节码确认原始写法，暂未改动。
