@@ -1806,24 +1806,38 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         if (!checkAuth(context)) {
             return returnData.setData("NEED_LOGIN").setErrorMsg("请登录后使用")
         }
-        val bookUrl = if (context.request().method() == HttpMethod.POST) {
-            context.bodyAsJson.getString("url") ?: ""
-        } else {
-            context.queryParam("url").firstOrNull() ?: ""
-        }
-        if (bookUrl.isEmpty()) {
-            return returnData.setErrorMsg("书籍链接不能为空")
-        }
+        val book = context.bodyAsJson.mapTo(Book::class.java)
         val userNameSpace = getUserNameSpace(context)
-        val bookList = getBookShelfBooks(false, userNameSpace).toMutableList()
-        val book = bookList.firstOrNull { it.bookUrl == bookUrl }
-        bookList.removeAll { it.bookUrl == bookUrl }
-        saveUserStorage(userNameSpace, "bookshelf", GSON.toJson(bookList))
-        if (book != null) {
-            LocalBook.deleteBook(book)
-            getChapterCacheDir(book, userNameSpace).deleteRecursively()
+        var bookshelf = asJsonArray(getUserStorage(userNameSpace, "bookshelf")) ?: JsonArray()
+        var existIndex = -1
+        var bookName = ""
+        var bookAuthor = ""
+        var bookUrl = ""
+        for (i in 0 until bookshelf.size()) {
+            bookName = bookshelf.getJsonObject(i).getString("name", "")
+            bookAuthor = bookshelf.getJsonObject(i).getString("author", "")
+            bookUrl = bookshelf.getJsonObject(i).getString("bookUrl", "")
+            if (bookUrl.equals(book.bookUrl)) {
+                existIndex = i
+                break
+            }
+            if (!bookName.equals(book.name) || !bookAuthor.equals(book.author)) continue
+            existIndex = i
+            break
         }
-        return returnData.setData("")
+        if (existIndex < 0) {
+            return returnData.setErrorMsg("书架书籍不存在")
+        }
+        val existBook = bookshelf.getJsonObject(existIndex)
+        bookshelf.remove(existIndex)
+        saveUserStorage(userNameSpace, "bookshelf", bookshelf)
+        val localBookPath = File(getWorkDir("storage", "data", userNameSpace, bookName + '_' + bookAuthor))
+        localBookPath.deleteRecursively()
+        val coverUrl = existBook.getString("coverUrl")
+        if (!coverUrl.isNullOrEmpty() && coverUrl.startsWith("/")) {
+            FileUtils.deleteFile(getWorkDir("storage" + existBook.getString("coverUrl")))
+        }
+        return returnData.setData("删除书籍成功")
     }
 
     suspend fun deleteBooks(context: RoutingContext): ReturnData {
@@ -1831,21 +1845,32 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         if (!checkAuth(context)) {
             return returnData.setData("NEED_LOGIN").setErrorMsg("请登录后使用")
         }
-        val bookUrlList = context.bodyAsJson.getJsonArray("bookUrlList")
-        if (bookUrlList == null || bookUrlList.size() == 0) {
-            return returnData.setErrorMsg("书籍链接不能为空")
-        }
+        val bookJsonArray = context.bodyAsJsonArray
         val userNameSpace = getUserNameSpace(context)
-        val bookList = getBookShelfBooks(false, userNameSpace).toMutableList()
-        bookUrlList.forEach { bookUrl ->
-            val book = bookList.firstOrNull { it.bookUrl == bookUrl }
-            bookList.removeAll { it.bookUrl == bookUrl }
-            if (book != null) {
-                LocalBook.deleteBook(book)
-                getChapterCacheDir(book, userNameSpace).deleteRecursively()
-            }
+        var bookshelf = asJsonArray(getUserStorage(userNameSpace, "bookshelf")) ?: JsonArray()
+        val infoMap = LinkedHashMap<String, Int>()
+        for (i in 0 until bookJsonArray.size()) {
+            val bookUrl = bookJsonArray.getJsonObject(i).getString("bookUrl", "")
+            infoMap[bookUrl] = i
+            infoMap[bookJsonArray.getJsonObject(i).getString("name", "") + '_' +
+                bookshelf.getJsonObject(i).getString("author", "")] = i
         }
-        saveUserStorage(userNameSpace, "bookshelf", GSON.toJson(bookList))
+        val iterator = bookshelf.iterator()
+        while (iterator.hasNext()) {
+            val book = iterator.next() as JsonObject
+            val bookName = book.getString("name", "")
+            val bookAuthor = book.getString("author", "")
+            val bookUrl = book.getString("bookUrl", "")
+            val existIndex = infoMap.getOrDefault(
+                bookUrl,
+                infoMap.getOrDefault(bookName + '_' + bookAuthor, -1)
+            )
+            if (existIndex < 0) continue
+            iterator.remove()
+            val localBookPath = File(getWorkDir("storage", "data", userNameSpace, bookName + '_' + bookAuthor))
+            localBookPath.deleteRecursively()
+        }
+        saveUserStorage(userNameSpace, "bookshelf", bookshelf)
         return returnData.setData("")
     }
 
