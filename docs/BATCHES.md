@@ -2909,3 +2909,67 @@ fun connect(urlStr: String, header: String?): StrResponse = runBlocking {
 
 **这 11 个暂缓**——继续盲改只是碰运气。要解需要先做一次 controlled experiment：
 写几个最小样例，测出 `$lambda-N` 在「`runCatching` 包裹 + 内联高阶函数」组合下的真实编号规则。
+
+### 3a-63 逐文件重构第二轮：BookController 2/8，`$lambda-N` 的计数规则终于吃透
+
+#### 关键规则：`$lambda-N` 数的是「所有 lambda 表达式」，不是「生成的类」
+
+这是这轮最重要的发现，解释了之前所有编号对不上的情况。
+
+`let` / `forEach` / `runCatching` 这些 **inline 函数**的 lambda **不生成类，但占编号**。所以：
+
+```kotlin
+bookSourceObject?.ruleToc?.preUpdateJs?.let {        // ← 占 $2，不生成类
+    AnalyzeRule(book, bookSourceObject).evalJS(it)
+}
+...
+editShelfBook(book, userNameSpace) { existBook ->     // ← 拿到 $3，生成类
+    existBook.lastCheckError = e.toString()
+    existBook
+}
+```
+
+制品有 `$getLocalChapterList$3` 而没有 `$2` —— **因为 `$2` 被 `let` 占掉了**。
+之前我一直按「生成的类」在数，所以永远对不上。
+
+**实测验证**：我先写了带 `getOrNull()?.let { }` 的版本，生成的类是 `$4`；
+把那个 `let` 改成 `if (!x.isNullOrEmpty())` 之后，变成了 `$3`。**一个 `let` 正好差一个号**。
+
+#### 另一个隐蔽的坑：参数名写错，ABI 闸门查不出来
+
+CFR 的签名：
+
+```kotlin
+getLocalChapterList(book, bookSource, refresh, userNameSpace, debugLog, mutex)
+```
+
+我写成了：
+
+```kotlin
+getLocalChapterList(book, bookSource, useCache, userNameSpace, refresh, mutex)
+```
+
+**第 3 个是 `refresh` 不是 `useCache`，第 5 个是 `debugLog` 不是 `refresh`**。
+
+两者的 JVM 描述符完全一样（`(Book, String, boolean, String, boolean, Mutex)`），
+**ABI 闸门一个字都查不出来**，只有对着 CFR 逐行看才发现。而且调用点全都能编过。
+
+#### 本轮完成（BookController 8 → 6）
+
+| 类 | 根因 |
+| --- | --- |
+| `$getBookSourceStringBySourceURLOpt$2` | 原实现用 asJsonArray+for，制品用 Jackson 流式 + `logger.info { }` |
+| `$getLocalChapterList$3` | 原实现只处理本地书，缺网络书源 + `preUpdateJs?.let` + `editShelfBook { }` |
+
+#### 剩余 6 个（全部归到编译器差异）
+
+| 类 | 现象 | 根因 |
+| --- | --- | --- |
+| `$cacheBookOnServer$2` | 我们 `$1/$3/$4`，制品 `$1/$2/$3` | 前置 lambda 计数差 1 |
+| `$cacheBookSSE$3` / `$4` | 我们只有 `$1` | 实现被简化过，但 CFR 里找不到对应的 lambda 结构 |
+| `$ttsByTextToSpeechCn$2` | 我们只有 `$1` + `$result$1` | `map.forEach(BiConsumer { })` 的 SAM 被 1.5.21 优化掉 |
+| `$getLastBackFileFromWebdav$lambda-16$...` | 我们 `lambda-19` | 文件级 lambda 计数差 3 |
+| `BookControllerKt$sam$java_util_function_BiConsumer$0` | 没生成 | 同上，SAM 转换优化 |
+
+**这 6 个都需要逐方法对齐整个文件的 lambda 表达式序列**，且部分依赖编译器行为
+（SAM 转换是否内联）。继续推的边际收益已经很低。
