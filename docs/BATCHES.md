@@ -3956,3 +3956,73 @@ map.forEach(BiConsumer { key, value -> add(multiMap, key, value) })
 | `Coroutine` | 32 | 33 | 多一个 `access$executeBlock`（3a-83） |
 
 **两个类的方法集合现在只差一个编译器桥，逻辑层面已经齐了。**
+
+### 3a-85 阶段总结：本轮（11-04 深夜 ~ 11-05）的全部结论
+
+#### 数字变化
+
+| 指标 | 本轮开始 | 本轮结束 |
+| --- | --- | --- |
+| 类名覆盖 | 930/936 (99.36%) | 930/936 (99.36%) |
+| 字节码口径 | 672/930 (72.3%) **虚低** | **720/930 (77.4%) 真实** |
+| BookController delta | 18441 | **18127** |
+| Coroutine 方法集合 | 33（多 1） | **30/30 完全一致** |
+
+**注意**：字节码那个数字从 672 涨到 720，**代码只改了一点点，主要是统计器口径修正**。
+统计器经历了三次修正：常量池编号归一化（+46 类）、过滤 nop（+2 类）。
+
+#### 修好的（按价值排序）
+
+1. **`exportToEpub`**（482 → 0）：35 行 → 19 行。我们臆想了一个"遍历所有章节"的循环，
+   制品根本没有；文件名要带作者、要用 `FileUtils.createFileWithReplace`、没有 try/finally。
+   **这是本轮最大的一笔**。
+2. **`BookSource.toString` / `RssArticle.equals+hashCode`**：两个方向的 data class 错误。
+   前者该删手写（制品用自动生成的 182 条），后者该加手写（制品只比 link / origin+link）。
+3. **`BaseSource` 7 个 getter/setter**：`CacheManager(...).xxx()` 链式 → `val cache = ...; cache.xxx()`。
+4. **`JsExtensions` 8 个加解密方法**：改用 hutool 的 `AES`/`DESede(mode, padding, keyBytes, ivBytes)`，
+   补 try/catch，`isNullOrBlank`。
+5. **`ttsByTextToSpeechCn` 漏了局部函数 `add(headers, key, value)`**。
+6. **`Coroutine.executeBlock`**：`private` → `internal` → `public`（internal 会加 `$reader_pro` 后缀）。
+   最终方法集合 30/30 完全一致。
+7. **`BaseSource$evalJS$1`**：`(SimpleBindings) -> Unit` → `SimpleBindings.() -> Unit`。
+
+#### 累积的判据（这是最值钱的部分）
+
+**编译噪声（命中就跳过）**
+- `trim()` 内联：`CharSequence.charAt` + `Intrinsics.compare(c, 32)`
+- `nop`：行号占位
+- 常量池编号 `#N`
+- 局部变量槽位偏移
+- `checkNotNullExpressionValue`（jsoup 等库的 `@NotNull`）
+
+**真差异（要继续查）**
+- `invokeinterface Map.xxx` vs `invokevirtual HashMap.xxx` → 变量声明类型
+- `String.valueOf(x)` vs `x.toString()` → 字符串模板
+- `ldc "$this$xxx"` vs `ldc "it"` → 带接收者的 lambda
+- 制品多 20+ 条且出现 `astore`/`goto`/`LogUtils` → 缺 try/catch
+- `StringsKt.isBlank` → `isNullOrBlank()`
+- `new cn/hutool/.../AES` → 直接用了 hutool
+- `astore`+`aload` vs `dup` → 制品先命名存变量
+- **`javap -p` 方法数不一致 → 真缺/多方法（最可靠）**
+- `internal` 修饰符会给方法名加 `$模块名` 后缀
+
+#### 已知的无解项（不浪费时间）
+
+- **`inline` + `crossinline`**：1.5.21 生成 `$$inlined$executeBlock$1`，1.5.1 不生成；
+  去掉 inline 又多出方法本体。两条路各错一半。
+- **SAM 转换**：`-Xsam-conversions=indy` vs `class`。改全局会多 33 个类。
+- **`trim()` 内联**：约 500 条 delta，全是版本产物。
+
+#### 剩余大头
+
+```
+18127  BookController  12 个方法，getBookContent 1830 最大
+ 2691  YueduApi
+ 2653  Relator
+ 2275  Base64$Decoder
+ 1808  ExtKt
+ 1746  BytesEncodingDetect
+ 1647  UserController
+```
+
+**方法数已经全部对齐**（除 2 个编译器桥），剩余差异都在方法体内。
