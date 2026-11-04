@@ -102,6 +102,7 @@ import java.net.SocketTimeoutException
 import javax.script.ScriptException
 import kotlinx.coroutines.CancellationException
 import io.legado.app.exception.NoStackTraceException
+import com.htmake.reader.utils.success
 
 private val logger: KLogger = KotlinLogging.logger { }
 
@@ -2877,43 +2878,71 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
     }
 
     suspend fun exportBook(context: RoutingContext) {
-        val response = context.response()
+        val returnData = ReturnData()
         if (!checkAuth(context)) {
-            response.setStatusCode(401).end("未登录")
+            context.success(returnData.setData("NEED_LOGIN").setErrorMsg("请登录后使用"))
             return
         }
-        val bookUrl = context.queryParam("url").firstOrNull() ?: ""
-        val type = context.queryParam("type").firstOrNull() ?: "txt"
-        if (bookUrl.isEmpty()) {
-            response.setStatusCode(400).end("参数错误")
+        val bookUrl: String
+        val isEpub: Int
+        if (context.request().method() == HttpMethod.POST) {
+            bookUrl = context.bodyAsJson.getString("url")
+                ?: (context.bodyAsJson.getString("bookUrl") ?: "")
+            isEpub = context.bodyAsJson.getInteger("isEpub", 0)
+        } else {
+            bookUrl = context.queryParam("url").firstOrNull() ?: ""
+            isEpub = context.queryParam("isEpub").firstOrNull()?.toInt() ?: 0
+        }
+        if (bookUrl.length == 0) {
+            context.success(returnData.setErrorMsg("请输入书籍链接"))
             return
         }
         val userNameSpace = getUserNameSpace(context)
         val book = getShelfBookByURL(bookUrl, userNameSpace)
         if (book == null) {
-            response.setStatusCode(404).end("书籍信息错误")
+            context.success(returnData.setErrorMsg("请先加入书架"))
             return
         }
-        val bookSource = (getBookSourceStringBySourceURLOpt(book.origin, userNameSpace) ?: "")
-        val exportDir = File(getWorkDir("storage", "cache", "export", userNameSpace))
-        if (!exportDir.exists()) {
-            exportDir.mkdirs()
+        if (book.isLocalBook() && book.isLocalTxt()) {
+            val file = book.getLocalFile()
+            context.response()
+                .putHeader("Cache-Control", "300")
+                .putHeader(
+                    "Content-Disposition",
+                    "attachment; filename=" + java.net.URLEncoder.encode(file.name, "UTF-8")
+                )
+                .sendFile(file.toString())
+            return
         }
-        val file = if (type == "epub") {
+        if (book.isLocalTxt()) {
+            val file = book.getLocalFile()
+            context.response()
+                .putHeader("Cache-Control", "300")
+                .putHeader(
+                    "Content-Disposition",
+                    "attachment; filename=" + java.net.URLEncoder.encode(file.name, "UTF-8")
+                )
+                .sendFile(file.toString())
+            return
+        }
+        val bookSource = getBookSourceString(context, book.origin) ?: ""
+        if (!book.isLocalBook() && bookSource.length == 0) {
+            context.success(returnData.setErrorMsg("未配置书源"))
+            return
+        }
+        val exportDir = File(getWorkDir("storage", "assets", "export"))
+        val file = if (isEpub == 1) {
             exportToEpub(exportDir, book, bookSource, userNameSpace)
         } else {
             exportToTxt(exportDir, book, bookSource, userNameSpace)
         }
-        if (!file.exists()) {
-            response.setStatusCode(404).end("导出失败")
-            return
-        }
-        response.putHeader("Content-Type", "application/octet-stream")
-        response.putHeader(
-            "Content-Disposition",
-            "attachment; filename=" + java.net.URLEncoder.encode(file.name, "UTF-8")
-        )
-        response.sendFile(file.absolutePath)
+        context.response()
+            .putHeader("Cache-Control", "300")
+            .putHeader(
+                "Content-Disposition",
+                "attachment; filename=" + java.net.URLEncoder.encode(file.name, "UTF-8")
+            )
+            .sendFile(file.toString())
     }
 
     suspend fun exportToTxt(

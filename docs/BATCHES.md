@@ -4089,3 +4089,70 @@ return if (prim.isNumber) prim.asNumber.toInt() else null
 aconst_null / checkcast X / areturn   → if-else 表达式分支
 aconst_null / areturn                 → 语句级 return
 ```
+
+### 3a-87 `exportBook` 完全重写：delta 473 → 0
+
+#### 我们的实现（38 行，308 条）
+
+```kotlin
+suspend fun exportBook(context: RoutingContext) {
+    val response = context.response()
+    if (!checkAuth(context)) { response.setStatusCode(401).end("未登录"); return }
+    val bookUrl = context.queryParam("url").firstOrNull() ?: ""
+    val type = context.queryParam("type").firstOrNull() ?: "txt"
+    ...
+}
+```
+
+#### 制品的实现（约 66 行，749 条）
+
+```kotlin
+suspend fun exportBook(context: RoutingContext) {
+    val returnData = ReturnData()
+    if (!checkAuth(context)) {
+        context.success(returnData.setData("NEED_LOGIN").setErrorMsg("请登录后使用"))
+        return
+    }
+    val bookUrl: String
+    val isEpub: Int
+    if (context.request().method() == HttpMethod.POST) {
+        bookUrl = context.bodyAsJson.getString("url")
+            ?: (context.bodyAsJson.getString("bookUrl") ?: "")
+        isEpub = context.bodyAsJson.getInteger("isEpub", 0)
+    } else {
+        bookUrl = context.queryParam("url").firstOrNull() ?: ""
+        isEpub = context.queryParam("isEpub").firstOrNull()?.toInt() ?: 0
+    }
+    if (bookUrl.length == 0) { context.success(returnData.setErrorMsg("请输入书籍链接")); return }
+    val userNameSpace = getUserNameSpace(context)
+    val book = getShelfBookByURL(bookUrl, userNameSpace)
+    if (book == null) { context.success(returnData.setErrorMsg("请先加入书架")); return }
+    // 本地 txt 直接发文件，不走导出
+    if (book.isLocalBook() && book.isLocalTxt()) { sendLocalFile(); return }
+    if (book.isLocalTxt()) { sendLocalFile(); return }
+    val bookSource = getBookSourceString(context, book.origin) ?: ""
+    if (!book.isLocalBook() && bookSource.length == 0) {
+        context.success(returnData.setErrorMsg("未配置书源")); return
+    }
+    val exportDir = File(getWorkDir("storage", "assets", "export"))
+    val file = if (isEpub == 1) exportToEpub(...) else exportToTxt(...)
+    sendFile(file)
+}
+```
+
+#### 五处关键差异
+
+| 项 | 我们 | 制品 |
+| --- | --- | --- |
+| 错误返回 | `response.setStatusCode(401).end("未登录")` | `context.success(returnData.setErrorMsg(...))` |
+| 参数名 | `type`（"txt"/"epub"） | **`isEpub`（Int，0/1）** |
+| POST 支持 | 无，只读 queryParam | **有**，优先 `url` 再 `bookUrl` |
+| 本地 txt | 走 exportToTxt | **直接 sendFile(localFile)，不走导出** |
+| 导出目录 | `cache/export/{userNameSpace}` | **`storage/assets/export`** |
+
+#### 教训
+
+**参数名和类型是硬信息**。我们把 `isEpub: Int` 写成 `type: String`，
+两边的 API 契约根本不同——不是"实现细节差异"，是**接口不兼容**。
+
+这种错误 delta 特别大（473），因为整个参数解析段都不同。
