@@ -2798,7 +2798,10 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             map.putAll(options)
         }
         val multiMap = CaseInsensitiveHeaders()
-        map.forEach(BiConsumer { key, value -> multiMap.add(key, value) })
+        fun add(headers: CaseInsensitiveHeaders, key: String, value: String) {
+            headers.add(key, value)
+        }
+        map.forEach(BiConsumer { key, value -> add(multiMap, key, value) })
         val ttsUrl = "https://www.text-to-speech.cn/getSpeek.php"
         val result = awaitResult<HttpResponse<Buffer>> { handler ->
             webClient.postAbs(ttsUrl)

@@ -3866,3 +3866,93 @@ for (index in chapterList.indices) { ... }        // 普通 for，不带 lambda
 
 **下次改这个方法时**：先只加 `for (index in chapterList.indices)` 骨架 + `saveImages` 一行，
 编译看 delta 是涨是跌，逐步逼近，不要一次写一大块。
+
+### 3a-83 `executeBlock` 的 inline 困境：两条路各错一半，无法两全
+
+#### 三个事实（都来自实测）
+
+1. **制品里没有 `executeBlock` 方法**（`javap` 查 0 个）→ 制品确实是 `inline`，被完全内联
+2. **我们的非 inline 版本多了 `access$executeBlock` 桥**（`private` 方法被内部类访问）
+3. **改 `internal` 能消掉这个桥**，但仍保留 `executeBlock` 方法本体
+
+#### 试过的四种组合
+
+| 写法 | executeBlock 方法 | access$ 桥 | $$inlined$ 类 | 结果 |
+| --- | --- | --- | --- | --- |
+| `inline` + `crossinline` | 无 | 无 | **有**（2 个） | 类名多 2 个（3a-70 回滚的原因） |
+| `inline` 无 `crossinline` | — | — | — | **编译失败**：`Can't inline 'block' here` |
+| `private suspend`（非 inline） | 有 | **有** | 无 | 现值，delta 28 |
+| `internal suspend`（非 inline） | 有 | 无 | 无 | delta 略好，但方法仍在 |
+
+#### 结论
+
+**制品是 1.5.1，它 inline + crossinline 但不生成 `$$inlined$executeBlock$1`；1.5.21 会生成。**
+这是 `crossinline` 内联包装类的生成策略差异，源码层面无解。
+
+**两条路各错一半**：
+- 走 inline → 类名多 2 个（`$$inlined$executeBlock$1` × 2）
+- 走非 inline → 方法多 1 个（`executeBlock` + 可选 `access$` 桥）
+
+**当前选择 `internal suspend`**（方法多 1 个但桥也消了），这是四个方案里 delta 最小的。
+
+#### 但这条揭示了一个新判据
+
+**`javap` 方法数不一致 = 真缺/多方法，优先查**。
+
+`Coroutine` 是 32/33（我们多 `access$executeBlock`）、`BookController` 是 124/121（我们少 3 个）。
+这个判据比 delta 大小可靠得多 —— delta 大小分不清"编译噪声"和"真差异"，方法数能。
+
+### 3a-84 用「方法数不一致」判据挖出 `ttsByTextToSpeechCn` 漏写的局部函数
+
+#### 判据（本轮最有价值的产出）
+
+**`javap -p` 的方法数不一致 = 真缺/多方法**，比 delta 大小可靠：
+
+```python
+a = {方法名 for 制品}
+b = {方法名 for 本地}
+缺 = a - b
+多 = b - a
+```
+
+`Coroutine` 抓到 1 个多的（`access$executeBlock`），
+`BookController` 抓到 2 个缺的（`ttsByTextToSpeechCn$add` + 它的 `access$` 桥）。
+
+#### 修好的：`ttsByTextToSpeechCn` 漏了局部函数
+
+我们原写法：
+
+```kotlin
+val multiMap = CaseInsensitiveHeaders()
+map.forEach(BiConsumer { key, value -> multiMap.add(key, value) })
+```
+
+制品字节码里有个 `ttsByTextToSpeechCn$add(CaseInsensitiveHeaders, String, String)`，
+说明源码里有个局部函数：
+
+```kotlin
+val multiMap = CaseInsensitiveHeaders()
+fun add(headers: CaseInsensitiveHeaders, key: String, value: String) {
+    headers.add(key, value)
+}
+map.forEach(BiConsumer { key, value -> add(multiMap, key, value) })
+```
+
+**改完 `ttsByTextToSpeechCn$add` 就生成了**。
+
+#### 剩下的 `access$ttsByTextToSpeechCn$add` 无解
+
+那个桥只有当「局部函数被**非内联** lambda 捕获」时才生成。我们用的是
+`-Xsam-conversions=indy`，`BiConsumer` 走 invokedynamic，不产生匿名类，自然不需要桥。
+制品是 class 模式，所以有。
+
+**这是 3a-67 / 3a-71 已确认的 SAM 编译模式差异，源码层面无解。**
+
+#### 方法数对比现状
+
+| 类 | 制品 | 本地 | 缺 |
+| --- | --- | --- | --- |
+| `BookController` | 115 | 114 | `access$ttsByTextToSpeechCn$add`（无解） |
+| `Coroutine` | 32 | 33 | 多一个 `access$executeBlock`（3a-83） |
+
+**两个类的方法集合现在只差一个编译器桥，逻辑层面已经齐了。**

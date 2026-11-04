@@ -174,7 +174,7 @@ class Coroutine<T> constructor(
         }
     }
 
-    private suspend fun executeBlock(
+    internal suspend fun executeBlock(
         scope: CoroutineScope,
         context: CoroutineContext,
         timeMillis: Long,
