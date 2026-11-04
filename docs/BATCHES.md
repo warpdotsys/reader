@@ -4400,3 +4400,63 @@ result2.add(x);       // ← 继续循环
 
 **3a-90 那 5 个是这么判出来的（先看字节码才动手），3a-91 这 5 个是我看到文本
 模式就直接批量改的——差别就在这里。**
+
+### 3a-92 StringUtil 全清（3 个方法，3 类判据各中一个）
+
+#### 1. `collapsePathDots`：`ArrayList` → `List`
+
+```java
+// 改前
+ArrayList<String> parts = new ArrayList<String>(Arrays.asList(stringParts));
+// 改后
+List<String> parts = new ArrayList<String>(Arrays.asList(stringParts));
+```
+
+字节码：`invokevirtual ArrayList.size/get/remove` → `invokeinterface List.size/get/remove`。
+
+**3a-76 判据复用：局部集合变量声明成接口类型才走 `invokeinterface`。**
+
+另外方法末尾两处 `continue` 也要改正向：
+
+```java
+// if (!currentDir.equals("..")) continue; + 三段 body
+if (currentDir.equals("..")) { ... }
+
+// if (i >= parts.size() - 1) continue; result2.append('/');
+if (i < parts.size() - 1) { result2.append('/'); }
+```
+
+这里 `continue` 后跟的是**赋值/累加**（3a-91 说这种一般不该改），
+但字节码显示制品确实是 `ifeq`／`if_icmpge` 正向形态，所以按字节码改了，结果对。
+
+**再次印证：判据只能看字节码，不能看源码文本形态。**
+
+#### 2. `isBlank`：`Character.isWhitespace(...) continue` → 正向
+
+```java
+if (!Character.isWhitespace(text.charAt(i))) {
+    return false;
+}
+```
+
+#### 3. `formatHtml`：拆赋值 + 内层 `continue` 改 `else`
+
+```java
+s = s.replaceAll("^\\s+|\\s+$", "");
+if (s.length() > 0) {
+    if (s.matches("(?i)^<img\\s([^>]+)/?>$")) {
+        body.append(...);
+    } else {
+        body.append("<p>").append(s).append("</p>");
+    }
+}
+```
+
+#### 踩坑
+
+- 重写 `formatHtml` 时把类尾的 `}` 一起吃掉了 → `compileJava` 报「到达文件结尾」
+- 修法：数括号配平（`{` 46 个、`}` 45 个，补 1 个）
+
+#### 结果
+
+`compared 1 / exact 1 / different 0`，`StringUtil` 全清。

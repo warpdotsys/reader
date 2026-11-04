@@ -5,12 +5,13 @@
 package me.ag2s.epublib.util;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Arrays;
 
 public class StringUtil {
     public static String collapsePathDots(String path) {
         String[] stringParts = path.split("/");
-        ArrayList<String> parts = new ArrayList<String>(Arrays.asList(stringParts));
+        List<String> parts = new ArrayList<String>(Arrays.asList(stringParts));
         for (int i = 0; i < parts.size() - 1; ++i) {
             String currentDir = (String)parts.get(i);
             if (currentDir.length() == 0 || currentDir.equals(".")) {
@@ -18,10 +19,11 @@ public class StringUtil {
                 --i;
                 continue;
             }
-            if (!currentDir.equals("..")) continue;
-            parts.remove(i - 1);
-            parts.remove(i - 1);
-            i -= 2;
+            if (currentDir.equals("..")) {
+                parts.remove(i - 1);
+                parts.remove(i - 1);
+                i -= 2;
+            }
         }
         StringBuilder result2 = new StringBuilder();
         if (path.startsWith("/")) {
@@ -29,8 +31,9 @@ public class StringUtil {
         }
         for (int i = 0; i < parts.size(); ++i) {
             result2.append((String)parts.get(i));
-            if (i >= parts.size() - 1) continue;
-            result2.append('/');
+            if (i < parts.size() - 1) {
+                result2.append('/');
+            }
         }
         return result2.toString();
     }
@@ -44,8 +47,9 @@ public class StringUtil {
             return true;
         }
         for (int i = 0; i < text.length(); ++i) {
-            if (Character.isWhitespace(text.charAt(i))) continue;
-            return false;
+            if (!Character.isWhitespace(text.charAt(i))) {
+                return false;
+            }
         }
         return true;
     }
@@ -165,14 +169,15 @@ public class StringUtil {
     public static String formatHtml(String text) {
         StringBuilder body = new StringBuilder();
         for (String s : text.split("\\r?\\n")) {
-            if ((s = s.replaceAll("^\\s+|\\s+$", "")).length() <= 0) continue;
-            if (s.matches("(?i)^<img\\s([^>]+)/?>$")) {
-                body.append(s.replaceAll("(?i)^<img\\s([^>]+)/?>$", "<div class=\"duokan-image-single\"><img class=\"picture-80\" $1/></div>"));
-                continue;
+            s = s.replaceAll("^\\s+|\\s+$", "");
+            if (s.length() > 0) {
+                if (s.matches("(?i)^<img\\s([^>]+)/?>$")) {
+                    body.append(s.replaceAll("(?i)^<img\\s([^>]+)/?>$", "<div class=\"duokan-image-single\"><img class=\"picture-80\" $1/></div>"));
+                } else {
+                    body.append("<p>").append(s).append("</p>");
+                }
             }
-            body.append("<p>").append(s).append("</p>");
         }
         return body.toString();
     }
 }
-
