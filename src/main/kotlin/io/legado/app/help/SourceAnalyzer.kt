@@ -343,7 +343,7 @@ object SourceAnalyzer {
         var loginUrl: Any? = null,
         var loginUi: Any? = null,
         var loginCheckJs: String? = null,
-        var bookSourceComment: String = "",
+        var bookSourceComment: String? = null,
         var lastUpdateTime: Long = 0L,
         var respondTime: Long = 180000L,
         var weight: Int = 0,
