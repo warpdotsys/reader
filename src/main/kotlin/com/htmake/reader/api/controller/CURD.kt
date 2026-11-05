@@ -28,7 +28,8 @@ interface CURD<T> {
 
     fun convertToEntityList(var1: String): Array<T> {
         val clazz = java.lang.reflect.Array.newInstance(getEntityClass(), 0).javaClass
-        return gson.fromJson(var1, clazz) as Array<T>
+        val itemList: Array<T> = gson.fromJson(var1, clazz) as Array<T>
+        return itemList
     }
 
     fun onList(var1: JsonArray, userNameSpace: String): JsonArray = var1
