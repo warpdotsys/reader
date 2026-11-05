@@ -95,16 +95,18 @@ extends ProxyInputStream {
 
     private ByteOrderMark find() {
         for (ByteOrderMark bom : this.boms) {
-            if (!this.matches(bom)) continue;
-            return bom;
+            if (this.matches(bom)) {
+                return bom;
+            }
         }
         return null;
     }
 
     private boolean matches(ByteOrderMark bom) {
         for (int i = 0; i < bom.length(); ++i) {
-            if (bom.get(i) == this.firstBytes[i]) continue;
-            return false;
+            if (bom.get(i) != this.firstBytes[i]) {
+                return false;
+            }
         }
         return true;
     }
@@ -121,10 +123,11 @@ extends ProxyInputStream {
         int b = 0;
         while (len > 0 && b >= 0) {
             b = this.readFirstBytes();
-            if (b < 0) continue;
-            buf[off++] = (byte)(b & 0xFF);
-            --len;
-            ++firstCount;
+            if (b >= 0) {
+                buf[off++] = (byte)(b & 0xFF);
+                --len;
+                ++firstCount;
+            }
         }
         int secondCount = this.in.read(buf, off, len);
         return secondCount < 0 ? (firstCount > 0 ? firstCount : -1) : firstCount + secondCount;
