@@ -743,7 +743,8 @@ open class YueduApi : RestVerticle() {
         launch(MDCContext() + Dispatchers.IO) {
             try {
                 logger.info("开始清理 {} 天未登录用户", appConfig.autoClearInactiveUser)
-                UserController(coroutineContext).clearInactiveUsers(appConfig.autoClearInactiveUser)
+                val userController = UserController(coroutineContext)
+                userController.clearInactiveUsers(appConfig.autoClearInactiveUser)
                 logger.info("不活跃用户自动清理结束")
             } catch (e: Exception) {
                 e.printStackTrace()
