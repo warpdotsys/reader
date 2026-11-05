@@ -6,6 +6,10 @@ import com.jayway.jsonpath.DocumentContext
 import com.jayway.jsonpath.JsonPath
 import io.legado.app.model.DebugLog
 import kotlin.jvm.Transient
+import io.legado.app.utils.jsonPath
+import io.legado.app.utils.readBool
+import io.legado.app.utils.readInt
+import io.legado.app.utils.readString
 
 @JsonIgnoreProperties(
     value = [
@@ -133,45 +137,45 @@ data class RssSource(
         fun fromJsonDoc(doc: DocumentContext): Result<RssSource> {
             return runCatching {
                 RssSource(
-                    sourceUrl = doc.read("$.sourceUrl"),
-                    sourceName = doc.read("$.sourceName"),
-                    sourceIcon = doc.read("$.sourceIcon"),
-                    sourceGroup = doc.read("$.sourceGroup"),
-                    sourceComment = doc.read("$.sourceComment"),
-                    enabled = doc.read("$.enabled"),
-                    concurrentRate = doc.read("$.concurrentRate"),
-                    header = doc.read("$.header"),
-                    loginUrl = doc.read("$.loginUrl"),
-                    loginCheckJs = doc.read("$.loginCheckJs"),
-                    sortUrl = doc.read("$.sortUrl"),
-                    singleUrl = doc.read("$.singleUrl"),
-                    articleStyle = doc.read("$.articleStyle"),
-                    ruleArticles = doc.read("$.ruleArticles"),
-                    ruleNextPage = doc.read("$.ruleNextPage"),
-                    ruleTitle = doc.read("$.ruleTitle"),
-                    rulePubDate = doc.read("$.rulePubDate"),
-                    ruleDescription = doc.read("$.ruleDescription"),
-                    ruleImage = doc.read("$.ruleImage"),
-                    ruleLink = doc.read("$.ruleLink"),
-                    ruleContent = doc.read("$.ruleContent"),
-                    style = doc.read("$.style"),
-                    enableJs = doc.read("$.enableJs"),
-                    loadWithBaseUrl = doc.read("$.loadWithBaseUrl"),
-                    enabledCookieJar = doc.read("$.enabledCookieJar"),
-                    customOrder = doc.read("$.customOrder")
+                    sourceUrl = doc.readString("$.sourceUrl")!!,
+                    sourceName = doc.readString("$.sourceName")!!,
+                    sourceIcon = doc.readString("$.sourceIcon") ?: "",
+                    sourceGroup = doc.readString("$.sourceGroup"),
+                    sourceComment = doc.readString("$.sourceComment"),
+                    enabled = doc.readBool("$.enabled") ?: true,
+                    enabledCookieJar = doc.readBool("$.enabledCookieJar") ?: false,
+                    concurrentRate = doc.readString("$.concurrentRate"),
+                    header = doc.readString("$.header"),
+                    loginUrl = doc.readString("$.loginUrl"),
+                    loginCheckJs = doc.readString("$.loginCheckJs"),
+                    sortUrl = doc.readString("$.sortUrl"),
+                    singleUrl = doc.readBool("$.singleUrl") ?: false,
+                    articleStyle = doc.readInt("$.articleStyle") ?: 0,
+                    ruleArticles = doc.readString("$.ruleArticles"),
+                    ruleNextPage = doc.readString("$.ruleNextPage"),
+                    ruleTitle = doc.readString("$.ruleTitle"),
+                    rulePubDate = doc.readString("$.rulePubDate"),
+                    ruleDescription = doc.readString("$.ruleDescription"),
+                    ruleImage = doc.readString("$.ruleImage"),
+                    ruleLink = doc.readString("$.ruleLink"),
+                    ruleContent = doc.readString("$.ruleContent"),
+                    style = doc.readString("$.style"),
+                    enableJs = doc.readBool("$.enableJs") ?: true,
+                    loadWithBaseUrl = doc.readBool("$.loadWithBaseUrl") ?: true,
+                    customOrder = doc.readInt("$.customOrder") ?: 0
                 )
             }
         }
 
         fun fromJson(json: String): Result<RssSource> {
-            return fromJsonDoc(JsonPath.parse(json))
+            return fromJsonDoc(jsonPath.parse(json))
         }
 
         fun fromJsonArray(jsonArray: String): Result<List<RssSource>> {
             return runCatching {
                 val list = arrayListOf<RssSource>()
-                JsonPath.parse(jsonArray).read<List<Map<String, Any>>>("$").forEach {
-                    list.add(fromJsonDoc(JsonPath.parse(it)).getOrThrow())
+                (jsonPath.parse(jsonArray).read<Any>("$") as List<Map<String, Any>>).forEach {
+                    list.add(fromJsonDoc(jsonPath.parse(it)).getOrThrow())
                 }
                 list
             }
