@@ -144,7 +144,7 @@ fun File.unzip(descDir: String): Boolean {
         val zf = ZipFile(toString())
         val entries = zf.entries()
         while (entries.hasMoreElements()) {
-            val zipEntry = entries.nextElement()!!
+            val zipEntry = entries.nextElement() as ZipEntry
             val zipEntryName = zipEntry.name
             val descFilePath = descDir + File.separator + zipEntryName
             if (zipEntry.isDirectory) {
