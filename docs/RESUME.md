@@ -189,3 +189,31 @@ G="C:/Program Files/Git/cmd/git.exe"
 ```
 
 push 偶尔会 `Internal Server Error`，等 30-60 秒重试即可。
+
+## 已确认「试过但做不到」的清单（不要再重复投入）
+
+| 类 / 方法 | 原因 |
+| --- | --- |
+| `ReaderApplication$Companion.getVertx` | 1.5.21 给 `by lazy` getter 多加了 `checkNotNullExpressionValue` |
+| `ByteConverter.responseBodyConverter` | Java 平台类型参数：制品无 `checkNotNullParameter`，改可空又 overrides nothing |
+| `Utf8BomUtils` / `UTF8BOMFighter` | 1.5.21 的 CSE 把 `Charsets.UTF_8` 提取成局部变量 |
+| `VertExtKt.success` | 1.5.21 提取 `when` subject（`astore_3`/`aload_3`） |
+| `BookController$setBookSource$2` | 6 个 `checkNotNullExpressionValue`（1.5.21 平台类型检查） |
+| `Coroutine.executeBlock` | 加 `inline` 后 delta 28→29（`InlineMarker.mark` 形态不同） |
+| `BookController$textToSpeech$2` | `text.element!!` 存变量后 97→115 |
+| `CURD$deleteMulti$2` | lambda 参数名改 `it` 后 45→44（索引循环 vs for-each 没解决） |
+| `LicenseController$importLicense$2` | `getJsonObject("data")` 存变量后 45→171 |
+| `BookController$getBookShelfBooks$2$1` | `book.element!!` 存变量后 38→40 |
+| `BookController$syncBookProgressFromWebdav$2` | 4 个 `!!` 改局部变量后 42/34（原 42/50） |
+| `BaseBook$DefaultImpls.getKindList` | `wordCount?.let{!it.isBlank()}` 改 `!isNullOrBlank()` 后 delta 不变（76） |
+| `TextFile$Companion.getContent` | `Regex("...")` 的字符串存变量后 21→37 |
+| `RssArticle.equals` | `if (other is ...)` 结构后 27→23 |
+| `NCXDocumentV2.readTOCReferences` | 试了 `&&`、嵌套 if，编译产物一样，都差 `goto` |
+| `CharsetRecog_euc.nextChar` | 试了 `else{if}`、调换 if 顺序，都没改善 |
+| `Base64$Encoder/Decoder` | 差异在 `switch(state)` 的 case 布局 |
+| `UmdReader.ReadAdditionalSection` | `switch` 空 case 布局 |
+| `ResourcesLoader.loadResources` | 22 块槽位 + `LazyResource` 构造位置 |
+| `CharsetRecog_UTF8.match` | 槽位链（本地少一个变量），关系难解 |
+| `EncodingDetectHelp` | 槽位 + `dup` vs `astore` |
+| `OkHttpUtilsKt$await$2$2` / `Book$Converters` | `runCatching` 在 lambda 里的展开形态（1.5.21 多一层局部变量） |
+| `AttemptResult` | inline 类 + `var` 占位 + `getError()` 调用 |
