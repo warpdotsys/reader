@@ -49,8 +49,9 @@ extends Node {
 
     public String getAttributeValue(String namespace, String name) {
         for (int i = 0; i < this.getAttributeCount(); ++i) {
-            if (!name.equals(this.getAttributeName(i)) || namespace != null && !namespace.equals(this.getAttributeNamespace(i))) continue;
-            return this.getAttributeValue(i);
+            if (name.equals(this.getAttributeName(i)) && (namespace == null || namespace.equals(this.getAttributeNamespace(i)))) {
+                return this.getAttributeValue(i);
+            }
         }
         return null;
     }
@@ -77,8 +78,9 @@ extends Node {
     public String getNamespaceUri(String prefix) {
         int cnt = this.getNamespaceCount();
         for (int i = 0; i < cnt; ++i) {
-            if (prefix != this.getNamespacePrefix(i) && (prefix == null || !prefix.equals(this.getNamespacePrefix(i)))) continue;
-            return this.getNamespaceUri(i);
+            if (prefix == this.getNamespacePrefix(i) || (prefix != null && prefix.equals(this.getNamespacePrefix(i)))) {
+                return this.getNamespaceUri(i);
+            }
         }
         return this.parent instanceof Element ? ((Element)this.parent).getNamespaceUri(prefix) : null;
     }
@@ -131,13 +133,14 @@ extends Node {
         }
         for (int i = this.attributes.size() - 1; i >= 0; --i) {
             String[] attribut = (String[])this.attributes.elementAt(i);
-            if (!attribut[0].equals(namespace) || !attribut[1].equals(name)) continue;
-            if (value == null) {
-                this.attributes.removeElementAt(i);
-            } else {
-                attribut[2] = value;
+            if (attribut[0].equals(namespace) && attribut[1].equals(name)) {
+                if (value == null) {
+                    this.attributes.removeElementAt(i);
+                } else {
+                    attribut[2] = value;
+                }
+                return;
             }
-            return;
         }
         this.attributes.addElement(new String[]{namespace, name, value});
     }
