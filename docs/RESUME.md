@@ -217,3 +217,38 @@ push 偶尔会 `Internal Server Error`，等 30-60 秒重试即可。
 | `EncodingDetectHelp` | 槽位 + `dup` vs `astore` |
 | `OkHttpUtilsKt$await$2$2` / `Book$Converters` | `runCatching` 在 lambda 里的展开形态（1.5.21 多一层局部变量） |
 | `AttemptResult` | inline 类 + `var` 占位 + `getError()` 调用 |
+
+## 方法：字段集合扫描能发现真 bug
+
+**`javap -p` 的方法名集合几乎全部对齐（只差 1 个 SAM 桥），但字段集合还有 11 个类不一致。**
+
+扫法：对每个差异类 `javap -p`，取「类体里、方法签名之前」的字段行，
+对比制品的 `字段名:类型` 集合和本地的。
+
+发现的问题分两类：
+
+| 类 | 差异 | 性质 |
+| --- | --- | --- |
+| `Book` | 制品 `isInShelf` / 本地 `inShelf` | **ABI 硬差异**，已修 |
+| `BookSourceController$updateRemoteSourceSub$2` | 制品捕获 `$i`/`$remoteBookSource`，本地没有 | **逻辑缺失 bug**，已修 |
+| `BookController$cacheBookSSE$3` | 制品 `$localCacheDir`/`$isEnd`，本地 `$response`/`$returnData` | 实现不同，未修 |
+| `BookController$exportToTxt$2` | 制品 `$bookFile`+`this$0`，本地 `$writer` | 实现不同，未修 |
+| `BookController$getAvailableBookSource$2` | 本地 `$bookRef` vs 制品 `$book` | 变量名，已修 |
+| `BookController$getBookShelfBooks$2` | 本地多 `L$1`/`L$2` | 续体槽位 |
+| `AnalyzeRule$ajax$1` / `JsExtensions$connect$1` / `$ajaxAll$1` | `L$0`/`I$3` 槽位 | 续体槽位 |
+| `JsExtensions$queryTTF$font$1` | 本地多 `$cacheInstance` | 捕获多余变量 |
+| `BookController$restoreFromMongodb$handler$1` | 本地多 `this$0` | 多用了成员方法 |
+
+**`updateRemoteSourceSub` 的 bug 值得单独说**：
+
+```kotlin
+// 复原错的：
+saveUserStorage(userNameSpace, "remoteBookSourceSub",
+    "remoteBookSourceList.set(i, remoteBookSource.put(\"lastSyncTime\", System.currentTimeMillis()))")
+// 第三参数是个字符串字面量，set/put 根本没执行
+```
+
+**远程书源的 `lastSyncTime` 永远不会更新** —— 这是功能性 bug，不是字节码差异。
+发现它的唯一线索就是「制品 lambda 捕获了 `$i`，本地没有」。
+
+**教训：字节码差异有时指向的是逻辑缺失，不只是编译形态。**
