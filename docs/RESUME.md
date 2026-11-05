@@ -387,3 +387,92 @@ if (appConfig.secure) { 遍历 users，对每个用户名调 handler }
 - **不要改页面文件**（用户明确禁止）。
 - **后台实例会超时退出**，每次验证前先探测 8830/8831 的 `/health`。
 - **报时间必须跑 `date`**，绝不推算。
+
+
+## 2026-11-05 深夜 ~ 11-06 凌晨：字符串常量层大扫荡
+
+用户指令「今晚自行推进」。这一轮把"字符串常量（ldc）集合差"这个扫描层面用到了极致，
+挖出了不少**只有这一层能发现**的真 bug。
+
+### 关键工具经验：UTF-8 强制输出
+
+Windows 下 javap 默认用 GBK 输出，中文全变成 U+FFFD——
+**两个不同的字（如 〉vs ︽）会显示成同一个乱码，看不出差异**。
+必须用：
+```
+javap -J-Dfile.encoding=UTF-8 -v -p -classpath <cp> <class>
+```
+Python 侧 `r.stdout.decode('utf-8', errors='replace')`。
+
+### 这一轮修掉的真差异
+
+1. **StringUtils 正则多了一个"拾"**
+   制品：`^[〇零一二三四五六七八九壹贰叁肆伍陆柒捌玖]$`
+   本地多了末位的"拾"。多这一个字会让"拾"被判定为合法单个中文数字。
+
+2. **ACache 日志用了插值不是格式化占位符**
+   `logger.info("ACache can't make dirs in %s", path)` vs `${path}` 插值——
+   占位符是延迟格式化，插值是调用前拼接，字节码和输出行为都不同。
+
+3. **JsExtensions.aesEncodeToByteArray / aesEncodeToBase64ByteArray 缺 catch**
+   制品是 try/catch + e.printOnDebug() + log(...ERROR) + 返回 null；
+   本地直接 return，加密失败会直接抛异常而不是返回 null。
+   （注意 printOnDebug 是 Throwable 的扩展函数，写法是 e.printOnDebug()）
+
+4. **BookHelp 的 "%d.txt".format(index) → String.format("%d.txt", index)**
+   前者走 Kotlin 的 String.format 扩展（receiver 是 format 字符串），
+   后者是 Java 静态方法。3 处。
+
+5. **Debugger 日志文本逐字符对齐**（这一项是 UTF-8 输出的最大受益者）
+   - `⇒开始访问目录页:` → `⇒开始访目录页:`（缺"问"，原作者笔误，照抄）
+   - `⇒开始访问正文页:` → `⇒开始访正文页:`
+   - `《开始解析XX页` → `︾开始解析XX页`（U+300A → U+FE3E）
+   - `》XX页解析完成` → `︽XX页解析完成`（U+300B → U+FE3D）
+   - `》未获取到书籍` → `︽未获取到书籍`、`》目录列表为空` → `︽目录列表为空`
+
+6. **Book.fileCharset 加 charsetName 中间变量**
+
+7. **MapDeserializerDoubleAsIntFix.read 解构 → 显式 entry.key/value + map.put**
+
+8. **HttpTTS/RssSource.fromJsonArray 的 jsonItem 中间变量**（还漏了一处静态 JsonPath.parse）
+
+9. **LicenseController 的 JsonObject.mapFrom 加非空类型声明**
+
+10. **DefaultAdpater.getWorkDir：if 表达式 → if 语句 + path 中间变量**
+
+11. **YueduApi 未激活页面 HTML 补全**
+    `<body></body></html>` → `<body><div style='text-align: center;padding: 30px 0;'>未激活该功能，请加<a href='https://t.me/+pQ8HDlANPZ84ZWNl'>TG群</a>激活</div></body></html>`
+    （含 TG 群链接，之前只到 body 就关了）
+
+12. **exportToEpub 全套重写**（最大的一块，见下节）
+
+### exportToEpub 重写详情
+
+之前是半成品，现在按制品字节码逐条重写：
+
+- `setAssets`：从 classpath 读 `/epub/fonts.css`、`/epub/main.css`、`/epub/logo.png`
+  加进 resources；用 `ResourceUtil.createPublicResource(name, author, intro, kind, wordCount, html, href)`
+  加"封面"、"简介"两个 section；返回 `/epub/chapter.html` 文本
+- `setEpubContent`：章节名受 `appConfig.exportNoChapterName` 控制；
+  用 `ResourceUtil.createChapterResource(title.replace("🔒",""), content1, contentModel, "Text/chapter_$index.html")`
+- `fixPic`：**之前是空实现**。完整逻辑：
+  `AppPattern.imgPattern` 匹配 → `NetworkUtils.getAbsoluteURL(chapter.url, src)` →
+  `MD5Utils.md5Encode16(src) + '.' + BookHelp.getImageSuffix(src)` →
+  `LazyResource(FileResourceProvider(imageFile.parent), "Images/$originalHref", originalHref)` →
+  行内替换成 `"../Images/$originalHref"`
+- `setEpubMetadata`：完整 Metadata（titles/authors(getRealAuthor)/language/dates/publishers("Legado")/descriptions）
+  **注意 `Date` 是 `me.ag2s.epublib.domain.Date`，不是 java.util.Date**（编译报错过）
+
+### 编译器行为差异（源码层无解，跳过）
+
+- `setAssets` 里 `Charsets.UTF_8`：制品每次 `getstatic`，本地编译器提取为局部变量（CSE），
+  与已知的 Utf8BomUtils/UTF8BOMFighter 同类问题。
+- `CURD$DefaultImpls` 的 `context.bodyAsJson`：制品生成 `checkNotNullExpressionValue`（非空声明），
+  本地是 `!!` 生成 `checkNotNull`。低频差异，暂不动。
+
+### 最终状态
+
+- 类名 **936/936** 对齐
+- 字节码 **775/934 = 83.0%**（v39）
+- HTTP 差分（灌入书源+书架数据）：**84 通过 / 1 假阳性**
+- 工作区干净，HEAD 到 `c412ab9`
