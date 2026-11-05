@@ -503,3 +503,34 @@ Python 侧 `r.stdout.decode('utf-8', errors='replace')`。
   HttpTTS、RssSource、LicenseController、DefaultAdpater、YueduApi、BookController(exportToEpub 全套 + ttsByEdge)、
   EncoderUtils、ExtKt）
 - 工具经验：`javap -J-Dfile.encoding=UTF-8` 强制 UTF-8（GBK 会把不同中文字都变成 U+FFFD）
+
+
+### 凌晨续战（05:00 ~ 07:30）再追加
+
+18. **SourceAnalyzer.toNewUrls 正则**（花了很久，教训值得记）：
+    javap 的显示规则有歧义：显示 `\\` = 一个实际反斜杠；显示 `\n` = 一个真实的换行符（U+000A 的转义显示）。
+    制品常量 `\n\\s*`（显示）的真实值 = [换行符] + \ + s + *，正则语义"换行 + \s*"。
+    之前我们写 `"\\n\\s*"` 得到 "\ + n + \ + \ + s + *"，字符串层面不同。
+    **正确源码：`Regex("\n\\s*")`**（Kotlin 里 \n -> 真换行符，\\s -> 反斜杠+s）。
+    教训：直接用字符级构造目标字符串 + 写个"数连续反斜杠"的分析器验证，不要心算转义层数。
+
+19. **BookController.saveBookSources 按制品重写**：
+    - 检查 `book.name.isEmpty()`（不是 sourceList.isEmpty）
+    - `replace=false` 时先读已有列表（book.name_author 路径）
+    - 构建 urlMap 合并去重：已存在 -> set；不存在 -> add + 更新 urlMap
+    - 之前我们直接 add 所有，忽略 replace 语义和去重
+
+20. **editShelfBook 的差异已确认但暂缓**（风险高）：
+    制品有 `UserMutex.getLocker("$ns@bookshelf")` 锁 + `logger.info("wait for lock {}/lock success")`，
+    匹配策略是 bookUrl 或 name+author，**找不到时直接返回 null（不 add）**，返回类型是 `Book?`。
+    我们目前的实现没有锁、只按 bookUrl 匹配、找不到时 add。
+    8 个调用方大多忽略返回值（只有 saveBookConfig 用了 `?: book`），但改返回类型 + 去掉 add 分支涉及行为变化，需要全链路验证后再动。
+    另外制品 `setData` 的非空参数与 Book? 返回值的组合方式还没研究清楚（字节码有 checkNotNullParameter 但调用方直接传可能为 null 的值）。
+
+### 最终状态（07:30）
+
+- 类名 936/936
+- 字节码 775/934 = 83.0%（v44）
+- HTTP 84 通过 / 1 假阳性（http14.txt）
+- 今夜共 15 个提交：bcaf729 → 0c45516
+- 工作区干净
