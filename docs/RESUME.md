@@ -1,4 +1,4 @@
-# 续接说明（2026-11-06 14:10）
+# 续接说明（2026-11-06 16:25）
 
 ## 用户目标（明确、无妥协）
 
@@ -10,7 +10,7 @@ ABI 一致性已经不重要，类名和字节码三重对齐才是目标。
 ```
 制品应用类   : 936
 已适配       : 930  (99.36%)   还缺 6 / 多出 3
-字节码完全一致: 757 / 930 (81.4%)   有差异 173 个类
+字节码完全一致: 759 / 930 (81.6%)   有差异 171 个类
 HEAD         : 见 git log（本轮最后提交在 3a-97 之后）
 D 盘可用     : 92G（清掉 handwriting-yolo-cache/uv 的 90G uv 缓存后）
 ```
@@ -94,7 +94,13 @@ powershell -NoProfile -Command "& { $env:JAVA_HOME='D:\Tools\java\jdk-11.0.8+10'
     （`TTSService.getOrCreateWs`）。
 22. **`continue` 在 for-each 里批量改要逐个看**：`Resources` 8 个方法一次改完
     6 处 `continue` + 2 处 `ArrayList`，全清。
-23. **`const val TAG` 不发 static 字段**：`const` 是编译期常量会内联，
+23. **捕获字段 `Ljava/lang/Long;` vs `J`**：变量声明缺显式类型，Kotlin 把
+    Java 平台类型推断成了可空。加 `: Long` / `: Int` 能拉回基本类型
+    （`addBookGroupMulti` / `removeBookGroupMulti` 各一处，合计 2 个类归零）。
+24. **捕获字段 `Ref$ObjectRef` = 源码里是 `var`**；直接是具体类型 = `val`。
+    `RemoteWebview$getStrResponse` 的两个变量改 `var` 后指令 23/23 对齐
+    （只剩捕获字段声明顺序差一位）。
+25. **`const val TAG` 不发 static 字段**：`const` 是编译期常量会内联，
     制品有 `<clinit>` 里的 `putstatic TAG` 就说明是普通 `val`。
     **`javap -p` 只比方法名集合，查不出缺字段。**
 14. **`while (i < n)` vs `for (i in 0 until n)`**：前者 `goto` 回循环头，
