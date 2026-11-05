@@ -71,7 +71,7 @@ class Debugger(val logMsg: (String) -> Unit) : DebugLog {
                 val book = Book(origin = bookSource.bookSourceUrl).apply {
                     tocUrl = url
                 }
-                log(bookSource.bookSourceUrl, "⇒开始访问目录页:$url")
+                log(bookSource.bookSourceUrl, "⇒开始访目录页:$url")
                 tocDebug(webBook, book)
             }
 
@@ -82,7 +82,7 @@ class Debugger(val logMsg: (String) -> Unit) : DebugLog {
                     title = "调试"
                     this.url = url
                 }
-                log(bookSource.bookSourceUrl, "⇒开始访问正文页:$url")
+                log(bookSource.bookSourceUrl, "⇒开始访正文页:$url")
                 contentDebug(webBook, book, chapter, null)
             }
 
@@ -95,17 +95,17 @@ class Debugger(val logMsg: (String) -> Unit) : DebugLog {
 
     private suspend fun exploreDebug(webBook: WebBook, url: String) {
         webBook.debugLogger = this
-        log(msg = "《开始解析发现页")
+        log(msg = "︾开始解析发现页")
         runCatching {
             webBook.exploreBook(url, 1)
         }.onSuccess { exploreBooks ->
             if (exploreBooks.isNotEmpty()) {
                 log("┌发现结果列表")
                 log("└${GSON.toJson(exploreBooks)}")
-                log(webBook.sourceUrl, "》发现页解析完成\n\n")
+                log(webBook.sourceUrl, "︽发现页解析完成\n\n")
                 infoDebug(webBook, exploreBooks[0].toBook())
             } else {
-                log(webBook.sourceUrl, "》未获取到书籍")
+                log(webBook.sourceUrl, "︽未获取到书籍")
             }
         }.onFailure {
             log(webBook.sourceUrl, "Error: ${it.localizedMessage}")
@@ -115,17 +115,17 @@ class Debugger(val logMsg: (String) -> Unit) : DebugLog {
 
     private suspend fun searchDebug(webBook: WebBook, key: String) {
         webBook.debugLogger = this
-        log(msg = "《开始解析搜索页")
+        log(msg = "︾开始解析搜索页")
         runCatching {
             webBook.searchBook(key, 1)
         }.onSuccess { searchBooks ->
             if (searchBooks.isNotEmpty()) {
                 log("┌搜索结果列表")
                 log("└${GSON.toJson(searchBooks)}")
-                log(webBook.sourceUrl, "》搜索页解析完成\n\n")
+                log(webBook.sourceUrl, "︽搜索页解析完成\n\n")
                 infoDebug(webBook, searchBooks[0].toBook())
             } else {
-                log(webBook.sourceUrl, "》未获取到书籍")
+                log(webBook.sourceUrl, "︽未获取到书籍")
             }
         }.onFailure {
             log(webBook.sourceUrl, "Error: ${it.localizedMessage}")
@@ -135,13 +135,13 @@ class Debugger(val logMsg: (String) -> Unit) : DebugLog {
 
     private suspend fun infoDebug(webBook: WebBook, book: Book) {
         webBook.debugLogger = this
-        log(msg = "《开始解析详情页")
+        log(msg = "︾开始解析详情页")
         runCatching {
             webBook.getBookInfo(book)
         }.onSuccess {
             log("┌书籍详情")
             log("└${GSON.toJson(it)}")
-            log(webBook.sourceUrl, "》详情页解析完成\n\n")
+            log(webBook.sourceUrl, "︽详情页解析完成\n\n")
             tocDebug(webBook, it)
         }.onFailure {
             log(webBook.sourceUrl, "Error: ${it.localizedMessage}")
@@ -151,17 +151,17 @@ class Debugger(val logMsg: (String) -> Unit) : DebugLog {
 
     private suspend fun tocDebug(webBook: WebBook, book: Book) {
         webBook.debugLogger = this
-        log(msg = "《开始解析目录页")
+        log(msg = "︾开始解析目录页")
         runCatching {
             webBook.getChapterList(book)
         }.onSuccess { chapterList ->
             chapterList?.takeIf { it.isNotEmpty() }?.let {
                 log("┌目录列表")
                 log("└${GSON.toJson(it)}")
-                log(webBook.sourceUrl, "》目录页解析完成\n\n")
+                log(webBook.sourceUrl, "︽目录页解析完成\n\n")
                 val nextChapterUrl = if (it.size > 1) it[1].url else null
                 contentDebug(webBook, book, it[0], nextChapterUrl)
-            } ?: log(webBook.sourceUrl, "》目录列表为空")
+            } ?: log(webBook.sourceUrl, "︽目录列表为空")
         }.onFailure {
             log(webBook.sourceUrl, "Error: ${it.localizedMessage}")
             throw it
@@ -175,13 +175,13 @@ class Debugger(val logMsg: (String) -> Unit) : DebugLog {
         nextChapterUrl: String?
     ) {
         webBook.debugLogger = this
-        log(webBook.sourceUrl, "《开始解析正文页")
+        log(webBook.sourceUrl, "︾开始解析正文页")
         runCatching {
             webBook.getBookContent(book, bookChapter, nextChapterUrl)
         }.onSuccess {
             log("┌正文内容")
             log("└$it")
-            log(webBook.sourceUrl, "》正文页解析完成")
+            log(webBook.sourceUrl, "︽正文页解析完成")
         }.onFailure {
             log(webBook.sourceUrl, "Error: ${it.localizedMessage}")
         }
