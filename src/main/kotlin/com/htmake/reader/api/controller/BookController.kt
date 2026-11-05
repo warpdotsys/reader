@@ -2623,14 +2623,19 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         if (!checkAuth(context)) {
             return returnData.setData("NEED_LOGIN").setErrorMsg("请登录后使用")
         }
-        val bookUrl = context.bodyAsJson.getString("url") ?: ""
-        if (bookUrl.isEmpty()) {
-            return returnData.setErrorMsg("书籍链接不能为空")
+        val url = context.bodyAsJson.getString("url")
+        val bookUrl = url ?: context.bodyAsJson.getString("bookUrl")
+        if (bookUrl.isNullOrEmpty()) {
+            return returnData.setErrorMsg("请输入书籍链接")
         }
         val userNameSpace = getUserNameSpace(context)
-        val book = getShelfBookByURL(bookUrl, userNameSpace)
-            ?: return returnData.setErrorMsg("书籍信息错误")
-        getChapterCacheDir(book, userNameSpace).deleteRecursively()
+        val bookInfo = getShelfBookByURL(bookUrl, userNameSpace)
+            ?: return returnData.setErrorMsg("请先加入书架")
+        if (bookInfo.isLocalBook()) {
+            return returnData.setErrorMsg("本地书籍无需删除缓存")
+        }
+        val localCacheDir = getChapterCacheDir(bookInfo, userNameSpace)
+        localCacheDir.deleteRecursively()
         return returnData.setData("")
     }
 

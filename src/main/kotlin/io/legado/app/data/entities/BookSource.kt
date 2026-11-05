@@ -80,20 +80,20 @@ data class BookSource(
         debugLog = logger
     }
 
-    val searchRule: SearchRule
-        get() = ruleSearch ?: SearchRule()
-
-    val exploreRule: ExploreRule
-        get() = ruleExplore ?: ExploreRule()
-
     val bookInfoRule: BookInfoRule
         get() = ruleBookInfo ?: BookInfoRule()
+
+    val contentRule: ContentRule
+        get() = ruleContent ?: ContentRule()
+
+    val searchRule: SearchRule
+        get() = ruleSearch ?: SearchRule()
 
     val tocRule: TocRule
         get() = ruleToc ?: TocRule()
 
-    val contentRule: ContentRule
-        get() = ruleContent ?: ContentRule()
+    val exploreRule: ExploreRule
+        get() = ruleExplore ?: ExploreRule()
 
     fun equal(source: BookSource): Boolean {
         return equal(bookSourceName, source.bookSourceName) &&

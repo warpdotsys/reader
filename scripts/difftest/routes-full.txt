@@ -1,0 +1,205 @@
+GET /reader3/getSystemInfo
+POST /reader3/saveBookSource {}
+POST /reader3/saveBookSource {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/saveBookSources {}
+POST /reader3/saveBookSources {"url":"","bookSourceUrl":"","username":"","password":""}
+GET /reader3/getBookSource
+POST /reader3/getBookSource {}
+POST /reader3/getBookSource {"url":"","bookSourceUrl":"","username":"","password":""}
+GET /reader3/getBookSources
+POST /reader3/getBookSources {}
+POST /reader3/getBookSources {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/deleteAllBookSources {}
+POST /reader3/deleteAllBookSources {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/deleteBookSource {}
+POST /reader3/deleteBookSource {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/deleteBookSources {}
+POST /reader3/deleteBookSources {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/readSourceFile {}
+POST /reader3/readSourceFile {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/saveFromRemoteSource {}
+POST /reader3/saveFromRemoteSource {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/setAsDefaultBookSources {}
+POST /reader3/setAsDefaultBookSources {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/deleteUserBookSource {}
+POST /reader3/deleteUserBookSource {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/deleteBookSourcesFile {}
+POST /reader3/deleteBookSourcesFile {"url":"","bookSourceUrl":"","username":"","password":""}
+GET /reader3/getBookshelf
+GET /reader3/getShelfBook
+POST /reader3/saveBook {}
+POST /reader3/saveBook {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/deleteBook {}
+POST /reader3/deleteBook {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/deleteBooks {}
+POST /reader3/deleteBooks {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/getInvalidBookSources {}
+POST /reader3/getInvalidBookSources {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/exploreBook {}
+POST /reader3/exploreBook {"url":"","bookSourceUrl":"","username":"","password":""}
+GET /reader3/exploreBook
+GET /reader3/searchBook
+POST /reader3/searchBook {}
+POST /reader3/searchBook {"url":"","bookSourceUrl":"","username":"","password":""}
+GET /reader3/searchBookMulti
+POST /reader3/searchBookMulti {}
+POST /reader3/searchBookMulti {"url":"","bookSourceUrl":"","username":"","password":""}
+GET /reader3/getBookInfo
+POST /reader3/getBookInfo {}
+POST /reader3/getBookInfo {"url":"","bookSourceUrl":"","username":"","password":""}
+GET /reader3/getChapterList
+POST /reader3/getChapterList {}
+POST /reader3/getChapterList {"url":"","bookSourceUrl":"","username":"","password":""}
+GET /reader3/getBookContent
+POST /reader3/getBookContent {}
+POST /reader3/getBookContent {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/saveBookContent {}
+POST /reader3/saveBookContent {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/saveBookProgress {}
+POST /reader3/saveBookProgress {"url":"","bookSourceUrl":"","username":"","password":""}
+GET /reader3/searchBookSource
+POST /reader3/searchBookSource {}
+POST /reader3/searchBookSource {"url":"","bookSourceUrl":"","username":"","password":""}
+GET /reader3/getAvailableBookSource
+POST /reader3/getAvailableBookSource {}
+POST /reader3/getAvailableBookSource {"url":"","bookSourceUrl":"","username":"","password":""}
+GET /reader3/setBookSource
+POST /reader3/setBookSource {}
+POST /reader3/setBookSource {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/saveBookGroupId {}
+POST /reader3/saveBookGroupId {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/addBookGroupMulti {}
+POST /reader3/addBookGroupMulti {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/removeBookGroupMulti {}
+POST /reader3/removeBookGroupMulti {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/importBookPreview {}
+POST /reader3/importBookPreview {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/refreshLocalBook {}
+POST /reader3/refreshLocalBook {"url":"","bookSourceUrl":"","username":"","password":""}
+GET /reader3/getTxtTocRules
+POST /reader3/getChapterListByRule {}
+POST /reader3/getChapterListByRule {"url":"","bookSourceUrl":"","username":"","password":""}
+GET /reader3/getBookGroups
+POST /reader3/saveBookGroup {}
+POST /reader3/saveBookGroup {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/deleteBookGroup {}
+POST /reader3/deleteBookGroup {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/saveBookGroupOrder {}
+POST /reader3/saveBookGroupOrder {"url":"","bookSourceUrl":"","username":"","password":""}
+GET /reader3/getShelfBookWithCacheInfo
+POST /reader3/deleteBookCache {}
+POST /reader3/deleteBookCache {"url":"","bookSourceUrl":"","username":"","password":""}
+GET /reader3/searchBookContent
+POST /reader3/searchBookContent {}
+POST /reader3/searchBookContent {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/backupToMongodb {}
+POST /reader3/backupToMongodb {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/restoreFromMongodb {}
+POST /reader3/restoreFromMongodb {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/book/saveBookConfig {}
+POST /reader3/book/saveBookConfig {"url":"","bookSourceUrl":"","username":"","password":""}
+GET /reader3/book/tts
+POST /reader3/book/tts {}
+POST /reader3/book/tts {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/uploadFile {}
+POST /reader3/uploadFile {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/deleteFile {}
+POST /reader3/deleteFile {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/login {}
+POST /reader3/login {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/logout {}
+POST /reader3/logout {"url":"","bookSourceUrl":"","username":"","password":""}
+GET /reader3/getUserInfo
+POST /reader3/saveUserConfig {}
+POST /reader3/saveUserConfig {"url":"","bookSourceUrl":"","username":"","password":""}
+GET /reader3/getUserConfig
+GET /reader3/getUserList
+POST /reader3/deleteUsers {}
+POST /reader3/deleteUsers {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/clearInactiveUsers {}
+POST /reader3/clearInactiveUsers {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/addUser {}
+POST /reader3/addUser {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/resetPassword {}
+POST /reader3/resetPassword {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/updateUser {}
+POST /reader3/updateUser {"url":"","bookSourceUrl":"","username":"","password":""}
+GET /reader3/user/downloadBackupFile
+GET /reader3/getLicense
+POST /reader3/importLicense {}
+POST /reader3/importLicense {"url":"","bookSourceUrl":"","username":"","password":""}
+GET /reader3/isHostValid
+POST /reader3/isHostValid {}
+POST /reader3/isHostValid {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/activateLicense {}
+POST /reader3/activateLicense {"url":"","bookSourceUrl":"","username":"","password":""}
+GET /reader3/isLicenseValid
+POST /reader3/isLicenseValid {}
+POST /reader3/isLicenseValid {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/decryptLicense {}
+POST /reader3/decryptLicense {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/sendCodeToEmail {}
+POST /reader3/sendCodeToEmail {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/supplyLicense {}
+POST /reader3/supplyLicense {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/backupToWebdav {}
+POST /reader3/backupToWebdav {"url":"","bookSourceUrl":"","username":"","password":""}
+GET /reader3/getRssSources
+POST /reader3/saveRssSource {}
+POST /reader3/saveRssSource {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/saveRssSources {}
+POST /reader3/saveRssSources {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/deleteRssSource {}
+POST /reader3/deleteRssSource {"url":"","bookSourceUrl":"","username":"","password":""}
+GET /reader3/getRssArticles
+POST /reader3/getRssArticles {}
+POST /reader3/getRssArticles {"url":"","bookSourceUrl":"","username":"","password":""}
+GET /reader3/getRssContent
+POST /reader3/getRssContent {}
+POST /reader3/getRssContent {"url":"","bookSourceUrl":"","username":"","password":""}
+GET /reader3/getReplaceRules
+POST /reader3/saveReplaceRule {}
+POST /reader3/saveReplaceRule {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/saveReplaceRules {}
+POST /reader3/saveReplaceRules {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/deleteReplaceRule {}
+POST /reader3/deleteReplaceRule {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/deleteReplaceRules {}
+POST /reader3/deleteReplaceRules {"url":"","bookSourceUrl":"","username":"","password":""}
+GET /reader3/getBookmarks
+POST /reader3/saveBookmark {}
+POST /reader3/saveBookmark {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/saveBookmarks {}
+POST /reader3/saveBookmarks {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/deleteBookmark {}
+POST /reader3/deleteBookmark {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/deleteBookmarks {}
+POST /reader3/deleteBookmarks {"url":"","bookSourceUrl":"","username":"","password":""}
+GET /reader3/file/list
+GET /reader3/file/get
+POST /reader3/file/save {}
+POST /reader3/file/save {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/file/mkdir {}
+POST /reader3/file/mkdir {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/file/upload {}
+POST /reader3/file/upload {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/file/delete {}
+POST /reader3/file/delete {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/file/deleteMulti {}
+POST /reader3/file/deleteMulti {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/file/importPreview {}
+POST /reader3/file/importPreview {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/file/restore {}
+POST /reader3/file/restore {"url":"","bookSourceUrl":"","username":"","password":""}
+GET /reader3/file/parse
+POST /reader3/file/parse {}
+POST /reader3/file/parse {"url":"","bookSourceUrl":"","username":"","password":""}
+GET /reader3/httpTTS/list
+POST /reader3/httpTTS/save {}
+POST /reader3/httpTTS/save {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/httpTTS/saveMulti {}
+POST /reader3/httpTTS/saveMulti {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/httpTTS/delete {}
+POST /reader3/httpTTS/delete {"url":"","bookSourceUrl":"","username":"","password":""}
+POST /reader3/httpTTS/deleteMulti {}
+POST /reader3/httpTTS/deleteMulti {"url":"","bookSourceUrl":"","username":"","password":""}

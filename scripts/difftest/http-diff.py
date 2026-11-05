@@ -77,6 +77,13 @@ def compare(art_base, loc_base, method, path, body=None, timeout=10):
     return False, '; '.join(detail)
 
 
+# 会改变服务端状态的路由（写文件/删数据/登录），顺序执行会互相污染
+MUTATING = re.compile(
+    r'/(save|delete|add|update|set|clear|reset|import|upload|restore|backup|login|logout|'
+    r'create|generate|apply|remove|put|edit|sync|download|export)[A-Za-z]*$',
+    re.I)
+
+
 DEFAULT_ROUTES = [
     # (method, path, body)
     ('GET', '/health', None),
@@ -151,6 +158,9 @@ def main():
         out.write(f'# 制品 {args.art}  vs  本地 {args.loc}\n')
         out.write(f'# 共 {len(routes)} 条路由\n\n')
         for method, path, body in routes:
+            if MUTATING.search(path):
+                out.write(f'  SKIP {method} {path}  (会改状态)\n')
+                continue
             ok, detail = compare(args.art, args.loc, method, path, body, args.timeout)
             label = f'{method} {path}' + (f'  body={body}' if body else '')
             if ok:
