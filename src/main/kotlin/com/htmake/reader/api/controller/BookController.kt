@@ -1331,15 +1331,17 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         }
         val userNameSpace = Ref.ObjectRef<String>()
         userNameSpace.element = getUserNameSpace(context)
-        val bookRef = Ref.ObjectRef<Book>()
-        bookRef.element = getShelfBookByURL(bookUrl, userNameSpace.element)
-        if (bookRef.element == null) {
-            bookRef.element = bookInfoCache.getAsString(bookUrl)?.toMap()?.toDataClass<Book>()
+        val book = Ref.ObjectRef<Book>()
+        book.element = getShelfBookByURL(bookUrl, userNameSpace.element)
+        if (book.element == null) {
+            book.element = bookInfoCache.getAsString(bookUrl)?.toMap()?.toDataClass<Book>()
         }
-        val book = bookRef.element ?: return returnData.setErrorMsg("书籍信息错误")
+        if (book.element == null) {
+            return returnData.setErrorMsg("书籍信息错误")
+        }
         val bookSourceList = Ref.ObjectRef<JsonArray>()
         bookSourceList.element =
-            asJsonArray(getUserStorage(userNameSpace.element, book.name + "_" + book.author, "bookSource"))
+            asJsonArray(getUserStorage(userNameSpace.element, book.element!!.name + "_" + book.element!!.author, "bookSource"))
         if (bookSourceList.element == null || bookSourceList.element!!.size() <= 0) {
             return returnData.setData(arrayListOf<SearchBook>())
         }
@@ -1354,7 +1356,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             { index ->
                 val searchBook = bookSourceList.element!!.getJsonObject(index)
                     .mapTo(SearchBook::class.java)
-                if (searchBook.origin == "loc_book") {
+                if (searchBook.origin.equals("loc_book")) {
                     arrayListOf(searchBook)
                 } else {
                     val bookSource =
@@ -1363,7 +1365,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                         arrayListOf<SearchBook>()
                     } else {
                         searchBookWithSource(
-                            bookSource, book, false, userNameSpace.element
+                            bookSource, book.element!!, false, userNameSpace.element
                         )
                     }
                 }
@@ -1378,7 +1380,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                 true
             }
         )
-        saveBookSources(book, resultList.element, userNameSpace.element, true)
+        saveBookSources(book.element!!, resultList.element, userNameSpace.element, true)
         return returnData.setData(resultList.element)
     }
 
