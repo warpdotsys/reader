@@ -35,8 +35,12 @@ class MapDeserializerDoubleAsIntFix : JsonDeserializer<Map<String, Any?>> {
         }
         if (json.isJsonObject) {
             val map = LinkedTreeMap<String, Any?>()
-            for ((key, value) in json.asJsonObject.entrySet()) {
-                map[key] = read(value)
+            val obj = json.asJsonObject
+            val entitySet = obj.entrySet()
+            for (entry in entitySet) {
+                val key: String = entry.key
+                val value = entry.value
+                map.put(key, read(value))
             }
             return map
         }

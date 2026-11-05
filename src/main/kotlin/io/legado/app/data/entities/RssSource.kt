@@ -174,8 +174,9 @@ data class RssSource(
         fun fromJsonArray(jsonArray: String): Result<List<RssSource>> {
             return runCatching {
                 val list = arrayListOf<RssSource>()
-                (jsonPath.parse(jsonArray).read<Any>("$") as List<Map<String, Any>>).forEach {
-                    list.add(fromJsonDoc(jsonPath.parse(it)).getOrThrow())
+                (jsonPath.parse(jsonArray).read<Any>("$") as List<Map<String, Any>>).forEach { item ->
+                    val jsonItem = jsonPath.parse(item)
+                    list.add(fromJsonDoc(jsonItem).getOrThrow())
                 }
                 list
             }

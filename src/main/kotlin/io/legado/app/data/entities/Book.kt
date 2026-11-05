@@ -152,7 +152,10 @@ data class Book(
     fun getDisplayIntro(): String? =
         if (customIntro.isNullOrEmpty()) intro else customIntro
 
-    fun fileCharset(): Charset = Charset.forName(charset ?: "UTF-8")
+    fun fileCharset(): Charset {
+        val charsetName = charset ?: "UTF-8"
+        return Charset.forName(charsetName)
+    }
 
     private fun config(): ReadConfig {
         if (readConfig == null) {

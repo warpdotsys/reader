@@ -80,8 +80,9 @@ data class HttpTTS(
         fun fromJsonArray(jsonArray: String): Result<List<HttpTTS>> {
             return runCatching {
                 val list = arrayListOf<HttpTTS>()
-                (jsonPath.parse(jsonArray).read<Any>("$") as List<Map<String, Any>>).forEach {
-                    list.add(fromJsonDoc(JsonPath.parse(it)).getOrThrow())
+                (jsonPath.parse(jsonArray).read<Any>("$") as List<Map<String, Any>>).forEach { item ->
+                    val jsonItem = jsonPath.parse(item)
+                    list.add(fromJsonDoc(jsonItem).getOrThrow())
                 }
                 list
             }
