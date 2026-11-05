@@ -4,6 +4,7 @@ package com.htmake.reader.api.controller
 import com.htmake.reader.api.ReturnData
 import com.htmake.reader.entity.User
 import com.htmake.reader.utils.SpringContextUtils
+import com.htmake.reader.utils.UserMutex
 import com.htmake.reader.utils.deleteRecursively
 import com.htmake.reader.utils.getWorkDir
 import com.htmake.reader.utils.jsonEncode
@@ -2178,19 +2179,40 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
     suspend fun editShelfBook(
         book: Book,
         userNameSpace: String,
-        block: (Book) -> Book
-    ): Book {
-        val bookList = getBookShelfBooks(false, userNameSpace).toMutableList()
-        val index = bookList.indexOfFirst { it.bookUrl == book.bookUrl }
-        val existBook = if (index >= 0) bookList[index] else book
-        val newBook = block(existBook)
-        if (index >= 0) {
-            bookList[index] = newBook
-        } else {
-            bookList.add(newBook)
+        handler: (Book) -> Book
+    ): Book? {
+        val locker = UserMutex.getLocker("$userNameSpace@bookshelf")
+        logger.info("wait for lock {}", "$userNameSpace@bookshelf")
+        return locker.withLock {
+            logger.info("lock success")
+            var bookshelf = asJsonArray(getUserStorage(userNameSpace, "bookshelf")) ?: JsonArray()
+            var existIndex = -1
+            for (i in 0 until bookshelf.size()) {
+                val _book = bookshelf.getJsonObject(i).mapTo(Book::class.java)
+                if (book.bookUrl.length > 0 && _book.bookUrl == book.bookUrl) {
+                    existIndex = i
+                    break
+                }
+                if (book.name.length > 0 && _book.name == book.name &&
+                    book.author.length > 0 && _book.author == book.author
+                ) {
+                    existIndex = i
+                    break
+                }
+            }
+            if (existIndex >= 0) {
+                val list = bookshelf.list
+                val existBook: Book = handler(
+                    bookshelf.getJsonObject(existIndex).mapTo(Book::class.java) as Book
+                )
+                list.set(existIndex, JsonObject.mapFrom(existBook))
+                bookshelf = JsonArray(list)
+                saveUserStorage(userNameSpace, "bookshelf", bookshelf)
+                existBook
+            } else {
+                null
+            }
         }
-        saveUserStorage(userNameSpace, "bookshelf", GSON.toJson(bookList))
-        return newBook
     }
 
     fun saveBookSources(
