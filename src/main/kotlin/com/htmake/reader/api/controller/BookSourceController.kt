@@ -187,13 +187,13 @@ class BookSourceController(coroutineContext: CoroutineContext) : BaseController(
     suspend fun getBookSource(context: RoutingContext): ReturnData {
         val returnData = ReturnData()
         checkAuth(context)
-        var bookSourceUrl: String? = null
+        var bookSourceUrl: String
         if (context.request().method() == HttpMethod.POST) {
             bookSourceUrl = context.bodyAsJson.getString("bookSourceUrl")
         } else {
             bookSourceUrl = context.queryParam("bookSourceUrl").firstOrNull() ?: ""
         }
-        if (bookSourceUrl.isNullOrEmpty()) {
+        if (bookSourceUrl.isEmpty()) {
             return returnData.setErrorMsg("书源链接不能为空")
         }
         val userNameSpace = getUserNameSpace(context)

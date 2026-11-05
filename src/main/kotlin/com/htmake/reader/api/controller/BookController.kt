@@ -2868,24 +2868,21 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         if (!checkAuth(context)) {
             return returnData.setData("NEED_LOGIN").setErrorMsg("请登录后使用")
         }
-        val bookUrl = if (context.request().method() == HttpMethod.POST) {
-            context.bodyAsJson.getString("url") ?: ""
-        } else {
-            context.queryParam("url").firstOrNull() ?: ""
-        }
-        if (bookUrl.isEmpty()) {
-            return returnData.setErrorMsg("书籍链接不能为空")
-        }
         val userNameSpace = getUserNameSpace(context)
-        val book = getShelfBookByURL(bookUrl, userNameSpace)
-            ?: return returnData.setErrorMsg("书籍信息错误")
-        val cachedChapterSet = getCachedChapterContentSet(book, userNameSpace)
-        return returnData.setData(
-            mapOf(
-                "book" to book,
-                "cachedChapterIndex" to cachedChapterSet
-            )
-        )
+        val bookList = getBookShelfBooks(false, userNameSpace)
+        val result = arrayListOf<Map<String, Any>>()
+        var i = 0
+        val size = bookList.size
+        while (i < size) {
+            val bookInfo = bookList[i++]
+            if (!bookInfo.isLocalBook()) {
+                val cachedSet = getCachedChapterContentSet(bookInfo, userNameSpace)
+                val bookInfoMap = bookInfo.toMap().toMutableMap()
+                bookInfoMap.put("cachedChapterCount", cachedSet.size)
+                result.add(bookInfoMap)
+            }
+        }
+        return returnData.setData(result)
     }
 
     suspend fun exportBook(context: RoutingContext) {

@@ -1,6 +1,11 @@
 // Restored from reader-pro-3.2.14.jar; see docs/PROVENANCE.md.
 package com.htmake.reader.config
 
+import org.springframework.boot.context.properties.ConfigurationProperties
+import org.springframework.stereotype.Component
+
+@Component
+@ConfigurationProperties(prefix = "reader.app")
 open class AppConfig {
 
     open var workDir: String = ""
