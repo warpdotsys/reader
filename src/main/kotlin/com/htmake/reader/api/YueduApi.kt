@@ -131,7 +131,7 @@ open class YueduApi : RestVerticle() {
             }
             if (simpleWebExpiredAt != 0L && simpleWebExpiredAt < System.currentTimeMillis()) {
                 it.response().putHeader("content-type", "text/html; charset=UTF-8")
-                    .setStatusCode(403).end("<html><head><title>未激活该功能</title></head><body></body></html>")
+                    .setStatusCode(403).end("<html><head><title>未激活该功能</title></head><body><div style='text-align: center;padding: 30px 0;'>未激活该功能，请加<a href='https://t.me/+pQ8HDlANPZ84ZWNl'>TG群</a>激活</div></body></html>")
             } else {
                 it.next()
             }
