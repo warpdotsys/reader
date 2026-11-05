@@ -6,6 +6,10 @@ import com.jayway.jsonpath.DocumentContext
 import com.jayway.jsonpath.JsonPath
 import io.legado.app.model.DebugLog
 import kotlin.jvm.Transient
+import io.legado.app.utils.readLong
+import io.legado.app.utils.readString
+import io.legado.app.utils.GSON
+import io.legado.app.utils.jsonPath
 
 @JsonIgnoreProperties(value = ["headerMap", "source", "_userNameSpace", "userNameSpace"])
 data class HttpTTS(
@@ -54,27 +58,29 @@ data class HttpTTS(
         fun fromJsonDoc(doc: DocumentContext): Result<HttpTTS> {
             return runCatching {
                 HttpTTS(
-                    id = doc.read("$.id"),
-                    name = doc.read("$.name"),
-                    url = doc.read("$.url"),
-                    contentType = doc.read("$.contentType"),
-                    concurrentRate = doc.read("$.concurrentRate"),
-                    loginUrl = doc.read("$.loginUrl"),
-                    loginUi = doc.read("$.loginUi"),
-                    header = doc.read("$.header"),
-                    loginCheckJs = doc.read("$.loginCheckJs")
+                    id = doc.readLong("$.id") ?: System.currentTimeMillis(),
+                    name = doc.readString("$.name")!!,
+                    url = doc.readString("$.url")!!,
+                    contentType = doc.readString("$.contentType"),
+                    concurrentRate = doc.readString("$.concurrentRate"),
+                    loginUrl = doc.readString("$.loginUrl"),
+                    loginUi = doc.read<Any>("$.loginUi").let {
+                        if (it is List<*>) GSON.toJson(it) else it?.toString()
+                    },
+                    header = doc.readString("$.header"),
+                    loginCheckJs = doc.readString("$.loginCheckJs")
                 )
             }
         }
 
         fun fromJson(json: String): Result<HttpTTS> {
-            return fromJsonDoc(JsonPath.parse(json))
+            return fromJsonDoc(jsonPath.parse(json))
         }
 
         fun fromJsonArray(jsonArray: String): Result<List<HttpTTS>> {
             return runCatching {
                 val list = arrayListOf<HttpTTS>()
-                JsonPath.parse(jsonArray).read<List<Map<String, Any>>>("$").forEach {
+                (jsonPath.parse(jsonArray).read<Any>("$") as List<Map<String, Any>>).forEach {
                     list.add(fromJsonDoc(JsonPath.parse(it)).getOrThrow())
                 }
                 list
