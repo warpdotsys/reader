@@ -34,8 +34,7 @@ object ZipUtils {
         }
         ZipOutputStream(FileOutputStream(zipFilePath)).use { zos ->
             for (srcFile in srcFilePaths) {
-                val file = getFileByPath(srcFile)!!
-                if (!zipFile(file, "", zos, comment)) {
+                if (!zipFile(getFileByPath(srcFile)!!, "", zos, comment)) {
                     return@withContext false
                 }
             }
