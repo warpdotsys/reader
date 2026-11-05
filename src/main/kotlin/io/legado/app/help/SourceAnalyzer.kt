@@ -271,7 +271,7 @@ object SourceAnalyzer {
         }
         val urls = Regex("(&&|\r?\n)+").split(oldUrls)
         return urls.map {
-            toNewUrl(it)?.replace(Regex("\\n\\s*"), "")
+            toNewUrl(it)?.replace(Regex("\n\\s*"), "")
         }.joinToString("\n")
     }
 
