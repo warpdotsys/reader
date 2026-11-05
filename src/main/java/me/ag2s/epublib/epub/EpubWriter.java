@@ -51,7 +51,12 @@ public class EpubWriter {
 
     private void initTOCResource(EpubBook book) {
         try {
-            Resource tocResource = book.isEpub3() ? NCXDocumentV3.createNCXResource(book) : NCXDocumentV2.createNCXResource(book);
+            Resource tocResource;
+            if (book.isEpub3()) {
+                tocResource = NCXDocumentV3.createNCXResource(book);
+            } else {
+                tocResource = NCXDocumentV2.createNCXResource(book);
+            }
             Resource currentTocResource = book.getSpine().getTocResource();
             if (currentTocResource != null) {
                 book.getResources().remove(currentTocResource.getHref());
@@ -94,14 +99,14 @@ public class EpubWriter {
 
     private void writeContainer(ZipOutputStream resultStream) throws IOException {
         resultStream.putNextEntry(new ZipEntry("META-INF/container.xml"));
-        OutputStreamWriter out = new OutputStreamWriter(resultStream);
+        Writer out = new OutputStreamWriter(resultStream);
         out.write("<?xml version=\"1.0\"?>\n");
         out.write("<container version=\"1.0\" xmlns=\"urn:oasis:names:tc:opendocument:xmlns:container\">\n");
         out.write("\t<rootfiles>\n");
         out.write("\t\t<rootfile full-path=\"OEBPS/content.opf\" media-type=\"application/oebps-package+xml\"/>\n");
         out.write("\t</rootfiles>\n");
         out.write("</container>");
-        ((Writer)out).flush();
+        out.flush();
     }
 
     private void writeMimeType(ZipOutputStream resultStream) throws IOException {
