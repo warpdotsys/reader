@@ -32,10 +32,10 @@ object RemoteWebview {
         debugLog: DebugLog? = null
     ): StrResponse {
         val remoteApi = remoteWebviewApi
+        var remoteUrl = "$remoteApi/render.html"
         if (remoteApi.isEmpty()) {
             throw Exception("不支持webview")
         }
-        var remoteUrl = "$remoteApi/render.html"
         var requestBody = jsonEncode(
             mapOf(
                 "url" to url,
