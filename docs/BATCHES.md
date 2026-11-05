@@ -5213,3 +5213,65 @@ var requestBody = jsonEncode(...)
 
 **捕获字段类型是 `Lkotlin/jvm/internal/Ref$ObjectRef;` = 源码里是 `var`；
 直接是 `Ljava/lang/String;` = `val`。** 想改捕获形态，改 `val`/`var` 就行。
+
+### 3a-109 三个 TypeAdapter 全清：3a-86 的翻案（精确形态是三层嵌套）
+
+#### 最终形态
+
+```kotlin
+override fun deserialize(json: JsonElement, typeOfT: Type?, context: JsonDeserializationContext?): Int? {
+    return if (json.isJsonPrimitive) {          // ① 外层 if/else 表达式
+        val prim = json.asJsonPrimitive
+        if (prim.isNumber) {                     // ② 内层 if/else 块（带 checkcast）
+            prim.asNumber.toInt()
+        } else {
+            null
+        }
+    } else null                                  // ③ 外层 else 单行（无 checkcast）
+}
+```
+
+字节码结构：
+
+```
+5  ifeq <外层 else>
+6  aload_1 / getAsJsonPrimitive / astore 4
+9  aload 4 / isNumber
+11 ifeq <内层 else>
+12-15 Integer.valueOf(...)
+16 goto <外层汇合>
+17 aconst_null
+18 checkcast Integer        ← 内层 else 有 checkcast
+19 goto <外层汇合>
+20 aconst_null
+21 areturn                   ← 外层 else 无 checkcast
+```
+
+#### 3a-86 当时为什么没搞定
+
+3a-86 我试了两种写法都失败：
+
+| 写法 | 结果 |
+| --- | --- |
+| `if/else` 表达式 + 内层单行 `if (c) x else null` + 外层 `else { null }` | 28/28，checkcast 跑到了**外层** |
+| 早退 `if (!json.isJsonPrimitive) return null` | 也是 28/27 |
+
+**真正的差异是三层各自的「表达式 vs 块」组合**：
+
+1. **外层必须是 `if/else` 表达式**（`return if (...) {...} else ...`），不能早退
+2. **内层必须是带大括号的块**（`if (c) { x } else { null }`）→ 内层 else 的 `null` 有 `checkcast`
+3. **外层的 `else` 必须写成单行 `else null`**（不加大括号）→ 外层没有 `checkcast`
+
+差一个括号，`checkcast` 就跑到另一层去了。
+
+#### 涉及 3 个类
+
+`IntTypeAdapter` / `LongTypeAdapter` / `IntJsonDeserializer`，
+`compared 3 / exact 3 / different 0`。
+
+#### 判据
+
+**`checkcast` 的位置直接反映「哪一层是表达式、哪一层是块」**：
+- 出现在内层 else → 内层是块，外层是表达式
+- 出现在外层 else → 外层是块
+- **一个 `checkcast` 一个位置，可以精确定位每个 `else` 该不该加括号。**
