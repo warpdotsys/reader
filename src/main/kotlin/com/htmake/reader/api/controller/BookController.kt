@@ -51,6 +51,7 @@ import com.htmake.reader.utils.asJsonObject
 import com.htmake.reader.utils.getRelativePath
 import com.htmake.reader.utils.readMongoFile
 import com.htmake.reader.utils.saveMongoFile
+import com.htmake.reader.lib.tts.constant.TtsStyleEnum
 import com.htmake.reader.lib.tts.constant.VoiceEnum
 import com.htmake.reader.lib.tts.model.SSML
 import com.htmake.reader.lib.tts.service.TTSService
@@ -84,6 +85,7 @@ import org.apache.pdfbox.rendering.PDFRenderer
 import java.awt.image.BufferedImage
 import java.io.FileOutputStream
 import java.io.InputStream
+import java.util.Base64
 import java.util.Locale
 import java.util.function.BiConsumer
 import javax.imageio.ImageIO
@@ -2706,19 +2708,40 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         text: String,
         options: Map<String, String>? = null
     ) {
-        val voice = options?.get("voice") ?: ""
-        val pitch = options?.get("pitch") ?: ""
-        val rate = options?.get("rate") ?: ""
+        var voice = VoiceEnum.zh_CN_XiaoxiaoNeural
+        var rate = "0"
+        var pitch = "0%"
+        if (options != null) {
+            if (options.containsKey("voice")) {
+                voice = VoiceEnum.fromSortName(options["voice"] as String)
+                    ?: VoiceEnum.zh_CN_XiaoxiaoNeural
+            }
+            if (options.containsKey("rate")) {
+                rate = (options["rate"] as String?) ?: "0"
+            }
+            if (options.containsKey("pitch")) {
+                pitch = (options["pitch"] as String) + "%"
+            }
+        }
+        val ttsService = TTSService.builder().build()
         val ssml = SSML.builder()
             .synthesisText(text)
-            .voice(VoiceEnum.valueOf(if (voice.isEmpty()) "zh_CN_XiaoxiaoNeural" else voice))
-            .pitch(if (pitch.isEmpty()) "0%" else pitch)
-            .rate(if (rate.isEmpty()) "0%" else rate)
+            .voice(voice)
+            .rate(rate)
+            .pitch(pitch)
+            .style(TtsStyleEnum.chat)
             .build()
-        val ttsService = TTSService.builder().usingAzureApi(false).build()
         val mp3byte = ttsService.sendText(ssml)
-        response.putHeader("Content-Type", "audio/mpeg")
-        response.end(Buffer.buffer(mp3byte))
+        if (options != null && "1" == options["base64"]) {
+            val returnData = ReturnData()
+            response.putHeader("content-type", "application/json; charset=utf-8")
+            val encoded = Base64.getEncoder().encodeToString(mp3byte)
+            returnData.setData(encoded)
+            response.end(jsonEncode(returnData))
+        } else {
+            response.putHeader("Content-Type", "audio/mpeg")
+            response.end(Buffer.buffer(mp3byte))
+        }
     }
 
     fun getHttpTTSByName(name: String, userNameSpace: String): HttpTTS? {
