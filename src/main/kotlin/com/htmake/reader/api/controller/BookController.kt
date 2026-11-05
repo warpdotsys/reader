@@ -3153,18 +3153,29 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         if (lastIndex >= chapterList.size) {
             return returnData.setErrorMsg("没有更多了")
         }
-        logger.info("searchBookContent keyword: {} lastIndex: {}", keyword, lastIndex)
         val resultList = ArrayList<SearchResult>()
-        var i = lastIndex
-        while (i < chapterList.size) {
-            val chapter = chapterList[i++]
+        val isEnd = Ref.BooleanRef()
+        context.request().connection().closeHandler { isEnd.element = true }
+        logger.info("searchBookContent keyword: {} lastIndex: {}", keyword, lastIndex)
+        var currentIndex = lastIndex + 1
+        while (currentIndex < chapterList.size) {
+            val chapter = chapterList[currentIndex]
+            currentIndex++
             val chapterResult = searchChapter(book, chapter, keyword)
             if (chapterResult.isNotEmpty()) {
                 resultList.addAll(chapterResult)
             }
-            if (resultList.size >= size) break
+            if (resultList.size < size && !isEnd.element && currentIndex < chapterList.size) {
+                continue
+            }
+            break
         }
-        return returnData.setData(resultList)
+        return returnData.setData(
+            mapOf(
+                "list" to resultList,
+                "lastIndex" to currentIndex
+            )
+        )
     }
 
     suspend fun searchChapter(
