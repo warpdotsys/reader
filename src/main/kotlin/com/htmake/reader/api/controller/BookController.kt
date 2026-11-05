@@ -2430,6 +2430,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
     }
 
     suspend fun bookSourceDebugSSE(context: RoutingContext) {
+        val returnData = ReturnData()
         val response = context.response()
         response.putHeader("Content-Type", "text/event-stream")
         response.putHeader("Cache-Control", "no-cache")
@@ -2446,8 +2447,9 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         val bookSource = (getBookSourceStringBySourceURLOpt(bookSourceUrl, userNameSpace) ?: "")
         if (bookSource.isEmpty()) {
             response.write("event: error\n")
-            response.write("data: 书源信息错误\n\n")
-            response.end()
+            response.end(
+                "data: " + jsonEncode(returnData.setErrorMsg("未配置书源"), false) + "\n\n"
+            )
             return
         }
         val debugger = Debugger { msg ->
