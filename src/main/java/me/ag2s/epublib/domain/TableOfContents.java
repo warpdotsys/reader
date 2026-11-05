@@ -44,8 +44,9 @@ implements Serializable {
 
     private static TOCReference findTocReferenceByTitle(String title, List<TOCReference> tocReferences) {
         for (TOCReference tocReference : tocReferences) {
-            if (!title.equals(tocReference.getTitle())) continue;
-            return tocReference;
+            if (title.equals(tocReference.getTitle())) {
+                return tocReference;
+            }
         }
         return null;
     }
@@ -76,7 +77,11 @@ implements Serializable {
         List<TOCReference> currentTocReferences = this.tocReferences;
         for (int i = 0; i < pathElements.length; ++i) {
             int currentIndex = pathElements[i];
-            result2 = currentIndex > 0 && currentIndex < currentTocReferences.size() - 1 ? currentTocReferences.get(currentIndex) : null;
+            if (currentIndex > 0 && currentIndex < currentTocReferences.size() - 1) {
+                result2 = currentTocReferences.get(currentIndex);
+            } else {
+                result2 = null;
+            }
             if (result2 == null) {
                 this.paddTOCReferences(currentTocReferences, pathElements, i, sectionTitlePrefix, sectionNumberSeparator);
                 result2 = currentTocReferences.get(currentIndex);
@@ -155,8 +160,9 @@ implements Serializable {
         int maxChildDepth = 0;
         for (TOCReference tocReference : tocReferences) {
             int childDepth = this.calculateDepth(tocReference.getChildren(), 1);
-            if (childDepth <= maxChildDepth) continue;
-            maxChildDepth = childDepth;
+            if (childDepth > maxChildDepth) {
+                maxChildDepth = childDepth;
+            }
         }
         return currentDepth + maxChildDepth;
     }
