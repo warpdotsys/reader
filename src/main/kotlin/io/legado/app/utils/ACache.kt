@@ -61,7 +61,7 @@ class ACache private constructor(
     init {
         try {
             if (!cacheDir.exists() && !cacheDir.mkdirs()) {
-                logger.info("ACache can't make dirs in ${cacheDir.absolutePath}")
+                logger.info("ACache can't make dirs in %s", cacheDir.absolutePath)
             }
             mCache = ACacheManager(cacheDir, max_size, max_count)
         } catch (e: Exception) {

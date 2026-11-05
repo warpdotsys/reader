@@ -540,12 +540,18 @@ interface JsExtensions {
         transformation: String,
         iv: String
     ): ByteArray? {
-        return EncoderUtils.encryptAES(
-            data.encodeToByteArray(),
-            key.encodeToByteArray(),
-            transformation,
-            iv.encodeToByteArray()
-        )
+        return try {
+            EncoderUtils.encryptAES(
+                data.encodeToByteArray(),
+                key.encodeToByteArray(),
+                transformation,
+                iv.encodeToByteArray()
+            )
+        } catch (e: Exception) {
+            e.printOnDebug()
+            log(e.localizedMessage ?: "aesEncodeToByteArrayERROR")
+            null
+        }
     }
 
     fun aesEncodeToString(
@@ -563,12 +569,18 @@ interface JsExtensions {
         transformation: String,
         iv: String
     ): ByteArray? {
-        return EncoderUtils.encryptAES2Base64(
-            data.encodeToByteArray(),
-            key.encodeToByteArray(),
-            transformation,
-            iv.encodeToByteArray()
-        )
+        return try {
+            EncoderUtils.encryptAES2Base64(
+                data.encodeToByteArray(),
+                key.encodeToByteArray(),
+                transformation,
+                iv.encodeToByteArray()
+            )
+        } catch (e: Exception) {
+            e.printOnDebug()
+            log(e.localizedMessage ?: "aesEncodeToBase64ByteArrayERROR")
+            null
+        }
     }
 
     fun aesEncodeToBase64String(

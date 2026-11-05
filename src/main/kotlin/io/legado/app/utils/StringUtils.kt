@@ -134,7 +134,7 @@ object StringUtils {
         var billion = 0
         val cn = chNum.toCharArray()
         if (cn.size > 1) {
-            if (Regex("^[〇零一二三四五六七八九壹贰叁肆伍陆柒捌玖拾]$").matches(chNum)) {
+            if (Regex("^[〇零一二三四五六七八九壹贰叁肆伍陆柒捌玖]$").matches(chNum)) {
                 for (i in cn.indices) {
                     cn[i] = (48 + ChnMap[cn[i]]!!).toChar()
                 }
