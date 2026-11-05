@@ -9,18 +9,18 @@ import kotlin.jvm.Transient
 
 @JsonIgnoreProperties(value = ["headerMap", "source", "_userNameSpace", "userNameSpace"])
 data class HttpTTS(
-    val id: Long = 0,
+    val id: Long = System.currentTimeMillis(),
     var name: String = "",
     var url: String = "",
     var contentType: String? = null,
-    override var concurrentRate: String? = null,
+    override var concurrentRate: String? = "0",
     override var loginUrl: String? = null,
     override var loginUi: String? = null,
     override var header: String? = null,
     var jsLib: String? = null,
     override var enabledCookieJar: Boolean? = false,
     var loginCheckJs: String? = null,
-    var lastUpdateTime: Long = 0
+    var lastUpdateTime: Long = System.currentTimeMillis()
 ) : BaseSource {
 
     @Transient
