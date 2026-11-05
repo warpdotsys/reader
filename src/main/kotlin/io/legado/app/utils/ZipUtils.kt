@@ -145,18 +145,18 @@ object ZipUtils {
             return null
         }
         val files = ArrayList<File>()
-        val zip2 = ZipFile(zipFile)
-        val entries = zip2.entries()
-        zip2.use {
+        val zip = ZipFile(zipFile)
+        val entries = zip.entries()
+        zip.use {
             if (isSpace(keyword)) {
                 while (entries.hasMoreElements()) {
-                    val entry = entries.nextElement()!!
+                    val entry = entries.nextElement() as ZipEntry
                     val entryName = entry.name
                     if (entryName.contains("../")) {
                         logger.error("ZipUtils entryName: $entryName is dangerous!")
                         continue
                     }
-                    if (!unzipChildFile(destDir, files, zip2, entry, entryName)) {
+                    if (!unzipChildFile(destDir, files, zip, entry, entryName)) {
                         return files
                     }
                 }
@@ -169,7 +169,7 @@ object ZipUtils {
                         continue
                     }
                     if (!entryName.contains(keyword!!)) continue
-                    if (!unzipChildFile(destDir, files, zip2, entry, entryName)) {
+                    if (!unzipChildFile(destDir, files, zip, entry, entryName)) {
                         return files
                     }
                 }
@@ -182,7 +182,7 @@ object ZipUtils {
     private fun unzipChildFile(
         destDir: File,
         files: MutableList<File>,
-        zip2: ZipFile,
+        zip: ZipFile,
         entry: ZipEntry,
         name: String
     ): Boolean {
@@ -194,7 +194,7 @@ object ZipUtils {
         if (!createOrExistsFile(file)) {
             return false
         }
-        BufferedInputStream(zip2.getInputStream(entry)).use { inputStream ->
+        BufferedInputStream(zip.getInputStream(entry)).use { inputStream ->
             BufferedOutputStream(FileOutputStream(file)).use { out ->
                 out.write(inputStream.readBytes())
             }
@@ -213,10 +213,10 @@ object ZipUtils {
             return null
         }
         val paths = ArrayList<String>()
-        val zip2 = ZipFile(zipFile)
-        val entries = zip2.entries()
+        val zip = ZipFile(zipFile)
+        val entries = zip.entries()
         while (entries.hasMoreElements()) {
-            val entryName = entries.nextElement()!!.name
+            val entryName = (entries.nextElement() as ZipEntry).name
             if (entryName.contains("../")) {
                 logger.error("ZipUtils entryName: $entryName is dangerous!")
                 paths.add(entryName)
@@ -224,7 +224,7 @@ object ZipUtils {
             }
             paths.add(entryName)
         }
-        zip2.close()
+        zip.close()
         return paths
     }
 
@@ -239,13 +239,13 @@ object ZipUtils {
             return null
         }
         val comments = ArrayList<String?>()
-        val zip2 = ZipFile(zipFile)
-        val entries = zip2.entries()
+        val zip = ZipFile(zipFile)
+        val entries = zip.entries()
         while (entries.hasMoreElements()) {
-            val entry = entries.nextElement()!!
+            val entry = entries.nextElement() as ZipEntry
             comments.add(entry.comment)
         }
-        zip2.close()
+        zip.close()
         return comments
     }
 
@@ -279,8 +279,7 @@ object ZipUtils {
         if (s == null) {
             return true
         }
-        val len = s.length
-        for (i in 0 until len) {
+        for (i in 0 until s.length) {
             if (Character.isWhitespace(s[i])) continue
             return false
         }
