@@ -43,6 +43,7 @@ import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonObject
 import cn.hutool.crypto.symmetric.AES
 import cn.hutool.crypto.symmetric.DESede
+import io.legado.app.exception.NoStackTraceException
 
 interface JsExtensions {
 
@@ -114,7 +115,7 @@ interface JsExtensions {
             }
         }
         if (result.isBlank()) {
-            throw Exception("$path 内容获取失败或者为空")
+            throw NoStackTraceException("$path 内容获取失败或者为空")
         }
         return result
     }
