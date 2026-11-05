@@ -57,7 +57,7 @@ object BookHelp {
 
     fun getContent(book: Book, bookChapter: BookChapter): String? {
         val file = getBookCacheDir(book)
-        val file2 = file.getFile("%d.txt".format(bookChapter.index))
+        val file2 = file.getFile(String.format("%d.txt", bookChapter.index))
         if (file2.exists()) {
             return file2.readText()
         }
@@ -73,7 +73,7 @@ object BookHelp {
 
     fun delContent(book: Book, bookChapter: BookChapter) {
         val file = getBookCacheDir(book)
-        FileUtils.createFileIfNotExist(file, "%d.txt".format(bookChapter.index)).delete()
+        FileUtils.createFileIfNotExist(file, String.format("%d.txt", bookChapter.index)).delete()
     }
 
     suspend fun saveContent(
@@ -89,7 +89,7 @@ object BookHelp {
 
     fun saveText(book: Book, bookChapter: BookChapter, content: String) {
         val file = getBookCacheDir(book)
-        FileUtils.createFileIfNotExist(file, "%d.txt".format(bookChapter.index)).writeText(content)
+        FileUtils.createFileIfNotExist(file, String.format("%d.txt", bookChapter.index)).writeText(content)
     }
 
     suspend fun saveImages(
