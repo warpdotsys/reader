@@ -26,6 +26,7 @@ JAVAP = os.environ.get('JAVAP', r'D:\Tools\java\jdk-11.0.8+10\bin\javap.exe')
 INSN_RE = re.compile(r'^\s+(\d+):\s+(\S+)(.*)$')
 # 方法签名行："  public final Object foo(java.lang.String);"
 METH_RE = re.compile(r'^\s{2}\S.*?\s([\w$<>]+)\(')
+CLINIT_RE = re.compile(r'^\s*static \{\};')
 
 
 def dump(cp, cls):
@@ -40,6 +41,12 @@ def dump(cp, cls):
 
     methods, cur = {}, None
     for line in r.stdout.splitlines():
+        # 静态初始化块：javap 输出 "static {};"，没有括号参数，METH_RE 匹配不到，
+        # 会让 <clinit> 的指令错误地归到上一个方法头上。
+        if CLINIT_RE.match(line):
+            cur = '<clinit>'
+            methods.setdefault(cur, [])
+            continue
         m = METH_RE.match(line)
         if m and 'Code:' not in line:
             cur = m.group(1)
