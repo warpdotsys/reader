@@ -5128,3 +5128,46 @@ String origin;
 #### 结果
 
 `compared 1 / exact 1 / different 0`。
+
+### 3a-107 两个 BookController lambda 全清：平台类型推断成可空导致装箱
+
+#### 现象
+
+```
+制品 getfield $groupId:J                          ← 基本类型 long
+本地 getfield $groupId:Ljava/lang/Long;  + astore_2 ← 装箱 Long
+```
+
+同一段代码，制品捕获的 `groupId` 是 `long`，我们是 `Long` 对象。
+
+#### 原因
+
+```kotlin
+// 改前
+val groupId = context.bodyAsJson.getLong("groupId", 0L)
+```
+
+`JsonObject.getLong(String, Long)` 是 **Java 方法，返回平台类型 `Long!`**。
+Kotlin 对平台类型做类型推断时，**在 lambda 捕获的上下文里会推断成 `Long?`**，
+于是捕获字段变成 `Ljava/lang/Long;`（装箱对象）。
+
+```kotlin
+// 改后：显式声明非空 Long
+val groupId: Long = context.bodyAsJson.getLong("groupId", 0L)
+```
+
+加类型注解后强制为 `long`（JVM 基本类型），捕获字段变成 `J`。
+
+#### 影响范围
+
+`addBookGroupMulti` 和 `removeBookGroupMulti` 各一处，都用了这个 `groupId`。
+两处都加注解后：`compared 2 / exact 2 / different 0`。
+
+#### 新判据
+
+**捕获字段类型是 `Ljava/lang/Long;` 而制品是 `J` → 源码里的变量声明缺显式类型，
+被 Kotlin 把平台类型推断成了可空。**
+
+同类：`Integer`/`int`、`Boolean`/`boolean`、`Double`/`double` 都一样。
+
+**加 `: Long` / `: Int` 这类显式注解，能把装箱类型拉回基本类型。**

@@ -1770,7 +1770,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         if (!checkAuth(context)) {
             return returnData.setData("NEED_LOGIN").setErrorMsg("请登录后使用")
         }
-        val groupId = context.bodyAsJson.getLong("groupId", 0L)
+        val groupId: Long = context.bodyAsJson.getLong("groupId", 0L)
         if (groupId <= 0L) {
             return returnData.setErrorMsg("分组信息错误")
         }
@@ -1792,7 +1792,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         if (!checkAuth(context)) {
             return returnData.setData("NEED_LOGIN").setErrorMsg("请登录后使用")
         }
-        val groupId = context.bodyAsJson.getLong("groupId", 0L)
+        val groupId: Long = context.bodyAsJson.getLong("groupId", 0L)
         if (groupId <= 0L) {
             return returnData.setErrorMsg("分组信息错误")
         }
