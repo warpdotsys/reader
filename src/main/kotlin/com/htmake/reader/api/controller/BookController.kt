@@ -1024,7 +1024,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         val searchSize = Ref.IntRef()
         val bookSourceGroup = Ref.ObjectRef<String>()
         if (context.request().method() == HttpMethod.POST) {
-            bookUrl = context.bodyAsJson.getString("url") ?: ""
+            bookUrl = context.bodyAsJson.getString("url")
             lastIndex.element = context.bodyAsJson.getInteger("lastIndex", -1)
             searchSize.element = context.bodyAsJson.getInteger("searchSize", 5)
             bookSourceGroup.element = context.bodyAsJson.getString("bookSourceGroup", "")
@@ -3115,20 +3115,31 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         if (!checkAuth(context)) {
             return returnData.setData("NEED_LOGIN").setErrorMsg("请登录后使用")
         }
-        val body = context.bodyAsJson
-        val bookUrl = body.getString("url") ?: ""
-        val query = body.getString("query") ?: ""
-        val pageSize = body.getInteger("pageSize", 10)
-        val pageIndex = body.getInteger("pageIndex", 0)
-        if (bookUrl.isEmpty()) {
-            return returnData.setErrorMsg("书籍链接不能为空")
+        val bookUrl: String
+        val keyword: String
+        val lastIndex: Int
+        val size: Int
+        if (context.request().method() == HttpMethod.POST) {
+            val url = context.bodyAsJson.getString("url")
+            bookUrl = url ?: context.bodyAsJson.getString("bookUrl") ?: ""
+            keyword = context.bodyAsJson.getString("keyword") ?: ""
+            lastIndex = context.bodyAsJson.getInteger("lastIndex", 0)!!
+            size = context.bodyAsJson.getInteger("size", 20)!!
+        } else {
+            bookUrl = context.queryParam("url").firstOrNull() ?: ""
+            keyword = context.queryParam("keyword").firstOrNull() ?: ""
+            lastIndex = context.queryParam("lastIndex").firstOrNull()?.toInt() ?: 0
+            size = context.queryParam("size").firstOrNull()?.toInt() ?: 20
         }
-        if (query.isEmpty()) {
+        if (bookUrl.isEmpty()) {
+            return returnData.setErrorMsg("请输入书籍链接")
+        }
+        if (keyword.isEmpty()) {
             return returnData.setErrorMsg("请输入搜索关键字")
         }
         val userNameSpace = getUserNameSpace(context)
         val book = getShelfBookByURL(bookUrl, userNameSpace)
-            ?: return returnData.setErrorMsg("书籍信息错误")
+            ?: return returnData.setErrorMsg("请先加入书架")
         book.setRootDir(getWorkDir())
         book.setUserNameSpace(userNameSpace)
         val bookSource = (getBookSourceStringBySourceURLOpt(book.origin, userNameSpace) ?: "")
@@ -3137,17 +3148,21 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         } else {
             WebBook(bookSource, appConfig.debugLog, userNameSpace = userNameSpace).getChapterList(book)
         }
-        val resultList = ArrayList<SearchResult>()
-        chapterList.forEach { chapter ->
-            val chapterResult = searchChapter(book, chapter, query)
-            resultList.addAll(chapterResult)
+        if (lastIndex >= chapterList.size) {
+            return returnData.setErrorMsg("没有更多了")
         }
-        val isEnd = Ref.BooleanRef()
-        isEnd.element = true
-        val start = pageIndex * pageSize
-        val end = minOf(start + pageSize, resultList.size)
-        val pageList = if (start < end) resultList.subList(start, end) else arrayListOf()
-        return returnData.setData(pageList)
+        logger.info("searchBookContent keyword: {} lastIndex: {}", keyword, lastIndex)
+        val resultList = ArrayList<SearchResult>()
+        var i = lastIndex
+        while (i < chapterList.size) {
+            val chapter = chapterList[i++]
+            val chapterResult = searchChapter(book, chapter, keyword)
+            if (chapterResult.isNotEmpty()) {
+                resultList.addAll(chapterResult)
+            }
+            if (resultList.size >= size) break
+        }
+        return returnData.setData(resultList)
     }
 
     suspend fun searchChapter(

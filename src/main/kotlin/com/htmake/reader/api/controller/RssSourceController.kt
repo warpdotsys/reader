@@ -175,15 +175,15 @@ class RssSourceController(coroutineContext: CoroutineContext) : BaseController(c
         if (!checkAuth(context)) {
             return returnData.setData("NEED_LOGIN").setErrorMsg("请登录后使用")
         }
-        var sourceUrl = ""
-        var sortName = ""
-        var sortUrl = ""
-        var page = 0
+        var sourceUrl: String
+        var sortName: String
+        var sortUrl: String
+        var page: Int
         if (context.request().method() == HttpMethod.POST) {
-            sourceUrl = context.bodyAsJson.getString("sourceUrl")!!
-            sortName = context.bodyAsJson.getString("sortName", "")!!
-            sortUrl = context.bodyAsJson.getString("sortUrl", "")!!
-            page = context.bodyAsJson.getInteger("page", 1)!!
+            sourceUrl = context.bodyAsJson.getString("sourceUrl")
+            sortName = context.bodyAsJson.getString("sortName", "")
+            sortUrl = context.bodyAsJson.getString("sortUrl", "")
+            page = context.bodyAsJson.getInteger("page", 1)
         } else {
             sourceUrl = context.queryParam("sourceUrl").firstOrNull() ?: ""
             sortName = context.queryParam("sortName").firstOrNull() ?: ""
@@ -207,13 +207,13 @@ class RssSourceController(coroutineContext: CoroutineContext) : BaseController(c
         if (!checkAuth(context)) {
             return returnData.setData("NEED_LOGIN").setErrorMsg("请登录后使用")
         }
-        var sourceUrl = ""
-        var link = ""
-        var origin = ""
+        var sourceUrl: String
+        var link: String
+        var origin: String
         if (context.request().method() == HttpMethod.POST) {
-            sourceUrl = context.bodyAsJson.getString("sourceUrl")!!
-            link = context.bodyAsJson.getString("link")!!
-            origin = context.bodyAsJson.getString("origin")!!
+            sourceUrl = context.bodyAsJson.getString("sourceUrl")
+            link = context.bodyAsJson.getString("link")
+            origin = context.bodyAsJson.getString("origin")
         } else {
             sourceUrl = context.queryParam("sourceUrl").firstOrNull() ?: ""
             link = context.queryParam("link").firstOrNull() ?: ""
