@@ -577,7 +577,7 @@ class UserController(coroutineContext: CoroutineContext) : BaseController(corout
         response.sendFile(backupFile.toString())
     }
 
-    suspend fun forEachUser(handler: suspend CoroutineScope.(User) -> Boolean) {
+    suspend fun forEachUser(handler: suspend CoroutineScope.(user: User) -> Boolean) {
         if (appConfig.secure) {
             var userMap: MutableMap<String, Map<String, Any>> = linkedMapOf()
             val userMapJson = asJsonObject(getStorage("data", "users"))
