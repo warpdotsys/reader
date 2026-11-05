@@ -848,9 +848,9 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                     lastIndex = max(lastIndex, index)
                     val bookSourceList = parseJsonStringList(
                         bookSourceFile, startIndex = index, endIndex = index,
-                        filter = if (bookSourceGroup.isEmpty()) null else { node: ObjectNode ->
-                            val group = node.get("bookSourceGroup").asText()
-                            group.isNotEmpty() && ("$group,").indexOf("$bookSourceGroup,") >= 0
+                        filter = if (bookSourceGroup.isEmpty()) null else { it: ObjectNode ->
+                            val group = it.get("bookSourceGroup").asText()
+                            !group.isNullOrEmpty() && ("$group,").indexOf("$bookSourceGroup,") >= 0
                         }
                     )
                     if (bookSourceList == null || bookSourceList.isEmpty()) {
@@ -973,9 +973,9 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                     lastIndex = max(lastIndex, index)
                     val bookSourceList = parseJsonStringList(
                         bookSourceFile, startIndex = index, endIndex = index,
-                        filter = if (bookSourceGroup.isEmpty()) null else { node: ObjectNode ->
-                            val group = node.get("bookSourceGroup").asText()
-                            group.isNotEmpty() && ("$group,").indexOf("$bookSourceGroup,") >= 0
+                        filter = if (bookSourceGroup.isEmpty()) null else { it: ObjectNode ->
+                            val group = it.get("bookSourceGroup").asText()
+                            !group.isNullOrEmpty() && ("$group,").indexOf("$bookSourceGroup,") >= 0
                         }
                     )
                     if (bookSourceList == null || bookSourceList.isEmpty()) {
@@ -1082,10 +1082,10 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                     lastIndex.element = max(lastIndex.element, index)
                     val bookSourceList = parseJsonStringList(
                         bookSourceFile.element!!, startIndex = index, endIndex = index,
-                        filter = if (bookSourceGroup.element!!.isEmpty()) null else { node: ObjectNode ->
-                            val group = node.get("bookSourceGroup").asText()
-                            group.isNotEmpty() &&
-                                    ("$group,").indexOf(bookSourceGroup.element!! + ",") >= 0
+                        filter = if (bookSourceGroup.element!!.isEmpty()) null else { it: ObjectNode ->
+                            val group = it.get("bookSourceGroup").asText()
+                            !group.isNullOrEmpty() &&
+                                    ("$group,").indexOf(bookSourceGroup.element + ",") >= 0
                         }
                     )
                     if (bookSourceList == null || bookSourceList.isEmpty()) {
@@ -1212,10 +1212,10 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                     lastIndex.element = max(lastIndex.element, index)
                     val bookSourceList = parseJsonStringList(
                         bookSourceFile.element!!, startIndex = index, endIndex = index,
-                        filter = if (bookSourceGroup.element!!.isEmpty()) null else { node: ObjectNode ->
-                            val group = node.get("bookSourceGroup").asText()
-                            group.isNotEmpty() &&
-                                    ("$group,").indexOf(bookSourceGroup.element!! + ",") >= 0
+                        filter = if (bookSourceGroup.element!!.isEmpty()) null else { it: ObjectNode ->
+                            val group = it.get("bookSourceGroup").asText()
+                            !group.isNullOrEmpty() &&
+                                    ("$group,").indexOf(bookSourceGroup.element + ",") >= 0
                         }
                     )
                     if (bookSourceList == null || bookSourceList.isEmpty()) {
