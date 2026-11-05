@@ -2445,7 +2445,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             return
         }
         val debugger = Debugger { msg ->
-            response.write("data: " + msg.replace("\n", "\ndata: ") + "\n\n")
+            response.write("data: " + jsonEncode(mapOf("msg" to msg), false) + "\n\n")
         }
         val webBook = WebBook(bookSource, true, debugger, userNameSpace)
         debugger.startDebug(webBook, key)
