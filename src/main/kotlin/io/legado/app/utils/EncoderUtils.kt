@@ -29,11 +29,12 @@ object EncoderUtils {
 
     @JvmOverloads
     fun base64Decode(str: String, flags: Int = 0): String {
-        return String(Base64.decode(str, flags), Charsets.UTF_8)
+        val bytes = Base64.decode(str, flags)
+        return String(bytes, Charsets.UTF_8)
     }
 
     @JvmOverloads
-    fun base64Encode(str: String, flags: Int = 2): String {
+    fun base64Encode(str: String, flags: Int = Base64.NO_WRAP): String {
         return Base64.encodeToString(str.toByteArray(Charsets.UTF_8), flags)
     }
 
@@ -45,7 +46,7 @@ object EncoderUtils {
         transformation: String? = "DES/ECB/PKCS5Padding",
         iv: ByteArray? = null
     ): ByteArray? {
-        return Base64.encode(encryptAES(data, key, transformation, iv), 2)
+        return Base64.encode(encryptAES(data, key, transformation, iv), Base64.NO_WRAP)
     }
 
     @Throws(Exception::class)
@@ -67,7 +68,7 @@ object EncoderUtils {
         transformation: String = "DES/ECB/PKCS5Padding",
         iv: ByteArray? = null
     ): ByteArray? {
-        return decryptAES(Base64.decode(data, 2), key, transformation, iv)
+        return decryptAES(Base64.decode(data, Base64.NO_WRAP), key, transformation, iv)
     }
 
     @Throws(Exception::class)
@@ -112,7 +113,7 @@ object EncoderUtils {
         transformation: String? = "DES/ECB/PKCS5Padding",
         iv: ByteArray? = null
     ): ByteArray? {
-        return Base64.encode(encryptDES(data, key, transformation, iv), 2)
+        return Base64.encode(encryptDES(data, key, transformation, iv), Base64.NO_WRAP)
     }
 
     @Throws(Exception::class)
@@ -134,7 +135,7 @@ object EncoderUtils {
         transformation: String = "DES/ECB/PKCS5Padding",
         iv: ByteArray? = null
     ): ByteArray? {
-        return decryptDES(Base64.decode(data, 2), key, transformation, iv)
+        return decryptDES(Base64.decode(data, Base64.NO_WRAP), key, transformation, iv)
     }
 
     @Throws(Exception::class)
@@ -156,7 +157,7 @@ object EncoderUtils {
         transformation: String? = "DESede/ECB/PKCS5Padding",
         iv: ByteArray? = null
     ): ByteArray? {
-        return Base64.encode(encryptDESede(data, key, transformation, iv), 2)
+        return Base64.encode(encryptDESede(data, key, transformation, iv), Base64.NO_WRAP)
     }
 
     @Throws(Exception::class)
@@ -178,7 +179,7 @@ object EncoderUtils {
         transformation: String = "DESede/ECB/PKCS5Padding",
         iv: ByteArray? = null
     ): ByteArray? {
-        return decryptDESede(Base64.decode(data, 2), key, transformation, iv)
+        return decryptDESede(Base64.decode(data, Base64.NO_WRAP), key, transformation, iv)
     }
 
     @Throws(Exception::class)
@@ -196,11 +197,11 @@ object EncoderUtils {
         val cipher = Cipher.getInstance("RSA")
         cipher.init(Cipher.ENCRYPT_MODE, privateKey)
         val encrypt = cipher.doFinal(input.toByteArray(Charsets.UTF_8))
-        return Base64.encodeToString(encrypt, 2)
+        return Base64.encodeToString(encrypt, Base64.NO_WRAP)
     }
 
     fun decryptByPublicKey(input: String, publicKey: PublicKey): String {
-        val decode = Base64.decode(input, 2)
+        val decode = Base64.decode(input, Base64.NO_WRAP)
         val cipher = Cipher.getInstance("RSA")
         cipher.init(Cipher.DECRYPT_MODE, publicKey)
         val encrypt = cipher.doFinal(decode)
@@ -211,11 +212,11 @@ object EncoderUtils {
         val cipher = Cipher.getInstance("RSA")
         cipher.init(Cipher.ENCRYPT_MODE, publicKey)
         val encrypt = cipher.doFinal(input.toByteArray(Charsets.UTF_8))
-        return Base64.encodeToString(encrypt, 2)
+        return Base64.encodeToString(encrypt, Base64.NO_WRAP)
     }
 
     fun decryptByPrivateKey(input: String, privateKey: PrivateKey): String {
-        val decode = Base64.decode(input, 2)
+        val decode = Base64.decode(input, Base64.NO_WRAP)
         val cipher = Cipher.getInstance("RSA")
         cipher.init(Cipher.DECRYPT_MODE, privateKey)
         val encrypt = cipher.doFinal(decode)
@@ -246,7 +247,7 @@ object EncoderUtils {
             bos.write(temp)
         }
         bos.close()
-        return Base64.encodeToString(bos.toByteArray(), 2)
+        return Base64.encodeToString(bos.toByteArray(), Base64.NO_WRAP)
     }
 
     fun decryptSegmentByPublicKey(
@@ -254,7 +255,7 @@ object EncoderUtils {
         publicKey: PublicKey,
         keySize: Int = 2048
     ): String? {
-        val bytes = Base64.decode(input, 2)
+        val bytes = Base64.decode(input, Base64.NO_WRAP)
         var offset = 0
         val maxDecryptBlock = keySize / 8
         val bos = ByteArrayOutputStream()
@@ -300,7 +301,7 @@ object EncoderUtils {
             bos.write(temp)
         }
         bos.close()
-        return Base64.encodeToString(bos.toByteArray(), 2)
+        return Base64.encodeToString(bos.toByteArray(), Base64.NO_WRAP)
     }
 
     fun decryptSegmentByPrivateKey(
@@ -308,7 +309,7 @@ object EncoderUtils {
         privateKey: PrivateKey,
         keySize: Int = 2048
     ): String? {
-        val bytes = Base64.decode(input, 2)
+        val bytes = Base64.decode(input, Base64.NO_WRAP)
         var offset = 0
         val maxDecryptBlock = keySize / 8
         val bos = ByteArrayOutputStream()
