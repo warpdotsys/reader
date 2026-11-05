@@ -1,4 +1,4 @@
-# 续接说明（2026-11-06 16:25）
+# 续接说明（2026-11-07 04:10）
 
 ## 用户目标（明确、无妥协）
 
@@ -10,7 +10,7 @@ ABI 一致性已经不重要，类名和字节码三重对齐才是目标。
 ```
 制品应用类   : 936
 已适配       : 930  (99.36%)   还缺 6 / 多出 3
-字节码完全一致: 759 / 930 (81.6%)   有差异 171 个类
+字节码完全一致: 772 / 930 (83.0%)   有差异 158 个类
 HEAD         : 见 git log（本轮最后提交在 3a-97 之后）
 D 盘可用     : 92G（清掉 handwriting-yolo-cache/uv 的 90G uv 缓存后）
 ```
@@ -100,7 +100,15 @@ powershell -NoProfile -Command "& { $env:JAVA_HOME='D:\Tools\java\jdk-11.0.8+10'
 24. **捕获字段 `Ref$ObjectRef` = 源码里是 `var`**；直接是具体类型 = `val`。
     `RemoteWebview$getStrResponse` 的两个变量改 `var` 后指令 23/23 对齐
     （只剩捕获字段声明顺序差一位）。
-25. **`const val TAG` 不发 static 字段**：`const` 是编译期常量会内联，
+25. **`tableswitch` 的跳转表是纯数字行**（`"  109"` / `"  109: 179"`），
+    全是偏移不是指令。统计器第五次修正，`norm()` 已过滤。
+26. **`checkcast` 的位置反映「哪一层是表达式、哪一层是块」**：
+    出现在内层 else → 内层是块、外层是表达式；出现在外层 else → 外层是块。
+    三个 TypeAdapter 就是靠这条精确到「差一个括号」搞定的。
+27. **lambda 参数名进字节码**（`ldc "it"` vs `ldc "node"`）；
+    **局部变量声明顺序决定槽位**；**`!!` 生成 `dup`+`checkNotNull`，
+    `as X` 只生成 `checkcast`**。
+28. **`const val TAG` 不发 static 字段**：`const` 是编译期常量会内联，
     制品有 `<clinit>` 里的 `putstatic TAG` 就说明是普通 `val`。
     **`javap -p` 只比方法名集合，查不出缺字段。**
 14. **`while (i < n)` vs `for (i in 0 until n)`**：前者 `goto` 回循环头，
