@@ -275,3 +275,115 @@ Kotlin 1.5.0 到 1.5.31 **全都输出 `mv={1,5,1}`**，所以「制品 mv=1.5.1
 真正的结论：制品的字节码特征与 **1.5.20 / 1.5.21** 最吻合（772/930），
 1.5.0/1.5.10/1.5.31 都明显更差（747-748/930），说明制品是 1.5.2x 线编译的。
 **当前 1.5.21 是最优选择，不需要再切换版本。**
+
+
+## 2026-11-05 夜间：HTTP 层差分测试（黑盒行为验证）
+
+用户要求"对所有都做差分测试，样本全一点，复杂引擎样本少了看不出差异"，由此建立了完整的四层验证体系。
+
+### 四层验证现状
+
+| 层 | 覆盖 | 结果 |
+| --- | --- | --- |
+| 类名集合 | 936 个类 | **936/936 完全对齐** |
+| 字节码指令 | 934 个可比类 | 775/934 = 83.0% |
+| 反射差分（无参+带参+private） | 约 22600 个测试点 | 真差异 1 个边界（`listFiles("")`） |
+| **HTTP 端到端** | 133 条路由 / 223 项 | **常规 84 通过 / 1 假阳性；特殊 15 通过 / 3 假阳性** |
+
+### 双实例 HTTP 差分的搭建方法
+
+```bash
+# 制品实例（工作目录不同，避免互相干扰）
+java -Xmx512m -cp "D:/Projects/reader/BOOT-INF/classes;D:/Projects/reader/BOOT-INF/lib/*" \
+     com.htmake.reader.ReaderApplicationKt \
+     --reader.server.port=8830 --reader.app.workDir="D:/bench/art"
+
+# 本地实例
+java -Xmx512m -cp "build/classes/kotlin/main;build/classes/java/main;build/resources/main;D:/Projects/reader/BOOT-INF/lib/*" \
+     com.htmake.reader.ReaderApplicationKt \
+     --reader.server.port=8831 --reader.app.workDir="D:/bench/loc"
+```
+
+工具在 `scripts/difftest/`：
+- `http-diff.py` —— 常规 JSON 路由，内置 MUTATING 正则跳过会改状态的接口
+- `http-diff-special.py` —— 二进制/文件类比状态码+类型+长度+sha256，SSE 类读前 5 个事件
+- `routes-full.txt` —— 从 YueduApi.kt 提取的 120 条可测路由
+
+**关键坑**：顺序执行时 `saveBookSource` / `deleteBookSource` 这类 POST 会改服务端状态，导致后续 GET 读到污染数据，且两实例状态不同步，产生假差异。必须用 MUTATING 正则跳过。
+
+### 这轮抓到的 14 个真 bug
+
+**最严重的：`AppConfig` 缺注解**
+
+```kotlin
+// 制品有，我们没有
+@Component
+@ConfigurationProperties(prefix = "reader.app")
+open class AppConfig {
+```
+
+后果：`YueduApi` 注入 `AppConfig` 失败，**Spring 上下文直接退出，本地构建根本起不来**。
+前面 22600 个类级测试点全过都测不出来——它们不需要 Spring 上下文就能跑。
+
+**逻辑完全相反的：`restoreFromMongodb`**
+
+```kotlin
+// 制品：清理本地缓存的备份文件
+val handler = { userNameSpace: String ->
+    syncDataFileList.forEach { fileName ->
+        val file = File(getWorkDir("storage", "data", userNameSpace, "$fileName.json"))
+        if (!file.exists()) return@forEach
+        file.delete()
+    }
+}
+handler("default")
+if (appConfig.secure) { 遍历 users，对每个用户名调 handler }
+
+// 我们原来：从 mongo 读内容再写本地 —— 方向相反
+```
+
+另外缺了 `checkManagerAuth(context)` 管理密码校验。
+
+**参数名不兼容的：`searchBookContent`**
+
+| 制品 | 本地 |
+| --- | --- |
+| `url` / `bookUrl` fallback | `url` |
+| `keyword` | `query` |
+| `lastIndex`（默认 0） | `pageIndex` |
+| `size`（默认 20） | `pageSize` |
+
+客户端按制品文档传 `keyword`，本地当空处理直接返回错误。
+深层逻辑也不同：制品用 `lastIndex` 游标逐章搜索 + `closeHandler` 提前停止 + 返回 `mapOf("list", "lastIndex")`，我们是搜完整个书架再 `subList` 分页。
+
+**其余 11 个**
+
+| 接口/类 | 问题 |
+| --- | --- |
+| `getShelfBookWithCacheInfo` | 制品遍历书架返回统计列表（带 `cachedChapterCount`），我们做单本查询 |
+| `getBookSource` | 制品非空 `String` 声明抛 NPE，我们返回"书源链接不能为空" |
+| `deleteBookCache` | 制品支持 `url`/`bookUrl` 回退 + 本地书检查 + 三个不同消息 |
+| `getRssArticles` / `getRssContent` | `!!` 生成 `checkNotNull`（消息 "null"），非空声明生成 `checkNotNullExpressionValue`（带完整表达式） |
+| `searchBookSource` | `getString("url") ?: ""` 吞掉 null，制品直接非空使用 |
+| `bookSourceDebugSSE` | 消息文案 + 输出格式（`jsonEncode(ReturnData)` vs 纯文本） |
+| `exportToTxt` | 文件名格式 `《书名》作者：xxx.txt`、`appendText(text, charset)`、`appConfig.exportCharset` |
+| `BookSourceAny.bookSourceComment` | 默认值 `""` 不是 `null` |
+| `HttpTTS` 三个默认值 | `id`/`lastUpdateTime` = `currentTimeMillis()`，`concurrentRate` = `"0"` |
+| `JsExtensions.importScript` | 异常类型 `NoStackTraceException` 不是 `Exception` |
+| `HttpTTS` / `RssSource` 的 `fromJson` | 静态 `JsonPath.parse` 应换成带 `SUPPRESS_EXCEPTIONS` 的 `jsonPath.parse` |
+
+### 新增的扫描方法（按发现能力排序）
+
+1. **捕获字段语义扫描** —— 比对 lambda 的 `$xxx` 捕获集合（排除 `L$`/`I$` 续体槽位）。158 个差异类里只 3 个不同，挖出 2 个真逻辑缺失。
+2. **HTTP 端到端差分** —— 唯一能发现"应用起不来"和"参数名不兼容"的手段。
+3. **字符串常量扫描** —— 抓 `ldc` 的字符串集合差。挖出 `restoreFromMongodb` 方向相反的 bug。注意大量假阳性：`checkNotNullExpressionValue` 的表达式文本、`Base64.NO_WRAP` 常量折叠、控制台编码乱码。
+4. **`d2` 元数据扫描** —— `javap -v` 的 `@Metadata d2` 记录参数名、`@ParameterName`、属性名、返回类型签名。挖出 `forEachUser` 的 lambda 参数名缺失。34 个类有差异，但只有 1 个是真源码差异，其余是元数据生成策略。
+5. **请求参数名扫描** —— 专抓 `getString`/`queryParam` 的字面量参数。842 个项目类里只有 1 处不同（且是文件路径不是 HTTP 参数），说明参数名已全对齐。
+6. **`AdaptedFunctionReference` 判据** —— 类 `extends AdaptedFunctionReference` 且构造带方法名+签名 → 源码用了方法引用 `x::y`。全库只有 1 处（`ttsByTextToSpeechCn$2`）。
+
+### 环境注意
+
+- **编译内存**：内存紧张时用 `-Xmx768m -XX:MaxMetaspaceSize=320m -XX:+UseSerialGC --offline`，实测 1分34秒编译成功。正常时 `-Xmx2048m` 约 15 秒。
+- **不要改页面文件**（用户明确禁止）。
+- **后台实例会超时退出**，每次验证前先探测 8830/8831 的 `/health`。
+- **报时间必须跑 `date`**，绝不推算。
