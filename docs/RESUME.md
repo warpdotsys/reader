@@ -476,3 +476,30 @@ Python 侧 `r.stdout.decode('utf-8', errors='replace')`。
 - 字节码 **775/934 = 83.0%**（v39）
 - HTTP 差分（灌入书源+书架数据）：**84 通过 / 1 假阳性**
 - 工作区干净，HEAD 到 `c412ab9`
+
+
+### 深夜续战（02:00 ~ 03:20）追加
+
+又修了 5 项：
+
+13. **EncoderUtils**：`Base64.NO_WRAP` 常量替代字面量 2（13 处）、`base64Decode` 加 `val bytes` 中间变量
+14. **ExtKt.unzip**：`entries.nextElement()!!` → `as ZipEntry`（与 ZipUtils 同源）
+15. **ttsByEdge 行为重写**（重要）：
+    - voice 参数类型从 String 改为 `VoiceEnum`，默认 `zh_CN_XiaoxiaoNeural`，`fromSortName` 解析失败回落
+    - rate 默认 `"0"`、pitch 默认 `"0%"`，**options 有 pitch 时拼 `$value%`**（之前原样取）
+    - `rate` 用 `containsKey` 取（试过 `in` 反而更差，回滚）
+    - SSML 加 `.style(TtsStyleEnum.chat)`
+    - **新增 `options["base64"] == "1"` 分支**：返回 JSON（Base64 编码的 mp3），content-type `application/json; charset=utf-8`；
+      否则照旧返回 `audio/mpeg` 二进制
+    - 去掉 `usingAzureApi(false)`
+16. **MapDeserializerDoubleAsIntFix**：试了 `val arr` + `MutableList/MutableMap` 声明（对齐 invokeinterface），
+    剩余 11 个差异块（编译器 for 循环展开模式），相似度 0.872，**已回滚**。
+17. **DeepSeek 报告**：全量 775/934 稳定；HTTP 84/1 稳定。
+
+### 今夜的统计
+
+- 提交数：`bcaf729` → `c3ea111` → `6245a24` → `57af494` → `092ee35` → `c598942` → `26005f9` → `c412ab9` → `546b0fd` → `b770116` → `142f748` → `d7ccc4c`
+- 修复类数：16 个类（StringUtils、ACache、JsExtensions、BookHelp、Debugger、Book、MapDeserializer、
+  HttpTTS、RssSource、LicenseController、DefaultAdpater、YueduApi、BookController(exportToEpub 全套 + ttsByEdge)、
+  EncoderUtils、ExtKt）
+- 工具经验：`javap -J-Dfile.encoding=UTF-8` 强制 UTF-8（GBK 会把不同中文字都变成 U+FFFD）
