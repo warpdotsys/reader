@@ -23,17 +23,22 @@ class CoroutinesCallAdapterFactory private constructor() : CallAdapter.Factory()
             return null
         }
         if (returnType !is ParameterizedType) {
-            val message = "Deferred return type must be parameterized as Deferred<Foo> or Deferred<out Foo>"
+            val message: Any = "Deferred return type must be parameterized as Deferred<Foo> or Deferred<out Foo>"
             throw IllegalStateException(message.toString())
         }
         val responseType = getParameterUpperBound(0, returnType)
         val rawDeferredType = getRawType(responseType)
         return if (rawDeferredType == Response::class.java) {
             if (responseType !is ParameterizedType) {
-                val message = "Response must be parameterized as Response<Foo> or Response<out Foo>"
+                val message: Any = "Response must be parameterized as Response<Foo> or Response<out Foo>"
                 throw IllegalStateException(message.toString())
             }
-            ResponseCallAdapter<Any>(getParameterUpperBound(0, responseType))
+            ResponseCallAdapter<Any>(
+                getParameterUpperBound(
+                    0,
+                    responseType
+                )
+            )
         } else {
             BodyCallAdapter<Any>(responseType)
         }
