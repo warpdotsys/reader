@@ -793,7 +793,8 @@ open class YueduApi : RestVerticle() {
             delay((1..10).random() * 1000L)
             try {
                 logger.info("开始检查授权是否正常")
-                LicenseController(coroutineContext).checkLicense(license)
+                val licenseController = LicenseController(coroutineContext)
+                licenseController.checkLicense(license)
             } catch (e: Exception) {
                 e.printStackTrace()
             }

@@ -69,6 +69,9 @@ def norm(seq):
         s = re.sub(r'#\d+', '#', s)
         # 跳转目标偏移：ifle 49 vs ifle 48 只是字节偏移不同，指令序列相同不代表语义不同
         s = re.sub(r'\b(if\w+|goto|jsr|ret)\s+\d+\b', r'\1', s)
+        # tableswitch/lookupswitch 的跳转表是纯数字行（"  109" / "  109: 179"），全是偏移，不是指令
+        if re.fullmatch(r'\d+(:\s*\d+)?', s):
+            continue
         # nop 是编译器为行号/调试插入的占位，两个编译器的插入点不同，不代表语义
         if s == 'nop':
             continue
