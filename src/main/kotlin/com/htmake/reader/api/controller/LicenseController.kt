@@ -251,7 +251,7 @@ class LicenseController(coroutineContext: CoroutineContext) : BaseController(cor
         activeLicense.activeTime = System.currentTimeMillis()
         activeLicense.activeIp = ip
         activeLicense.activeEmail = ""
-        val activeLicenseObject = JsonObject.mapFrom(activeLicense)
+        val activeLicenseObject: JsonObject = JsonObject.mapFrom(activeLicense)
         activeLicenseList.add(activeLicenseObject)
         logger.info("activeLicenseList: {}", activeLicenseList)
         saveStorage("data", "activeLicense", value = activeLicenseList)

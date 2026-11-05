@@ -9,15 +9,16 @@ import java.nio.file.Paths
 class DefaultAdpater : ReaderAdapterInterface {
 
     override fun getWorkDir(subPath: String): String {
-        val workDirPath: String
+        var workDirPath = ""
         val osName = System.getProperty("os.name")
         val currentDir = System.getProperty("user.dir")
-        workDirPath = if (osName.startsWith("Mac OS", true) && !currentDir.startsWith("/Users/")) {
-            Paths.get(System.getProperty("user.home"), ".reader").toString()
+        if (osName.startsWith("Mac OS", true) && !currentDir.startsWith("/Users/")) {
+            workDirPath = Paths.get(System.getProperty("user.home"), ".reader").toString()
         } else {
-            currentDir
+            workDirPath = currentDir
         }
-        return Paths.get(workDirPath, subPath).toString()
+        val path = Paths.get(workDirPath, subPath)
+        return path.toString()
     }
 
     override fun getWorkDir(vararg subDirFiles: String): String {
