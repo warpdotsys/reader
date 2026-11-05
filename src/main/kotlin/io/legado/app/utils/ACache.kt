@@ -253,8 +253,8 @@ class ACache private constructor(
 
         private val cacheSize = AtomicLong()
         private val cacheCount = AtomicInteger()
-        private val lastUsageDates: MutableMap<File, Long> =
-            Collections.synchronizedMap(HashMap())
+        private val lastUsageDates =
+            Collections.synchronizedMap(HashMap<File, Long>())
 
         init {
             calculateCacheSizeAndCacheCount()
