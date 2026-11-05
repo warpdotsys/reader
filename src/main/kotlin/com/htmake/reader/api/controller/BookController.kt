@@ -2199,14 +2199,40 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         userNameSpace: String,
         replace: Boolean = false
     ) {
-        if (sourceList.isEmpty() && !replace) {
+        if (book.name.isEmpty()) {
             return
         }
-        val sourceJsonArray = JsonArray()
-        sourceList.forEach {
-            sourceJsonArray.add(JsonObject.mapFrom(it))
+        var bookSourceList = JsonArray()
+        if (!replace) {
+            asJsonArray(
+                getUserStorage(
+                    userNameSpace,
+                    book.name + '_' + book.author,
+                    "bookSource"
+                )
+            )?.let {
+                bookSourceList = it
+            }
         }
-        saveUserStorage(userNameSpace, getRelativePath(book.name + '_' + book.author, "bookSource"), sourceJsonArray)
+        val urlMap = LinkedHashMap<String, Int>()
+        for (i in 0 until bookSourceList.size()) {
+            val bookUrl: String = bookSourceList.getJsonObject(i).getString("bookUrl")
+            urlMap[bookUrl] = i
+        }
+        sourceList.forEach { searchBook ->
+            val existIndex = urlMap.getOrDefault(searchBook.bookUrl, -1)
+            if (existIndex >= 0) {
+                bookSourceList.set(existIndex, JsonObject.mapFrom(searchBook))
+            } else {
+                bookSourceList.add(JsonObject.mapFrom(searchBook))
+                urlMap[searchBook.bookUrl] = bookSourceList.size() - 1
+            }
+        }
+        saveUserStorage(
+            userNameSpace,
+            getRelativePath(book.name + '_' + book.author, "bookSource"),
+            bookSourceList
+        )
     }
 
     fun extractEpub(book: Book, force: Boolean = false): Boolean {
