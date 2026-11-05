@@ -639,7 +639,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             return returnData.setData(bookContent)
         }
         var chapterCacheFile: File? = null
-        if (book.inShelf && appConfig.cacheChapterContent) {
+        if (book.isInShelf && appConfig.cacheChapterContent) {
             val localCacheDir = getChapterCacheDir(book, userNameSpace)
             chapterCacheFile =
                 File(localCacheDir.absolutePath + File.separator + chapterIndex + ".txt")
@@ -1545,7 +1545,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                 }
             }
         }
-        book.inShelf = true
+        book.isInShelf = true
         if (existIndex >= 0) {
             val bookList = bookshelf.list
             val existBook = bookshelf.getJsonObject(existIndex).mapTo(Book::class.java)
@@ -1687,7 +1687,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             existBook.originName = newBookInfo.element!!.originName
             existBook.bookUrl = newBookInfo.element!!.bookUrl
             existBook.tocUrl = newBookInfo.element!!.tocUrl
-            existBook.inShelf = true
+            existBook.isInShelf = true
             if (existBook.coverUrl.isNullOrEmpty()) {
                 if (!newBookInfo.element!!.coverUrl.isNullOrEmpty()) {
                     existBook.coverUrl = newBookInfo.element!!.coverUrl
@@ -1931,7 +1931,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             { index ->
                 val book = Ref.ObjectRef<Book>()
                 book.element = bookshelf.element!!.getJsonObject(index).mapTo(Book::class.java)
-                book.element!!.inShelf = true
+                book.element!!.isInShelf = true
                 if (!book.element!!.isLocalBook() && book.element!!.canUpdate && refresh) {
                     val bookSource = Ref.ObjectRef<String>()
                     bookSource.element =
@@ -1975,7 +1975,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         try {
             val md5Encode = MD5Utils.md5Encode(book.bookUrl).toString()
             val bookChaptersCache = getBookChaptersCache(userNameSpace)
-            val cached = if (book.inShelf) {
+            val cached = if (book.isInShelf) {
                 asJsonArray(getUserStorage(userNameSpace, "${book.name}_${book.author}", md5Encode))
             } else {
                 asJsonArray(bookChaptersCache.getAsString("${book.name}_${book.author}$md5Encode"))
@@ -2113,7 +2113,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             if (_book.bookUrl == url) {
                 _book.setRootDir(getWorkDir())
                 _book.setUserNameSpace(userNameSpace)
-                _book.inShelf = true
+                _book.isInShelf = true
                 return _book
             }
         }

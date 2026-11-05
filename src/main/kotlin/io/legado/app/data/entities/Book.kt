@@ -73,7 +73,7 @@ data class Book(
     var readConfig: ReadConfig? = null,
     @get:JsonProperty("isInShelf")
     @get:JvmName("isInShelf")
-    var inShelf: Boolean = false,
+    var isInShelf: Boolean = false,
     var lastCheckError: String? = null
 ): BaseBook {
 
@@ -373,7 +373,7 @@ data class Book(
                         )
                     }.getOrNull()
                 } else null,
-                inShelf = doc.readBool("$.isInShelf") ?: false
+                isInShelf = doc.readBool("$.isInShelf") ?: false
             )
         }
 

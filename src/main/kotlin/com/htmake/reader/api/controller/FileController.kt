@@ -518,7 +518,7 @@ class FileController(coroutineContext: CoroutineContext) : BaseController(corout
                         logger.debug("book {}", book)
                         if (import > 0) {
                             val result = bookController.saveBookToShelf(book, userNameSpace, context)
-                            if (result.second == null && result.first.inShelf) {
+                            if (result.second == null && result.first.isInShelf) {
                                 fileList.add(mapOf("name" to it.name))
                             }
                         } else {
