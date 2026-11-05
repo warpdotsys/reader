@@ -520,7 +520,12 @@ Python 侧 `r.stdout.decode('utf-8', errors='replace')`。
     - 构建 urlMap 合并去重：已存在 -> set；不存在 -> add + 更新 urlMap
     - 之前我们直接 add 所有，忽略 replace 语义和去重
 
-20. **editShelfBook 的差异已确认但暂缓**（风险高）：
+20. **editShelfBook 已重写完成**（2026-11-06 早晨）：
+    锁 + name/author 匹配 + 返回 Book? 全部按制品实现，8 个调用方已核对无回归（HTTP 84/1）。
+    剩余 20 条槽位编号差异（330 vs 310），不影响行为。
+    之前登记的内容保留在下方供参考：
+
+    ~~editShelfBook 的差异已确认但暂缓（风险高）~~：
     制品有 `UserMutex.getLocker("$ns@bookshelf")` 锁 + `logger.info("wait for lock {}/lock success")`，
     匹配策略是 bookUrl 或 name+author，**找不到时直接返回 null（不 add）**，返回类型是 `Book?`。
     我们目前的实现没有锁、只按 bookUrl 匹配、找不到时 add。
