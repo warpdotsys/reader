@@ -5171,3 +5171,45 @@ val groupId: Long = context.bodyAsJson.getLong("groupId", 0L)
 同类：`Integer`/`int`、`Boolean`/`boolean`、`Double`/`double` 都一样。
 
 **加 `: Long` / `: Int` 这类显式注解，能把装箱类型拉回基本类型。**
+
+### 3a-108 RemoteWebview lambda 部分改善：`val` -> `var` 让捕获变成 Ref
+
+#### 改动
+
+```kotlin
+// 改前
+val requestBody = jsonEncode(...)
+val remoteUrl = "$remoteApi/render.html"
+// 改后
+var remoteUrl = "$remoteApi/render.html"
+var requestBody = jsonEncode(...)
+```
+
+字节码证据：
+
+```
+制品 getfield $remoteApi:Ref$ObjectRef   ← var 捕获，包装成 Ref
+本地 getfield $remoteUrl:String          ← val 捕获，直接存值
+```
+
+**Kotlin 的 lambda 捕获：`val` 直接存值，`var` 包成 `Ref$ObjectRef`。**
+
+改完指令数从 23/19 变成 **23/23 完全对齐**。
+
+#### 没归零的原因：捕获字段的声明顺序
+
+```
+制品槽位 5: $remoteApi
+本地槽位 5: $remoteUrl
+```
+
+捕获字段按**变量在方法里第一次被引用的顺序**分配。制品是
+`remoteApi → remoteUrl → requestBody`，我们调整后还是差一位。
+
+试过一次把 `remoteUrl` 提到 `requestBody` 之前，没对上。
+**投入 3 轮编译（每轮 2.5 分钟），先放着。**
+
+#### 判据
+
+**捕获字段类型是 `Lkotlin/jvm/internal/Ref$ObjectRef;` = 源码里是 `var`；
+直接是 `Ljava/lang/String;` = `val`。** 想改捕获形态，改 `val`/`var` 就行。

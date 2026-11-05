@@ -35,7 +35,8 @@ object RemoteWebview {
         if (remoteApi.isEmpty()) {
             throw Exception("不支持webview")
         }
-        val requestBody = jsonEncode(
+        var remoteUrl = "$remoteApi/render.html"
+        var requestBody = jsonEncode(
             mapOf(
                 "url" to url,
                 "html" to html,
@@ -49,7 +50,6 @@ object RemoteWebview {
                 "sourceRegex" to sourceRegex
             )
         )
-        val remoteUrl = "$remoteApi/render.html"
         val strResponse = getProxyClient(debugLog = debugLog).newCallStrResponse {
             url(remoteUrl)
             postJson(requestBody)
