@@ -307,7 +307,8 @@ class WebdavController(
             file.writeBytes(context.getBody().getBytes())
             if (file.toString().indexOf("bookProgress") > 0 && file.toString().indexOf(".json") > 0) {
                 val userNameSpace = getUserNameSpace(context)
-                BookController(coroutineContext).syncBookProgressFromWebdav(file, userNameSpace)
+                val bookController = BookController(coroutineContext)
+                bookController.syncBookProgressFromWebdav(file, userNameSpace)
             }
             context.response().setStatusCode(201).end()
         } catch (e: Exception) {

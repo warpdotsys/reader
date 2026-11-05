@@ -802,7 +802,8 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             concurrentCount = context.queryParam("concurrentCount").firstOrNull()?.toInt() ?: 36
         }
         var userNameSpace = getUserNameSpace(context)
-        val urlMap = BookSourceController(coroutineContext).getBookSourceMap(userNameSpace)
+        val bookSourceController = BookSourceController(coroutineContext)
+        val urlMap = bookSourceController.getBookSourceMap(userNameSpace)
         if (urlMap.size <= 0) {
             return returnData.setErrorMsg("未配置书源")
         }
@@ -912,7 +913,8 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             concurrentCount = context.queryParam("concurrentCount").firstOrNull()?.toInt() ?: 24
         }
         var userNameSpace = getUserNameSpace(context)
-        val urlMap = BookSourceController(coroutineContext).getBookSourceMap(userNameSpace)
+        val bookSourceController = BookSourceController(coroutineContext)
+        val urlMap = bookSourceController.getBookSourceMap(userNameSpace)
         if (urlMap.size <= 0) {
             response.write("event: error\n")
             response.end("data: " + jsonEncode(returnData.setErrorMsg("未配置书源"), false)!! + "\n\n")
@@ -1034,7 +1036,8 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         }
         val userNameSpace = Ref.ObjectRef<String>()
         userNameSpace.element = getUserNameSpace(context)
-        val urlMap = BookSourceController(coroutineContext).getBookSourceMap(userNameSpace.element)
+        val bookSourceController = BookSourceController(coroutineContext)
+        val urlMap = bookSourceController.getBookSourceMap(userNameSpace.element)
         if (urlMap.size <= 0) {
             return returnData.setErrorMsg("未配置书源")
         }
@@ -1143,7 +1146,8 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         }
         val userNameSpace = Ref.ObjectRef<String>()
         userNameSpace.element = getUserNameSpace(context)
-        val urlMap = BookSourceController(coroutineContext).getBookSourceMap(userNameSpace.element)
+        val bookSourceController = BookSourceController(coroutineContext)
+        val urlMap = bookSourceController.getBookSourceMap(userNameSpace.element)
         if (urlMap.size <= 0) {
             response.write("event: error\n")
             response.end("data: " + jsonEncode(returnData.setErrorMsg("未配置书源"), false)!! + "\n\n")
