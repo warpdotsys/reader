@@ -2491,7 +2491,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             response.end("data: " + jsonEncode(returnData.setErrorMsg("请输入书籍链接"), false)!! + "\n\n")
             return
         }
-        val userNameSpace = getUserNameSpace(context)
+        var userNameSpace = getUserNameSpace(context)
         val bookInfo = getShelfBookByURL(bookUrl, userNameSpace)
         if (bookInfo == null) {
             response.write("event: error\n")
@@ -2503,10 +2503,10 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             response.end("data: " + jsonEncode(returnData.setErrorMsg("本地书籍无需缓存"), false)!! + "\n\n")
             return
         }
-        val bookSource = getBookSourceString(context, bookInfo.origin, false) ?: ""
-        val chapterList = WebBook(bookSource, appConfig.debugLog, userNameSpace = userNameSpace)
+        var bookSource = getBookSourceString(context, bookInfo.origin, false) ?: ""
+        var chapterList = WebBook(bookSource, appConfig.debugLog, userNameSpace = userNameSpace)
             .getChapterList(bookInfo)
-        val cachedChapterContentSet = Ref.ObjectRef<Set<Int>>()
+        val cachedChapterContentSet = Ref.ObjectRef<MutableSet<Int>>()
         cachedChapterContentSet.element = getCachedChapterContentSet(bookInfo, userNameSpace)
         val localCacheDir = getChapterCacheDir(bookInfo, userNameSpace)
         val isEnd = Ref.BooleanRef()
@@ -2515,37 +2515,45 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         context.request().connection().closeHandler { isEnd.element = true }
         val count = if (concurrentCount > 0) concurrentCount else 24
         logger.info("cacheBookSSE concurrentCount: {} refresh: {}", count, refresh)
-        limitConcurrent(count, 0, chapterList.size) { i ->
-            if (cachedChapterContentSet.element.contains(i)) {
-                return@limitConcurrent true
-            }
-            val chapterInfo = chapterList[i]
-            val nextChapterUrl = if (i + 1 < chapterList.size) chapterList[i + 1].url else null
-            try {
-                val content = WebBook(bookSource, appConfig.debugLog, userNameSpace = userNameSpace)
-                    .getBookContent(bookInfo, chapterInfo, nextChapterUrl)
-                if (content.isNotEmpty()) {
-                    BookHelp.saveText(bookInfo, chapterInfo, content)
+        limitConcurrent(count, 0, chapterList.size, handler = { it ->
+            val chapterIndex = it
+            if (!cachedChapterContentSet.element.contains(chapterIndex)) {
+                val chapterInfo = chapterList[chapterIndex]
+                var nextChapterUrl: String? = null
+                if (chapterIndex + 1 < chapterList.size) {
+                    val nextChapterInfo = chapterList[chapterIndex + 1]
+                    nextChapterUrl = nextChapterInfo.url
                 }
-                successCount.element++
-                response.write(
-                    "data: " + jsonEncode(
-                        returnData.setData(
-                            mapOf(
-                                "index" to i,
-                                "title" to chapterInfo.title,
-                                "success" to successCount.element,
-                                "failed" to failedCount.element
-                            )
-                        ),
-                        false
-                    ) + "\n\n"
-                )
-            } catch (e: Exception) {
-                failedCount.element++
+                try {
+                    val content = WebBook(bookSource, appConfig.debugLog, userNameSpace = userNameSpace)
+                        .getBookContent(bookInfo, chapterInfo, nextChapterUrl)
+                    val chapterCacheFile =
+                        File(localCacheDir.absolutePath + File.separator + chapterIndex + ".txt")
+                    chapterCacheFile.writeText(content)
+                    val bookSourceObj = BookSource.fromJson(bookSource).getOrNull() ?: BookSource()
+                    BookHelp.saveImages(this, bookSourceObj, bookInfo, chapterInfo, content)
+                    successCount.element++
+                    cachedChapterContentSet.element.add(chapterIndex)
+                } catch (e: Exception) {
+                    isEnd.element = true
+                    failedCount.element++
+                }
             }
-            Unit
-        }
+            chapterIndex
+        }, needContinue = { list, loopCount ->
+            if (isEnd.element) {
+                false
+            } else {
+                val result = mapOf(
+                    "cachedCount" to cachedChapterContentSet.element.size,
+                    "successCount" to successCount.element,
+                    "failedCount" to failedCount.element
+                )
+                response.write("data: " + jsonEncode(result, false) + "\n\n")
+                logger.info("Loop: {} list.size: {} result: {}", loopCount, list.size, result)
+                true
+            }
+        })
         if (!isEnd.element) {
             response.write("event: end\n")
             response.end(
@@ -2846,7 +2854,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         )
     }
 
-    fun getCachedChapterContentSet(bookInfo: Book, userNameSpace: String): Set<Int> {
+    fun getCachedChapterContentSet(bookInfo: Book, userNameSpace: String): MutableSet<Int> {
         val chapterCacheDir = getChapterCacheDir(bookInfo, userNameSpace)
         val set = HashSet<Int>()
         chapterCacheDir.listFiles()?.forEach { file ->
