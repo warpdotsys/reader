@@ -70,6 +70,11 @@ import io.vertx.core.json.JsonObject
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import me.ag2s.epublib.domain.Author
+import me.ag2s.epublib.domain.Date
+import me.ag2s.epublib.domain.FileResourceProvider
+import me.ag2s.epublib.domain.LazyResource
+import me.ag2s.epublib.domain.Metadata
+import me.ag2s.epublib.util.ResourceUtil
 import me.ag2s.epublib.domain.EpubBook
 import me.ag2s.epublib.domain.MediaTypes
 import me.ag2s.epublib.domain.Resource
@@ -3023,9 +3028,48 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
     }
 
     private fun setAssets(book: Book, epubBook: EpubBook): String {
-        val assets = arrayListOf<Resource>()
-        assets.forEach { epubBook.addResource(it) }
-        return ""
+        epubBook.resources.add(
+            Resource(
+                BookController::class.java.getResource("/epub/fonts.css").readBytes(),
+                "Styles/fonts.css"
+            )
+        )
+        epubBook.resources.add(
+            Resource(
+                BookController::class.java.getResource("/epub/main.css").readBytes(),
+                "Styles/main.css"
+            )
+        )
+        epubBook.resources.add(
+            Resource(
+                BookController::class.java.getResource("/epub/logo.png").readBytes(),
+                "Images/logo.png"
+            )
+        )
+        epubBook.addSection(
+            "封面", ResourceUtil.createPublicResource(
+                book.name, book.getRealAuthor(), book.getDisplayIntro(),
+                book.kind, book.wordCount,
+                String(
+                    BookController::class.java.getResource("/epub/cover.html").readBytes(),
+                    Charsets.UTF_8
+                ), "Text/cover.html"
+            )
+        )
+        epubBook.addSection(
+            "简介", ResourceUtil.createPublicResource(
+                book.name, book.getRealAuthor(), book.getDisplayIntro(),
+                book.kind, book.wordCount,
+                String(
+                    BookController::class.java.getResource("/epub/intro.html").readBytes(),
+                    Charsets.UTF_8
+                ), "Text/intro.html"
+            )
+        )
+        return String(
+            BookController::class.java.getResource("/epub/chapter.html").readBytes(),
+            Charsets.UTF_8
+        )
     }
 
     private suspend fun setCover(book: Book, epubBook: EpubBook, bookSourceString: String?) {
@@ -3067,7 +3111,9 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         val localCacheDir = getChapterCacheDir(book, userNameSpace)
         chapterList.forEachIndexed { index, chapter ->
             var content = ""
-            content += chapter.title + '\n'
+            if (!appConfig.exportNoChapterName) {
+                content += chapter.title + '\n'
+            }
             content = if (book.isLocalTxt()) {
                 content + (LocalBook.getContent(book, chapter) ?: "")
             } else {
@@ -3081,13 +3127,12 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             }
             val content1 = fixPic(epubBook, book, content, chapter)
             val title = chapter.title
-            val resource = Resource(
-                ("<html><head><title>$title</title></head><body>$content1</body></html>")
-                    .toByteArray(),
-                MediaTypes.XHTML
+            epubBook.addSection(
+                title, ResourceUtil.createChapterResource(
+                    title.replace("🔒", ""),
+                    content1, contentModel, "Text/chapter_$index.html"
+                )
             )
-            resource.href = "Text/chapter_$index.html"
-            epubBook.addSection(title, resource)
         }
     }
 
@@ -3097,13 +3142,36 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         content: String,
         chapter: BookChapter
     ): String {
-        return content
+        val data = StringBuilder("")
+        content.split("\n").forEach { text ->
+            var text1 = text
+            val matcher = AppPattern.imgPattern.matcher(text)
+            while (matcher.find()) {
+                val it = matcher.group(1) ?: continue
+                val src = NetworkUtils.getAbsoluteURL(chapter.url, it)
+                val originalHref = MD5Utils.md5Encode16(src) + '.' + BookHelp.getImageSuffix(src)
+                val href = "Images/$originalHref"
+                val imageFile = BookHelp.getImage(book, src)
+                if (!imageFile.exists()) continue
+                val fp = FileResourceProvider(imageFile.parent)
+                val img = LazyResource(fp, href, originalHref)
+                epubBook.resources.add(img)
+                text1 = text1.replace(it, "../$href")
+            }
+            data.append(text1).append("\n")
+        }
+        return data.toString()
     }
 
     private fun setEpubMetadata(book: Book, epubBook: EpubBook) {
-        epubBook.metadata.addTitle(book.name)
-        epubBook.metadata.addAuthor(Author(book.author, ""))
-        epubBook.metadata.language = "zh"
+        val metadata = Metadata()
+        metadata.titles.add(book.name)
+        metadata.authors.add(Author(book.getRealAuthor()))
+        metadata.language = "zh"
+        metadata.dates.add(Date())
+        metadata.publishers.add("Legado")
+        metadata.descriptions.add(book.getDisplayIntro())
+        epubBook.metadata = metadata
     }
 
     suspend fun searchBookContent(context: RoutingContext): ReturnData {
