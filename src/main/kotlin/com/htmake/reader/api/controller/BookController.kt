@@ -104,6 +104,7 @@ import javax.script.ScriptException
 import kotlinx.coroutines.CancellationException
 import io.legado.app.exception.NoStackTraceException
 import com.htmake.reader.utils.success
+import java.nio.charset.Charset
 
 private val logger: KLogger = KotlinLogging.logger { }
 
@@ -2963,26 +2964,18 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
 
     suspend fun exportToTxt(
         exportDir: File,
-        book: Book,
+        bookInfo: Book,
         bookSource: String,
         userNameSpace: String
     ): File {
-        val file = File(exportDir, book.name + ".txt")
-        val writer = file.bufferedWriter()
-        try {
-            getAllContents(book, bookSource, userNameSpace) { title, contents ->
-                writer.write(title)
-                writer.newLine()
-                contents.forEach { it2 ->
-                    writer.write(it2.third)
-                }
-                writer.newLine()
-                writer.newLine()
-            }
-        } finally {
-            writer.close()
+        val filename = "《${bookInfo.name}》作者：${bookInfo.getRealAuthor()}.txt"
+        val bookPath = FileUtils.getPath(exportDir, filename)
+        val bookFile = FileUtils.createFileWithReplace(bookPath)
+        getAllContents(bookInfo, bookSource, userNameSpace) { text, srcList ->
+            val charset = Charset.forName(appConfig.exportCharset)
+            bookFile.appendText(text, charset)
         }
-        return file
+        return bookFile
     }
 
     private suspend fun getAllContents(
