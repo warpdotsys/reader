@@ -143,7 +143,8 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
 
     private fun getInvalidBookSourceCache(userNameSpace: String): ACache {
         val cacheDir = File(getWorkDir("storage", "cache", "invalidBookSourceCache", userNameSpace))
-        return ACache.get(cacheDir, 5000000L, 1000000)
+        val cache = ACache.get(cacheDir, 5000000L, 1000000)
+        return cache
     }
 
     private fun isInvalidBookSource(bookSource: BookSource, userNameSpace: String): Boolean {
@@ -160,7 +161,8 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
 
     private fun getBookChaptersCache(userNameSpace: String): ACache {
         val cacheDir = File(getWorkDir("storage", "cache", "bookChaptersCache", userNameSpace))
-        return ACache.get(cacheDir, 5000000L, 1000000)
+        val cache = ACache.get(cacheDir, 5000000L, 1000000)
+        return cache
     }
 
     suspend fun getInvalidBookSources(context: RoutingContext): ReturnData {
@@ -455,15 +457,15 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             bookUrl = context.queryParam("url").firstOrNull() ?: ""
             chapterIndex = context.queryParam("index").firstOrNull()?.toInt() ?: -1
         }
-        if (bookUrl.length == 0) {
+        if (bookUrl.isEmpty()) {
             return returnData.setErrorMsg("请输入书籍链接")
         }
         val userNameSpace = getUserNameSpace(context)
         val bookInfo = getShelfBookByURL(bookUrl, userNameSpace)
-        if (bookInfo == null || bookInfo.origin.length == 0) {
+        if (bookInfo == null || bookInfo.origin.isEmpty()) {
             return returnData.setErrorMsg("书籍未加入书架")
         }
-        val bookSource = (getBookSourceStringBySourceURLOpt(bookInfo.origin, userNameSpace) ?: "")
+        val bookSource = getBookSourceStringBySourceURLOpt(bookInfo.origin, userNameSpace)
         if (!bookInfo.isLocalBook()) {
             if (bookSource.isNullOrEmpty()) {
                 return returnData.setErrorMsg("未配置书源")
@@ -507,7 +509,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             refresh = context.queryParam("refresh").firstOrNull()?.toInt() ?: 0
             epubContent = context.queryParam("epubContent").firstOrNull()?.toInt() ?: 0
         }
-        if (bookUrl.length == 0) {
+        if (bookUrl.isEmpty()) {
             return returnData.setErrorMsg("请输入书籍链接")
         }
         var bookSource = getBookSourceString(context)
@@ -529,7 +531,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                 bookSource = getBookSourceString(context, cacheInfo.origin)
             }
             if (chapterUrl.length == 0 && chapterIndex >= 0) {
-                if (bookUrl.length == 0) {
+                if (bookUrl.isEmpty()) {
                     return returnData.setErrorMsg("请输入书籍链接")
                 }
                 if (!bookSource.isNullOrEmpty()) {
@@ -2120,7 +2122,10 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         if (url.isEmpty()) {
             return null
         }
-        val bookshelf = asJsonArray(getUserStorage(userNameSpace, "bookshelf")) ?: return null
+        val bookshelf = asJsonArray(getUserStorage(userNameSpace, "bookshelf"))
+        if (bookshelf == null) {
+            return null
+        }
         for (i in 0 until bookshelf.size()) {
             val _book = bookshelf.getJsonObject(i).map.toDataClass<Book>()
             if (_book.bookUrl.equals(url)) {
@@ -2348,10 +2353,10 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
     }
 
     suspend fun syncBookProgressFromWebdav(progressFilePath: Any, userNameSpace: String) {
-        val progressFile = when (progressFilePath) {
-            is File -> progressFilePath
-            is String -> File(progressFilePath)
-            else -> null
+        var progressFile: File? = null
+        when (progressFilePath) {
+            is File -> progressFile = progressFilePath
+            is String -> progressFile = File(progressFilePath)
         }
         if (progressFile == null) {
             return
@@ -2359,7 +2364,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         val book = Ref.ObjectRef<Book>()
         book.element = asJsonObject(progressFile.readText())?.mapTo(Book::class.java)
         if (book.element != null) {
-            editShelfBook(book.element!!, userNameSpace) { existBook ->
+            editShelfBook(book.element, userNameSpace) { existBook ->
                 existBook.durChapterIndex = book.element!!.durChapterIndex
                 existBook.durChapterPos = book.element!!.durChapterPos
                 existBook.durChapterTime = book.element!!.durChapterTime
@@ -2460,7 +2465,8 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         latestZipFilePath: String? = null
     ): File? {
         val today = SimpleDateFormat("yyyy-MM-dd").format(System.currentTimeMillis())
-        val descDir = getWorkDir("storage", "data", userNameSpace, "backup$today")
+        var descDir: String
+        descDir = getWorkDir("storage", "data", userNameSpace, "backup$today")
         val descDirFile = File(descDir)
         descDirFile.deleteRecursively()
         try {
@@ -2470,10 +2476,11 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             val syncDataFileList = arrayListOf(*backupFileNames)
             syncDataFileList.forEach { it ->
                 val userDataFile = File(getWorkDir("storage", "data", userNameSpace, it))
-                if (!userDataFile.exists()) return@forEach
-                val backupFile = File(descDir + File.separator + it)
-                backupFile.deleteRecursively()
-                userDataFile.copyRecursively(backupFile)
+                if (userDataFile.exists()) {
+                    val backupFile = File(descDir + File.separator + it)
+                    backupFile.deleteRecursively()
+                    userDataFile.copyRecursively(backupFile)
+                }
             }
             val webdavBooksDir = File(getWorkDir("storage", "data", userNameSpace, "webdav", "books"))
             if (webdavBooksDir.exists()) {
