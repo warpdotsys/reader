@@ -178,7 +178,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         val invalidBookSourceCache = getInvalidBookSourceCache(userNameSpace)
         val cacheDir = File(getWorkDir("storage", "cache", "invalidBookSourceCache", userNameSpace))
         val files = cacheDir.listFiles()
-        val invalidBookSourceList = ArrayList<Map<String, Any>>()
+        val invalidBookSourceList = arrayListOf<Map<String, Any>>()
         if (files != null) {
             for (f in files) {
                 invalidBookSourceCache.getByHashCode(f.name)?.let {
@@ -319,7 +319,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                         val chapters = LocalBook.getChapterList(book)
                         fileList.add(mapOf("book" to book, "chapters" to chapters))
                     } catch (e: TocEmptyException) {
-                        fileList.add(mapOf("book" to book, "chapters" to ArrayList<BookChapter>()))
+                        fileList.add(mapOf("book" to book, "chapters" to arrayListOf<BookChapter>()))
                     }
                 }
                 file.deleteRecursively()
@@ -335,7 +335,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         }
         val userNameSpace = getUserNameSpace(context)
         val txtTocRules = getUserStorage(userNameSpace, "txtTocRule")
-        val rules = ArrayList<TxtTocRule>()
+        val rules = arrayListOf<TxtTocRule>()
         rules.addAll(DefaultData.txtTocRules)
         if (txtTocRules != null) {
             val customRule = GSON.fromJsonArray<TxtTocRule>(txtTocRules).getOrNull() ?: emptyList()
@@ -842,7 +842,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             isEnd = true
             coroutineContext.cancel()
         }
-        var resultList = ArrayList<SearchBook>()
+        var resultList = arrayListOf<SearchBook>()
         var resultMap = mutableMapOf<String, Int>()
         val book = Book()
         book.name = key
@@ -968,7 +968,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             isEnd = true
             coroutineContext.cancel()
         }
-        var resultList = ArrayList<SearchBook>()
+        var resultList = arrayListOf<SearchBook>()
         val book = Book()
         book.name = key
         var maxSize = urlMap.size
@@ -1875,7 +1875,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         val bookJsonArray = context.bodyAsJsonArray
         val userNameSpace = getUserNameSpace(context)
         var bookshelf = asJsonArray(getUserStorage(userNameSpace, "bookshelf")) ?: JsonArray()
-        val infoMap = LinkedHashMap<String, Int>()
+        val infoMap = linkedMapOf<String, Int>()
         for (i in 0 until bookJsonArray.size()) {
             val bookUrl = bookJsonArray.getJsonObject(i).getString("bookUrl", "")
             infoMap[bookUrl] = i
@@ -2248,7 +2248,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                 bookSourceList = it
             }
         }
-        val urlMap = LinkedHashMap<String, Int>()
+        val urlMap = linkedMapOf<String, Int>()
         for (i in 0 until bookSourceList.size()) {
             val bookUrl: String = bookSourceList.getJsonObject(i).getString("bookUrl")
             urlMap[bookUrl] = i
@@ -3066,7 +3066,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
 
     fun getCachedChapterContentSet(bookInfo: Book, userNameSpace: String): MutableSet<Int> {
         val localCacheDir = getChapterCacheDir(bookInfo, userNameSpace)
-        val cachedChapterContentSet: MutableSet<Int> = LinkedHashSet()
+        val cachedChapterContentSet: MutableSet<Int> = linkedSetOf()
         localCacheDir.listFiles().forEach { it ->
             if (!it.name.startsWith(".")) {
                 if (it.name.endsWith(".txt")) {
@@ -3416,7 +3416,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         if (lastIndex >= chapterList.size) {
             return returnData.setErrorMsg("没有更多了")
         }
-        val resultList = ArrayList<SearchResult>()
+        val resultList = arrayListOf<SearchResult>()
         val isEnd = Ref.BooleanRef()
         context.request().connection().closeHandler { isEnd.element = true }
         logger.info("searchBookContent keyword: {} lastIndex: {}", keyword, lastIndex)
@@ -3517,7 +3517,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         }
         handler("default")
         if (appConfig.secure) {
-            var userMap: MutableMap<String, Map<String, Any>> = LinkedHashMap()
+            var userMap: MutableMap<String, Map<String, Any>> = linkedMapOf()
             val userMapJson = asJsonObject(getStorage("data", "users"))
             if (userMapJson != null) {
                 userMap = userMapJson.map as MutableMap<String, Map<String, Any>>
