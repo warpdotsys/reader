@@ -1900,8 +1900,11 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
     }
 
     suspend fun saveBookInfoCache(bookList: List<Book>): List<Book> {
-        bookList.forEach { book ->
-            bookInfoCache.put(book.bookUrl, GSON.toJson(book), 600)
+        if (bookList.size > 0) {
+            for (i in 0 until bookList.size) {
+                val book = bookList[i]
+                bookInfoCache.put(book.bookUrl, jsonEncode(JsonObject.mapFrom(book).map))
+            }
         }
         return bookList
     }
@@ -2371,18 +2374,27 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
     }
 
     suspend fun saveBookProgressToWebdav(book: Book, bookChapter: BookChapter, userNameSpace: String) {
-        val progress = JsonObject()
-            .put("bookUrl", book.bookUrl)
-            .put("bookName", book.name)
-            .put("durChapterIndex", bookChapter.index)
-            .put("durChapterTitle", bookChapter.title)
-            .put("durChapterTime", System.currentTimeMillis())
-        val fileName = MD5Utils.md5Encode(book.bookUrl) + ".json"
-        val file = File(getWorkDir("storage", "webdav", userNameSpace, "progress", fileName))
-        if (!file.parentFile.exists()) {
-            file.parentFile.mkdirs()
+        val userHome = getUserWebdavHome(userNameSpace)
+        var bookProgressDir = File(userHome + File.separator + "bookProgress")
+        if (!bookProgressDir.exists()) {
+            bookProgressDir = File(userHome + File.separator + "legado" + File.separator + "bookProgress")
+            if (!bookProgressDir.exists()) {
+                return
+            }
         }
-        file.writeText(progress.encode())
+        val progressFile = File(bookProgressDir.toString() + File.separator + book.name + '_' + book.author + ".json")
+        progressFile.writeText(
+            jsonEncode(
+                mapOf(
+                    "name" to book.name,
+                    "author" to book.author,
+                    "durChapterIndex" to bookChapter.index,
+                    "durChapterPos" to 0,
+                    "durChapterTime" to System.currentTimeMillis(),
+                    "durChapterTitle" to bookChapter.title
+                ), true
+            )
+        )
     }
 
     suspend fun syncFromWebdav(zipFilePath: String, userNameSpace: String): Boolean {
@@ -3004,15 +3016,16 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
     }
 
     fun getCachedChapterContentSet(bookInfo: Book, userNameSpace: String): MutableSet<Int> {
-        val chapterCacheDir = getChapterCacheDir(bookInfo, userNameSpace)
-        val set = HashSet<Int>()
-        chapterCacheDir.listFiles()?.forEach { file ->
-            val name = file.name
-            if (name.endsWith(".txt")) {
-                name.substringBefore(".txt").toIntOrNull()?.let { set.add(it) }
+        val localCacheDir = getChapterCacheDir(bookInfo, userNameSpace)
+        val cachedChapterContentSet: MutableSet<Int> = LinkedHashSet()
+        localCacheDir.listFiles().forEach { it ->
+            if (!it.name.startsWith(".")) {
+                if (it.name.endsWith(".txt")) {
+                    cachedChapterContentSet.add(it.name.replace(".txt", "").toInt())
+                }
             }
         }
-        return set
+        return cachedChapterContentSet
     }
 
     suspend fun getShelfBookWithCacheInfo(context: RoutingContext): ReturnData {
