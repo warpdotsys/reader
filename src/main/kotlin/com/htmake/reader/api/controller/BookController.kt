@@ -192,7 +192,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         } else {
             bookUrl = context.queryParam("url").firstOrNull() ?: ""
         }
-        if (bookUrl.length == 0) {
+        if (bookUrl.isEmpty()) {
             return returnData.setErrorMsg("请输入书籍链接")
         }
         val userNameSpace = getUserNameSpace(context)
@@ -344,7 +344,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             return returnData.setData("NEED_LOGIN").setErrorMsg("请登录后使用")
         }
         val book = context.bodyAsJson.mapTo(Book::class.java)
-        if (book.origin.length == 0) {
+        if (book.origin.isEmpty()) {
             return returnData.setErrorMsg("未找到书源信息")
         }
         if (!(book.isLocalTxt() || book.isLocalEpub() || book.isLocalPdf())) {
@@ -367,7 +367,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         } else {
             bookUrl = context.queryParam("bookUrl").firstOrNull() ?: ""
         }
-        if (bookUrl.length == 0) {
+        if (bookUrl.isEmpty()) {
             return returnData.setErrorMsg("请输入书籍链接")
         }
         val userNameSpace = getUserNameSpace(context)
@@ -697,7 +697,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         val bookUrl = context.bodyAsJson.getString("url") ?: ""
         val chapterIndex = context.bodyAsJson.getInteger("index", -1)
         val content = context.bodyAsJson.getString("content") ?: ""
-        if (bookUrl.length == 0) {
+        if (bookUrl.isEmpty()) {
             return returnData.setErrorMsg("请输入书籍链接")
         }
         val userNameSpace = getUserNameSpace(context)
@@ -1674,7 +1674,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                 for (i in 0 until localBookSourceList.size()) {
                     val _searchBook = localBookSourceList.getJsonObject(i)
                         .mapTo(SearchBook::class.java)
-                    if (_searchBook.bookUrl == newBookUrl) {
+                    if (_searchBook.bookUrl.equals(newBookUrl)) {
                         searchBook = _searchBook.toBook()
                         break
                     }
@@ -2126,7 +2126,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         val bookshelf = asJsonArray(getUserStorage(userNameSpace, "bookshelf")) ?: return null
         for (i in 0 until bookshelf.size()) {
             val _book = bookshelf.getJsonObject(i).map.toDataClass<Book>()
-            if (_book.bookUrl == url) {
+            if (_book.bookUrl.equals(url)) {
                 _book.setRootDir(getWorkDir())
                 _book.setUserNameSpace(userNameSpace)
                 _book.isInShelf = true
@@ -2536,14 +2536,14 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         }
         val bookSourceUrl = context.queryParam("bookSourceUrl").firstOrNull() ?: ""
         val keyword = context.queryParam("keyword").firstOrNull() ?: ""
-        if (bookSourceUrl.length == 0) {
+        if (bookSourceUrl.isNullOrEmpty()) {
             response.write("event: error\n")
             response.end(
                 "data: " + jsonEncode(returnData.setErrorMsg("未配置书源"), false) + "\n\n"
             )
             return
         }
-        if (keyword.length == 0) {
+        if (keyword.isNullOrEmpty()) {
             response.write("event: error\n")
             response.end(
                 "data: " + jsonEncode(returnData.setErrorMsg("请输入搜索关键词"), false) + "\n\n"
@@ -2859,7 +2859,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             .style(TtsStyleEnum.chat)
             .build()
         val mp3byte = ttsService.sendText(ssml)
-        if (options != null && "1" == options["base64"]) {
+        if (options != null && "1".equals(options["base64"])) {
             val returnData = ReturnData()
             response.putHeader("content-type", "application/json; charset=utf-8")
             val encoded = Base64.getEncoder().encodeToString(mp3byte)
@@ -2872,9 +2872,22 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
     }
 
     fun getHttpTTSByName(name: String, userNameSpace: String): HttpTTS? {
-        val httpTTSList = getUserStorage(userNameSpace, "httpTTS") ?: return null
-        val list = GSON.fromJsonArray<HttpTTS>(httpTTSList).getOrNull() ?: return null
-        return list.firstOrNull { it.name == name }
+        if (name.isEmpty()) {
+            return null
+        }
+        val list = asJsonArray(getUserStorage(userNameSpace, "httpTTS"))
+        if (list == null) {
+            return null
+        }
+        for (i in 0 until list.size()) {
+            val httpTTS = HttpTTS.fromJson(list.getJsonObject(i).toString()).getOrNull()
+            if (httpTTS != null) {
+                if (httpTTS.name.equals(name)) {
+                    return httpTTS
+                }
+            }
+        }
+        return null
     }
 
     suspend fun ttsByApi(
@@ -3007,12 +3020,14 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
     }
 
     fun getChapterCacheDir(bookInfo: Book, userNameSpace: String): File {
-        return File(
-            getWorkDir(
-                "storage", "cache", "bookChapter", userNameSpace,
-                bookInfo.name + '_' + bookInfo.author
-            )
-        )
+        val md5Encode = MD5Utils.md5Encode(bookInfo.bookUrl).toString()
+        val localCacheDirPath =
+            getWorkDir("storage", "data", userNameSpace, bookInfo.name + '_' + bookInfo.author, md5Encode)
+        val localCacheDir = File(localCacheDirPath)
+        if (!localCacheDir.exists()) {
+            localCacheDir.mkdirs()
+        }
+        return localCacheDir
     }
 
     fun getCachedChapterContentSet(bookInfo: Book, userNameSpace: String): MutableSet<Int> {
@@ -3439,10 +3454,18 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         queryIndexInContent: Int,
         query: String
     ): Pair<Int, String> {
-        val start = maxOf(0, queryIndexInContent - 20)
-        val end = minOf(content.length, queryIndexInContent + query.length + 20)
-        val resultText = content.substring(start, end)
-        return Pair(queryIndexInContent - start, resultText)
+        val length = 20
+        var po1 = queryIndexInContent - length
+        var po2 = queryIndexInContent + query.length + length
+        if (po1 < 0) {
+            po1 = 0
+        }
+        if (po2 > content.length) {
+            po2 = content.length
+        }
+        val queryIndexInResult = queryIndexInContent - po1
+        val newText = content.substring(po1, po2)
+        return queryIndexInResult to newText
     }
 
     suspend fun backupToMongodb(context: RoutingContext): ReturnData {
@@ -3495,7 +3518,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             userMap.forEach { entry ->
                 try {
                     val ns = entry.value.getOrDefault("username", "") as String? ?: ""
-                    if (ns.length > 0) {
+                    if (ns.isNotEmpty()) {
                         handler(ns)
                     }
                 } catch (e: Exception) {
