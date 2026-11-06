@@ -25,14 +25,15 @@ class CbzFile(var book: Book) {
             return Pair(info, cover)
         }
         val zf = ZipFile(book.getLocalFile())
-        val imageExt = listOf("jpg", "jpeg", "gif", "png", "bmp", "webp", "svg")
         val entries = zf.entries()
+        val imageExt = listOf("jpg", "jpeg", "gif", "png", "bmp", "webp", "svg")
         while (entries.hasMoreElements()) {
-            val entry: ZipEntry = entries.nextElement()
+            val entry = entries.nextElement() as ZipEntry
             if (!entry.isDirectory) {
                 val name = entry.name
                 if (name.equals("ComicInfo.xml")) {
-                    info = XmlUtils.xml2map(zf.getInputStream(entry))
+                    val inputStream = zf.getInputStream(entry)
+                    info = XmlUtils.xml2map(inputStream)
                 } else if (cover == null) {
                     val ext = FileUtils.getFileExtetion(name).toLowerCase(Locale.ROOT)
                     if (imageExt.contains(ext)) {
@@ -48,7 +49,7 @@ class CbzFile(var book: Book) {
     private fun upBookInfo() {
         val result = parseBookInfo()
         if (result.first != null) {
-            val bookInfo = result.first!!
+            val bookInfo = result.first as Map<String, Any>
             val info = bookInfo["ComicInfo"] as Map<*, *>?
             book.name = info?.get("Title") as String? ?: book.name
             book.author = info?.get("Writer") as String? ?: book.author
@@ -61,9 +62,12 @@ class CbzFile(var book: Book) {
         val relativeCoverUrl = Paths.get("assets", book.getUserNameSpace(), "covers", coverFile).toString()
         book.coverUrl = "/" + relativeCoverUrl.replace("\\", "/")
         val coverUrl = Paths.get(book.workRoot(), "storage", relativeCoverUrl).toString()
-        val result = parseBookInfo()
-        if (!File(coverUrl).exists() && result.second != null) {
-            FileUtils.writeInputStream(coverUrl, result.second!!)
+        if (!File(coverUrl).exists()) {
+            val result = parseBookInfo()
+            if (result.second != null) {
+                val coverStream = result.second as InputStream
+                FileUtils.writeInputStream(coverUrl, coverStream)
+            }
         }
     }
 
@@ -74,18 +78,20 @@ class CbzFile(var book: Book) {
     private fun getChapterList(): ArrayList<BookChapter> {
         val chapterList = ArrayList<BookChapter>()
         val zf = ZipFile(book.getLocalFile())
-        val imageFileList = ArrayList<String>()
         val entries = zf.entries()
+        val imageFileList = ArrayList<String>()
         while (entries.hasMoreElements()) {
-            val entry: ZipEntry = entries.nextElement()
-            if (entry.isDirectory) continue
-            val name = entry.name
-            if (name.endsWith(".xml")) continue
-            imageFileList.add(name)
+            val entry = entries.nextElement() as ZipEntry
+            if (!entry.isDirectory) {
+                val name = entry.name
+                if (!name.endsWith(".xml")) {
+                    imageFileList.add(name)
+                }
+            }
         }
         imageFileList.sort()
-        for (i in imageFileList.indices) {
-            val name = imageFileList[i]
+        for (i in 0 until imageFileList.size) {
+            val name = imageFileList.get(i)
             val chapter = BookChapter()
             chapter.title = name
             chapter.index = i

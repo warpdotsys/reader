@@ -16,12 +16,11 @@ object EncoderUtils {
     fun escape(src: String): String {
         val tmp = StringBuilder()
         for (charCode in src) {
-            val plain = (charCode in '0'..'9') || (charCode in 'A'..'Z') || (charCode in 'a'..'z')
-            if (plain) {
+            if (charCode in '0'..'9' || charCode in 'A'..'Z' || charCode in 'a'..'z') {
                 tmp.append(charCode)
             } else {
                 val prefix = if (charCode < '\u0010') "%0" else if (charCode < '\u0100') "%" else "%u"
-                tmp.append(prefix).append(Integer.toString(charCode.code, 16))
+                tmp.append(prefix).append(charCode.code.toString(16))
             }
         }
         return tmp.toString()
