@@ -86,6 +86,7 @@ import org.apache.pdfbox.rendering.PDFRenderer
 import java.awt.image.BufferedImage
 import java.io.FileOutputStream
 import java.io.InputStream
+import java.text.SimpleDateFormat
 import java.util.Base64
 import java.util.Locale
 import java.util.function.BiConsumer
@@ -2448,21 +2449,40 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         userNameSpace: String,
         backupDir: String,
         latestZipFilePath: String? = null
-    ): File {
-        val dir = File(backupDir)
-        if (!dir.exists()) {
-            dir.mkdirs()
+    ): File? {
+        val today = SimpleDateFormat("yyyy-MM-dd").format(System.currentTimeMillis())
+        val descDir = getWorkDir("storage", "data", userNameSpace, "backup$today")
+        val descDirFile = File(descDir)
+        descDirFile.deleteRecursively()
+        try {
+            if (latestZipFilePath != null && !File(latestZipFilePath).unzip(descDir)) {
+                return null
+            }
+            val syncDataFileList = arrayListOf(*backupFileNames)
+            syncDataFileList.forEach { it ->
+                val userDataFile = File(getWorkDir("storage", "data", userNameSpace, it))
+                if (!userDataFile.exists()) return@forEach
+                val backupFile = File(descDir + File.separator + it)
+                backupFile.deleteRecursively()
+                userDataFile.copyRecursively(backupFile)
+            }
+            val webdavBooksDir = File(getWorkDir("storage", "data", userNameSpace, "webdav", "books"))
+            if (webdavBooksDir.exists()) {
+                val backupBooksDir = File(descDir + File.separator + "books")
+                backupBooksDir.deleteRecursively()
+                webdavBooksDir.copyRecursively(backupBooksDir)
+            }
+            val backupFile = FileUtils.createFileWithReplace(
+                backupDir + File.separator + "backup" + today + ".zip"
+            )
+            val files: Array<File> = descDirFile.listFiles()
+            return if (ZipUtils.zipFiles(arrayListOf(*files), backupFile, null)) backupFile else null
+        } catch (e: Exception) {
+            e.printStackTrace()
+        } finally {
+            descDirFile.deleteRecursively()
         }
-        val zipFile = File(dir, "backup-" + System.currentTimeMillis() + ".zip")
-        val files = ArrayList<File>()
-        val dataDir = File(getWorkDir("storage", "data", userNameSpace))
-        dataDir.listFiles()?.forEach { files.add(it) }
-        if (files.isEmpty()) {
-            zipFile.writeText("")
-            return zipFile
-        }
-        ZipUtils.zipFiles(files, zipFile, "")
-        return zipFile
+        return null
     }
 
     suspend fun getLastBackFileFromWebdav(userNameSpace: String): String? {
@@ -2489,34 +2509,56 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
     suspend fun bookSourceDebugSSE(context: RoutingContext) {
         val returnData = ReturnData()
         val response = context.response()
-        response.putHeader("Content-Type", "text/event-stream")
-        response.putHeader("Cache-Control", "no-cache")
-        response.setChunked(true)
+            .putHeader("Content-Type", "text/event-stream")
+            .putHeader("Cache-Control", "no-cache")
+            .setChunked(true)
         if (!checkAuth(context)) {
             response.write("event: error\n")
-            response.write("data: NEED_LOGIN\n\n")
-            response.end()
+            response.end(
+                "data: " + jsonEncode(
+                    returnData.setData("NEED_LOGIN").setErrorMsg("请登录后使用"),
+                    false
+                ) + "\n\n"
+            )
             return
         }
         val bookSourceUrl = context.queryParam("bookSourceUrl").firstOrNull() ?: ""
-        val key = context.queryParam("key").firstOrNull() ?: ""
-        val userNameSpace = getUserNameSpace(context)
-        val bookSource = (getBookSourceStringBySourceURLOpt(bookSourceUrl, userNameSpace) ?: "")
-        if (bookSource.isEmpty()) {
+        val keyword = context.queryParam("keyword").firstOrNull() ?: ""
+        if (bookSourceUrl.length == 0) {
             response.write("event: error\n")
             response.end(
                 "data: " + jsonEncode(returnData.setErrorMsg("未配置书源"), false) + "\n\n"
             )
             return
         }
+        if (keyword.length == 0) {
+            response.write("event: error\n")
+            response.end(
+                "data: " + jsonEncode(returnData.setErrorMsg("请输入搜索关键词"), false) + "\n\n"
+            )
+            return
+        }
+        val userNameSpace = getUserNameSpace(context)
+        val bookSourceString = getBookSourceStringBySourceURLOpt(bookSourceUrl, userNameSpace)
+        if (bookSourceString.isNullOrEmpty()) {
+            response.write("event: error\n")
+            response.end(
+                "data: " + jsonEncode(returnData.setErrorMsg("未配置书源"), false) + "\n\n"
+            )
+            return
+        }
+        context.request().connection().closeHandler {
+            logger.info("客户端已断开链接，停止 bookSourceDebugSSE")
+            coroutineContext.cancel()
+        }
+        logger.info("bookSourceDebugSSE bookSource: {} keyword: {}", bookSourceString, keyword)
         val debugger = Debugger { msg ->
             response.write("data: " + jsonEncode(mapOf("msg" to msg), false) + "\n\n")
         }
-        val webBook = WebBook(bookSource, true, debugger, userNameSpace)
-        debugger.startDebug(webBook, key)
+        val webBook = WebBook(bookSourceString, userNameSpace = userNameSpace)
+        debugger.startDebug(webBook, keyword)
         response.write("event: end\n")
-        response.write("data: end\n\n")
-        response.end()
+        response.end("data: " + jsonEncode(mapOf("end" to true), false) + "\n\n")
     }
 
     suspend fun cacheBookSSE(context: RoutingContext) {
@@ -2651,29 +2693,45 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
     suspend fun cacheBookOnServer(bookUrlList: JsonArray, userNameSpace: String) {
         for (i in 0 until bookUrlList.size()) {
             val bookUrl = bookUrlList.getString(i)
-            val book = getShelfBookByURL(bookUrl, userNameSpace) ?: continue
-            val bookSource = (getBookSourceStringBySourceURLOpt(book.origin, userNameSpace) ?: "")
-            val chapterList = if (book.isLocalBook()) {
-                getLocalChapterList(book, bookSource, false, userNameSpace)
-            } else {
-                WebBook(bookSource, appConfig.debugLog, userNameSpace = userNameSpace).getChapterList(book)
+            val bookInfo = getShelfBookByURL(bookUrl, userNameSpace)
+            if (bookInfo == null) {
+                logger.info("未找到书籍信息: {}", bookUrl)
+                continue
             }
-            for (chapter in chapterList) {
-                val content = if (book.isLocalBook()) {
-                    LocalBook.getContent(book, chapter) ?: ""
-                } else {
-                    WebBook(bookSource, appConfig.debugLog, userNameSpace = userNameSpace)
-                        .getBookContent(book, chapter)
-                }
-                if (content.isNotEmpty()) {
-                    BookHelp.saveText(book, chapter, content)
-                    BookHelp.saveImages(
-                        this,
-                        BookSource.fromJson(bookSource).getOrNull() ?: BookSource(),
-                        book, chapter, content
-                    )
+            if (bookInfo.isLocalBook()) {
+                logger.info("本地书籍跳过缓存: {}", bookUrl)
+                continue
+            }
+            logger.info("开始缓存书籍: {}", bookInfo)
+            val bookSource = getBookSourceStringBySourceURLOpt(bookInfo.origin, userNameSpace)
+            if (bookSource.isNullOrEmpty()) {
+                logger.info("未找到书源信息: {}", bookUrl)
+                continue
+            }
+            val chapterList = getLocalChapterList(bookInfo, bookSource, false, userNameSpace)
+            val cachedChapterContentSet = getCachedChapterContentSet(bookInfo, userNameSpace)
+            val localCacheDir = getChapterCacheDir(bookInfo, userNameSpace)
+            for ((chapterIndex, chapterInfo) in chapterList.withIndex()) {
+                if (cachedChapterContentSet.contains(chapterIndex)) continue
+                try {
+                    var nextChapterUrl: String? = null
+                    if (chapterIndex + 1 < chapterList.size) {
+                        val nextChapterInfo = chapterList[chapterIndex + 1]
+                        nextChapterUrl = nextChapterInfo.url
+                    }
+                    val content = WebBook(bookSource, appConfig.debugLog, userNameSpace = userNameSpace)
+                        .getBookContent(bookInfo, chapterInfo, nextChapterUrl)
+                    val chapterCacheFile =
+                        File(localCacheDir.absolutePath + File.separator + chapterIndex + ".txt")
+                    chapterCacheFile.writeText(content)
+                    val bookSourceObj = BookSource.fromJson(bookSource).getOrNull() ?: BookSource()
+                    BookHelp.saveImages(this, bookSourceObj, bookInfo, chapterInfo, content)
+                    cachedChapterContentSet.add(chapterIndex)
+                } catch (e: Exception) {
+                    logger.info("cacheBookOnServer error: {}", e.message)
                 }
             }
+            logger.info("缓存书籍完成: {}", bookInfo)
         }
     }
 
