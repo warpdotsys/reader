@@ -1961,34 +1961,25 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
 
     suspend fun getLocalChapterList(
         book: Book,
-        bookSource: String? = null,
+        bookSource: String?,
         refresh: Boolean = false,
         userNameSpace: String,
         debugLog: Boolean = true,
         mutex: Mutex? = null
     ): List<BookChapter> {
-        if (mutex != null) {
-            mutex.lock()
+        val md5Encode = MD5Utils.md5Encode(book.bookUrl).toString()
+        var chapterList: JsonArray? = null
+        val bookChaptersCache = getBookChaptersCache(userNameSpace)
+        if (book.isInShelf) {
+            chapterList = asJsonArray(getUserStorage(userNameSpace, book.name + "_" + book.author, md5Encode))
+        } else {
+            chapterList = asJsonArray(bookChaptersCache.getAsString(book.name + "_" + book.author + md5Encode))
         }
-        try {
-            val md5Encode = MD5Utils.md5Encode(book.bookUrl).toString()
-            val bookChaptersCache = getBookChaptersCache(userNameSpace)
-            val cached = if (book.isInShelf) {
-                asJsonArray(getUserStorage(userNameSpace, "${book.name}_${book.author}", md5Encode))
-            } else {
-                asJsonArray(bookChaptersCache.getAsString("${book.name}_${book.author}$md5Encode"))
-            }
-            if (cached != null && !refresh) {
-                val cachedList = GSON.fromJsonArray<BookChapter>(cached.toString()).getOrNull()
-                if (!cachedList.isNullOrEmpty()) {
-                    return cachedList
-                }
-            }
+        if (chapterList == null || refresh) {
+            var newChapterList: List<BookChapter>
             book.setRootDir(getWorkDir())
             book.setUserNameSpace(userNameSpace)
             if (book.isLocalBook()) {
-                book.setRootDir(getWorkDir())
-                book.setUserNameSpace(userNameSpace)
                 if (book.isEpub() && !extractEpub(book, refresh)) {
                     throw Exception("Epub书籍解压失败")
                 }
@@ -1998,43 +1989,63 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                 if (book.isPdf() && !convertPdfToImage(book, refresh)) {
                     throw Exception("PDF书籍转换失败")
                 }
-                return LocalBook.getChapterList(book)
-            }
-            if (!bookSource.isNullOrEmpty()) {
-                val bookSourceObject = BookSource.fromJson(bookSource).getOrNull()
-                bookSourceObject?.ruleToc?.preUpdateJs?.let {
-                    AnalyzeRule(book, bookSourceObject).evalJS(it)
-                }
-            }
-            if (book.tocUrl.isBlank()) {
-                WebBook(bookSource ?: "", debugLog, null, userNameSpace).getBookInfo(book)
-            }
-            try {
-                return WebBook(bookSource ?: "", debugLog, null, userNameSpace).getChapterList(book)
-            } catch (e: Exception) {
-                if (!bookSource.isNullOrEmpty()) {
-                    val bookSourceObject = BookSource.fromJson(bookSource).getOrNull()
-                    if (bookSourceObject != null) {
-                        val info = mutableMapOf(
-                            "sourceUrl" to bookSourceObject.bookSourceUrl,
-                            "time" to System.currentTimeMillis(),
-                            "error" to e.toString()
-                        )
-                        addInvalidBookSource(bookSourceObject.bookSourceUrl, info, userNameSpace)
+                newChapterList = LocalBook.getChapterList(book)
+            } else {
+                try {
+                    if (!bookSource.isNullOrEmpty()) {
+                        val bookSourceObject = BookSource.fromJson(bookSource).getOrNull()
+                        bookSourceObject?.ruleToc?.preUpdateJs?.let {
+                            AnalyzeRule(book, bookSourceObject).evalJS(it)
+                        }
+                        if (book.tocUrl.isBlank()) {
+                            WebBook(bookSource, debugLog, userNameSpace = userNameSpace).getBookInfo(book)
+                        }
                     }
+                    newChapterList = WebBook(bookSource!!, debugLog, userNameSpace = userNameSpace)
+                        .getChapterList(book)
+                } catch (e: Exception) {
+                    if (!bookSource.isNullOrEmpty()) {
+                        val bookSourceObject = BookSource.fromJson(bookSource).getOrNull()
+                        if (bookSourceObject != null) {
+                            val info = mutableMapOf(
+                                "sourceUrl" to bookSourceObject.bookSourceUrl,
+                                "time" to System.currentTimeMillis(),
+                                "error" to e.toString()
+                            )
+                            addInvalidBookSource(bookSourceObject.bookSourceUrl, info, userNameSpace)
+                        }
+                    }
+                    if (mutex != null) mutex.lock()
+                    try {
+                        book.lastCheckError = e.toString()
+                        editShelfBook(book, userNameSpace) { existBook ->
+                            existBook.lastCheckError = e.toString()
+                            existBook
+                        }
+                    } finally {
+                        mutex?.unlock()
+                    }
+                    throw e
                 }
-                book.lastCheckError = e.toString()
-                editShelfBook(book, userNameSpace) { existBook ->
-                    existBook.lastCheckError = e.toString()
-                    existBook
-                }
-                throw e
             }
-        } finally {
-            if (mutex != null) {
-                mutex.unlock()
+            if (book.isInShelf) {
+                saveUserStorage(
+                    userNameSpace,
+                    getRelativePath(book.name + "_" + book.author, md5Encode),
+                    newChapterList
+                )
+            } else {
+                bookChaptersCache.put(book.name + "_" + book.author + md5Encode, jsonEncode(newChapterList), 3600)
             }
+            saveShelfBookLatestChapter(book, newChapterList, userNameSpace, mutex)
+            return newChapterList
         }
+        var localChapterList = arrayListOf<BookChapter>()
+        for (i in 0 until chapterList.size()) {
+            var _chapter = chapterList.getJsonObject(i).mapTo(BookChapter::class.java)
+            localChapterList.add(_chapter)
+        }
+        return localChapterList
     }
 
     suspend fun getBookSourceString(
