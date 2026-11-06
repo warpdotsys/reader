@@ -22,6 +22,7 @@ import io.legado.app.model.webBook.WebBook
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.utils.ACache
 import io.legado.app.utils.FileUtils
+import io.legado.app.utils.HtmlFormatter
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonArray
 import io.legado.app.utils.MD5Utils
@@ -2899,18 +2900,35 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
 
     suspend fun ttsByApi(
         response: HttpServerResponse,
-        name: String,
         text: String,
+        userNameSpace: String,
         options: Map<String, String>? = null
     ) {
-        val httpTTS = getHttpTTSByName(name, "")
-        if (httpTTS == null) {
-            response.setStatusCode(404).end("未找到TTS")
+        val voice = options?.get("voice")
+        if (voice.isNullOrEmpty()) {
+            response.setStatusCode(404).end()
             return
         }
-        val inputStream = getSpeakStream(httpTTS, text, 0)
-        response.putHeader("Content-Type", "audio/mpeg")
-        response.end(Buffer.buffer(inputStream?.readBytes() ?: ByteArray(0)))
+        val httpTTS = getHttpTTSByName(voice, userNameSpace)
+        if (httpTTS == null) {
+            response.setStatusCode(404).end()
+            return
+        }
+        var speechRate = options?.get("rate")?.toDouble() ?: 1.0
+        speechRate = 5 + (speechRate - 0.5) * 30
+        val stream = getSpeakStream(httpTTS, text, speechRate.toInt())
+        if (stream != null) {
+            if (options != null && "1".equals(options["base64"])) {
+                val returnData = ReturnData()
+                response.putHeader("content-type", "application/json; charset=utf-8")
+                    .end(jsonEncode(returnData.setData(Base64.getEncoder().encodeToString(stream.readBytes()))))
+            } else {
+                response.putHeader("Content-Type", httpTTS.contentType ?: "audio/mpeg")
+                    .end(Buffer.buffer(stream.readBytes()))
+            }
+        } else {
+            response.setStatusCode(404).end()
+        }
     }
 
     suspend fun getSpeakStream(httpTts: HttpTTS, speakText: String, speechRate: Int): InputStream? {
@@ -3150,8 +3168,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         val bookPath = FileUtils.getPath(exportDir, filename)
         val bookFile = FileUtils.createFileWithReplace(bookPath)
         getAllContents(bookInfo, bookSource, userNameSpace) { text, srcList ->
-            val charset = Charset.forName(appConfig.exportCharset)
-            bookFile.appendText(text, charset)
+            bookFile.appendText(text, Charset.forName(appConfig.exportCharset))
         }
         return bookFile
     }
@@ -3160,24 +3177,26 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         book: Book,
         bookSourceString: String,
         userNameSpace: String,
-        append: (String, ArrayList<Triple<String, Int, String>>) -> Unit
+        append: (String, ArrayList<Triple<String, Int, String>>?) -> Unit
     ) {
-        book.setRootDir(getWorkDir())
-        book.setUserNameSpace(userNameSpace)
-        val chapterList = if (book.isLocalBook()) {
-            getLocalChapterList(book, bookSourceString, false, userNameSpace)
-        } else {
-            WebBook(bookSourceString, appConfig.debugLog, userNameSpace = userNameSpace)
-                .getChapterList(book)
-        }
-        val webBook = WebBook(bookSourceString, appConfig.debugLog, userNameSpace = userNameSpace)
-        chapterList.forEach { chapter ->
-            val content = if (book.isLocalBook()) {
-                LocalBook.getContent(book, chapter) ?: ""
-            } else {
-                webBook.getBookContent(book, chapter)
+        val text =
+            "${book.name}\n作者：${book.getRealAuthor()}\n简介：${HtmlFormatter.format(book.getDisplayIntro())}"
+        append(text, null)
+        val chapterList = getLocalChapterList(book, bookSourceString, false, userNameSpace)
+        val localCacheDir = getChapterCacheDir(book, userNameSpace)
+        chapterList.forEachIndexed { index, chapter ->
+            val chapterCacheFile =
+                File(localCacheDir.absolutePath + File.separator + index + ".txt")
+            var content = ""
+            if (!appConfig.exportNoChapterName) {
+                content += chapter.title + '\n'
             }
-            append(chapter.title, arrayListOf(Triple(chapter.title, chapter.index, content)))
+            if (chapterCacheFile.exists()) {
+                content += chapterCacheFile.readText() + '\n'
+            } else {
+                content += "暂无缓存内容。\n"
+            }
+            append("\n\n" + content, null)
         }
     }
 
