@@ -1418,19 +1418,19 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         if (!checkAuth(context)) {
             return returnData.setData("NEED_LOGIN").setErrorMsg("请登录后使用")
         }
-        var url = if (context.request().method() == HttpMethod.POST) {
-            context.bodyAsJson.getString("url")
+        var url: String
+        if (context.request().method() == HttpMethod.POST) {
+            url = context.bodyAsJson.getString("url")
         } else {
-            context.queryParam("url").firstOrNull() ?: ""
+            url = context.queryParam("url").firstOrNull() ?: ""
         }
-        if (url == null) {
-            url = ""
-        }
-        if (url.isEmpty()) {
+        if (url.isNullOrEmpty()) {
             return returnData.setErrorMsg("书源链接不能为空")
         }
         val book = getShelfBookByURL(url, getUserNameSpace(context))
-            ?: return returnData.setErrorMsg("书籍不存在")
+        if (book == null) {
+            return returnData.setErrorMsg("书籍不存在")
+        }
         return returnData.setData(book)
     }
 
