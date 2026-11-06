@@ -2154,9 +2154,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         userNameSpace: String,
         mutex: Mutex? = null
     ) {
-        if (mutex != null) {
-            mutex.lock()
-        }
+        mutex?.lock()
         try {
             editShelfBook(book, userNameSpace) { existBook ->
                 if (bookChapterList.size > 0) {
@@ -2177,9 +2175,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                 existBook
             }
         } finally {
-            if (mutex != null) {
-                mutex.unlock()
-            }
+            mutex?.unlock()
         }
     }
 
@@ -2770,14 +2766,21 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         if (!checkAuth(context)) {
             return returnData.setData("NEED_LOGIN").setErrorMsg("请登录后使用")
         }
-        val url = context.bodyAsJson.getString("url")
-        val bookUrl = url ?: context.bodyAsJson.getString("bookUrl")
+        var bookUrl: String
+        if (context.request().method() == HttpMethod.POST) {
+            bookUrl = context.bodyAsJson.getString("url")
+                ?: context.bodyAsJson.getString("bookUrl") ?: ""
+        } else {
+            bookUrl = context.queryParam("url").firstOrNull() ?: ""
+        }
         if (bookUrl.isNullOrEmpty()) {
             return returnData.setErrorMsg("请输入书籍链接")
         }
         val userNameSpace = getUserNameSpace(context)
         val bookInfo = getShelfBookByURL(bookUrl, userNameSpace)
-            ?: return returnData.setErrorMsg("请先加入书架")
+        if (bookInfo == null) {
+            return returnData.setErrorMsg("请先加入书架")
+        }
         if (bookInfo.isLocalBook()) {
             return returnData.setErrorMsg("本地书籍无需删除缓存")
         }
