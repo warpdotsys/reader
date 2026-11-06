@@ -393,7 +393,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             return returnData.setData("NEED_LOGIN").setErrorMsg("请登录后使用")
         }
         var bookUrl: String
-        var refresh: Int
+        var refresh = 0
         if (context.request().method() == HttpMethod.POST) {
             bookUrl = context.bodyAsJson.getString("url")
                 ?: context.bodyAsJson.getJsonObject("book").getString("bookUrl") ?: ""
@@ -402,46 +402,43 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             bookUrl = context.queryParam("url").firstOrNull() ?: ""
             refresh = context.queryParam("refresh").firstOrNull()?.toInt() ?: 0
         }
-        if (bookUrl.length == 0) {
+        if (bookUrl.isEmpty()) {
             return returnData.setErrorMsg("请输入书籍链接")
         }
-        val userNameSpace = getUserNameSpace(context)
+        var userNameSpace = getUserNameSpace(context)
         var bookInfo = getShelfBookByURL(bookUrl, userNameSpace)
+        var bookSource: String? = null
         if (bookInfo == null) {
-            var bookSource: String? = null
-            bookInfo = bookInfoCache.getAsString(bookUrl)?.toMap()?.toDataClass<Book>()
-            if (bookInfo != null) {
-                bookSource = getBookSourceString(context, bookInfo.origin)
-            }
-            if (bookInfo == null) {
+            var cacheInfo: Book? = bookInfoCache.getAsString(bookUrl)?.toMap()?.toDataClass<Book>()
+            if (cacheInfo != null) {
+                bookSource = getBookSourceString(context, cacheInfo.origin)
+            } else {
                 bookSource = getBookSourceString(context)
             }
             if (bookSource.isNullOrEmpty()) {
                 return returnData.setErrorMsg("未配置书源")
             }
-            bookInfo = WebBook(
-                bookSource,
-                appConfig.debugLog,
-                userNameSpace = userNameSpace
-            ).getBookInfo(bookUrl)
+            bookInfo = WebBook(bookSource, appConfig.debugLog, userNameSpace = userNameSpace)
+                .getBookInfo(bookUrl)
             bookInfo = mergeBookCacheInfo(bookInfo)
-            saveBookInfoCache(arrayListOf(bookInfo))
+            saveBookInfoCache(arrayListOf<Book>(bookInfo))
+        } else {
+            bookSource = getBookSourceString(context, bookInfo.origin)
         }
-        val book = bookInfo
-        val bookSource = getBookSourceString(context, book.origin)
-        if (!book.isLocalBook()) {
-            if (bookSource.isNullOrEmpty()) {
-                return returnData.setErrorMsg("未配置书源")
+        if (!bookInfo.isLocalBook() && bookSource.isNullOrEmpty()) {
+            return returnData.setErrorMsg("未配置书源")
+        }
+        bookInfo.setRootDir(getWorkDir())
+        bookInfo.setUserNameSpace(userNameSpace)
+        if (bookInfo.isLocalBook()) {
+            val localFile = bookInfo.getLocalFile()
+            if (!localFile.exists()) {
+                logger.info("localFile: {} not exists", localFile)
+                return returnData.setErrorMsg("本地书籍源文件不存在")
             }
         }
-        book.setRootDir(getWorkDir())
-        book.setUserNameSpace(userNameSpace)
-        if (book.isLocalBook() && !book.getLocalFile().exists()) {
-            logger.info("localFile: {} not exists", book.getLocalFile())
-            return returnData.setErrorMsg("本地书籍源文件不存在")
-        }
-        logger.info("bookInfo: {}", book)
-        val chapterList = getLocalChapterList(book, bookSource ?: "", refresh > 0, getUserNameSpace(context))
+        logger.info("bookInfo: {}", bookInfo)
+        val chapterList = getLocalChapterList(bookInfo, bookSource ?: "", refresh > 0, getUserNameSpace(context))
         return returnData.setData(chapterList)
     }
 
