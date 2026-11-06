@@ -2631,8 +2631,11 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                     val chapterCacheFile =
                         File(localCacheDir.absolutePath + File.separator + chapterIndex + ".txt")
                     chapterCacheFile.writeText(content)
-                    val bookSourceObj = BookSource.fromJson(bookSource).getOrNull() ?: BookSource()
-                    BookHelp.saveImages(this, bookSourceObj, bookInfo, chapterInfo, content)
+                    BookHelp.saveImages(
+                        this,
+                        BookSource.fromJson(bookSource).getOrNull() ?: BookSource(),
+                        bookInfo, chapterInfo, content
+                    )
                     successCount.element++
                     cachedChapterContentSet.element.add(chapterIndex)
                 } catch (e: Exception) {
@@ -2711,24 +2714,30 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             val chapterList = getLocalChapterList(bookInfo, bookSource, false, userNameSpace)
             val cachedChapterContentSet = getCachedChapterContentSet(bookInfo, userNameSpace)
             val localCacheDir = getChapterCacheDir(bookInfo, userNameSpace)
-            for ((chapterIndex, chapterInfo) in chapterList.withIndex()) {
-                if (cachedChapterContentSet.contains(chapterIndex)) continue
-                try {
-                    var nextChapterUrl: String? = null
-                    if (chapterIndex + 1 < chapterList.size) {
-                        val nextChapterInfo = chapterList[chapterIndex + 1]
-                        nextChapterUrl = nextChapterInfo.url
+            for (chapterIndex in chapterList.indices) {
+                if (!cachedChapterContentSet.contains(chapterIndex)) {
+                    val index = chapterIndex
+                    val chapterInfo = chapterList[chapterIndex]
+                    try {
+                        var nextChapterUrl: String? = null
+                        if (index + 1 < chapterList.size) {
+                            val nextChapterInfo = chapterList[index + 1]
+                            nextChapterUrl = nextChapterInfo.url
+                        }
+                        val content = WebBook(bookSource, appConfig.debugLog, userNameSpace = userNameSpace)
+                            .getBookContent(bookInfo, chapterInfo, nextChapterUrl)
+                        val chapterCacheFile =
+                            File(localCacheDir.absolutePath + File.separator + index + ".txt")
+                        chapterCacheFile.writeText(content)
+                        BookHelp.saveImages(
+                            this,
+                            BookSource.fromJson(bookSource).getOrNull() ?: BookSource(),
+                            bookInfo, chapterInfo, content
+                        )
+                        cachedChapterContentSet.add(index)
+                    } catch (e: Exception) {
+                        logger.info("cacheBookOnServer error: {}", e.message)
                     }
-                    val content = WebBook(bookSource, appConfig.debugLog, userNameSpace = userNameSpace)
-                        .getBookContent(bookInfo, chapterInfo, nextChapterUrl)
-                    val chapterCacheFile =
-                        File(localCacheDir.absolutePath + File.separator + chapterIndex + ".txt")
-                    chapterCacheFile.writeText(content)
-                    val bookSourceObj = BookSource.fromJson(bookSource).getOrNull() ?: BookSource()
-                    BookHelp.saveImages(this, bookSourceObj, bookInfo, chapterInfo, content)
-                    cachedChapterContentSet.add(chapterIndex)
-                } catch (e: Exception) {
-                    logger.info("cacheBookOnServer error: {}", e.message)
                 }
             }
             logger.info("缓存书籍完成: {}", bookInfo)
