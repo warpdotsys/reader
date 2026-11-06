@@ -94,6 +94,7 @@ import java.util.function.BiConsumer
 import javax.imageio.ImageIO
 import com.htmake.reader.utils.parseJsonStringList
 import com.htmake.reader.utils.saveStorage
+import com.htmake.reader.utils.fillData
 import com.htmake.reader.utils.getStorage
 import com.htmake.reader.utils.getStorageFile
 import com.fasterxml.jackson.databind.node.ObjectNode
@@ -1741,7 +1742,9 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         }
         val userNameSpace = getUserNameSpace(context)
         val book = getShelfBookByURL(bookUrl, userNameSpace)
-            ?: return returnData.setErrorMsg("书籍信息错误")
+        if (book == null) {
+            return returnData.setErrorMsg("书籍信息错误")
+        }
         if (pdfImageWidth.element <= 0f) {
             return returnData.setErrorMsg("pdf图片宽度错误")
         }
@@ -1772,7 +1775,9 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         }
         val userNameSpace = getUserNameSpace(context)
         val book = getShelfBookByURL(bookUrl, userNameSpace)
-            ?: return returnData.setErrorMsg("书籍信息错误")
+        if (book == null) {
+            return returnData.setErrorMsg("书籍信息错误")
+        }
         if (groupId.element <= 0L) {
             return returnData.setErrorMsg("分组信息错误")
         }
@@ -1915,18 +1920,10 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
     suspend fun mergeBookCacheInfo(book: Book): Book {
         val cacheInfo = bookInfoCache.getAsString(book.bookUrl)?.toMap()?.toDataClass<Book>()
         if (cacheInfo != null) {
-            if (book.intro.isNullOrEmpty()) {
-                book.intro = cacheInfo.intro
-            }
-            if (book.coverUrl.isNullOrEmpty()) {
-                book.coverUrl = cacheInfo.coverUrl
-            }
-            if (book.kind.isNullOrEmpty()) {
-                book.kind = cacheInfo.kind
-            }
-            if (book.wordCount.isNullOrEmpty()) {
-                book.wordCount = cacheInfo.wordCount
-            }
+            return book.fillData(
+                cacheInfo,
+                listOf("name", "author", "coverUrl", "tocUrl", "intro", "latestChapterTitle", "wordCount")
+            )
         }
         return book
     }
@@ -2517,11 +2514,13 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         }
         var latestZipFile: String? = null
         val zipFileReg = Regex("^backup[0-9-]+.zip$", RegexOption.IGNORE_CASE)
-        legadoHome.listFiles()?.also {
-            it.sortByDescending { file -> file.lastModified() }
-        }?.forEach { file ->
-            if (zipFileReg.matches(file.name)) {
-                latestZipFile = file.toString()
+        legadoHome.listFiles().also{
+            it.sortByDescending {
+                it.lastModified()
+            }
+        }.forEach { it ->
+            if (zipFileReg.matches(it.name)) {
+                latestZipFile = it.toString()
             }
         }
         return latestZipFile
