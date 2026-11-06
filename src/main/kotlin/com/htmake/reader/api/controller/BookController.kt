@@ -1610,30 +1610,29 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
 
     suspend fun saveBookCover(book: Book, userNameSpace: String, bookSource: String? = null) {
         val coverUrl = book.getDisplayCover()
-        if (coverUrl == null || coverUrl.startsWith("/")) {
-            return
-        }
-        val sourceString = bookSource ?: getBookSourceStringBySourceURLOpt(book.origin, userNameSpace)
-        val ext = getFileExt(coverUrl, "jpg")
-        val md5Encode = MD5Utils.md5Encode(coverUrl).toString()
-        val cachePath = getWorkDir("storage", "assets", userNameSpace, "covers", "$md5Encode.$ext")
-        val cachedCoverUrl = "/assets/$userNameSpace/covers/$md5Encode.$ext"
-        val cacheFile = File(cachePath)
-        if (cacheFile.exists()) {
-            book.coverUrl = cachedCoverUrl
-            return
-        }
-        val analyzeUrl = AnalyzeUrl(
-            coverUrl,
-            source = BookSource.fromJson(sourceString ?: "").getOrNull()
-        )
-        try {
-            analyzeUrl.getByteArrayAwait().let {
-                FileUtils.writeBytes(cachePath, it)
+        if (coverUrl != null && !coverUrl.startsWith("/")) {
+            val sourceString = bookSource ?: getBookSourceStringBySourceURLOpt(book.origin, userNameSpace)
+            val ext = getFileExt(coverUrl, "jpg")
+            val md5Encode = MD5Utils.md5Encode(coverUrl).toString()
+            val cachePath = getWorkDir("storage", "assets", userNameSpace, "covers", "$md5Encode.$ext")
+            val cachedCoverUrl = "/assets/$userNameSpace/covers/$md5Encode.$ext"
+            val cacheFile = File(cachePath)
+            if (cacheFile.exists()) {
                 book.coverUrl = cachedCoverUrl
+                return
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
+            val analyzeUrl = AnalyzeUrl(
+                coverUrl,
+                source = BookSource.fromJson(sourceString!!).getOrNull()
+            )
+            try {
+                analyzeUrl.getByteArrayAwait().let {
+                    FileUtils.writeBytes(cachePath, it)
+                    book.coverUrl = cachedCoverUrl
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
@@ -1711,7 +1710,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             existBook
         }
         try {
-            getLocalChapterList(newBookInfo, bookSourceString ?: "", true, userNameSpace, false)
+            getLocalChapterList(newBookInfo, bookSourceString ?: "", true, userNameSpace)
         } catch (e: Exception) {
         }
         return returnData.setData(newBookInfo)
@@ -2496,7 +2495,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             val backupFile = FileUtils.createFileWithReplace(
                 backupDir + File.separator + "backup" + today + ".zip"
             )
-            return if (ZipUtils.zipFiles(arrayListOf(*descDirFile.listFiles()), backupFile, null)) backupFile else null
+            return if (ZipUtils.zipFiles(arrayListOf(*descDirFile.listFiles()), backupFile, null)) backupFile else null as File?
         } catch (e: Exception) {
             e.printStackTrace()
         } finally {
