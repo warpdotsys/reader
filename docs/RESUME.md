@@ -678,3 +678,42 @@ scratch/probe/ProbeBC.java：kotlin-reflect 1.5.21 + 制品类路径，读方法
 新增：mergeBookCacheInfo、getLastBackFileFromWebdav（0.979）、searchBookWithSource、
 getAvailableBookSource、editShelfBook、syncBookProgressFromWebdav、saveBookGroupId（复核）、
 saveBookConfig（复核）、cacheBookOnServer（复核 1.0000）、setBookSource（0.998）。
+
+
+## 2026-11-07 凌晨 · 深夜批（方法级 72→79/116 @ f8363bf）
+
+### 规律 24：内联工厂函数标记（"凭空 iconst_0; istoreN"之谜）
+`arrayListOf()` / `mutableListOf()` / `linkedSetOf()` / `linkedMapOf()` 的 **no-arg 重载是 inline**，
+每次调用会在字节码留下 `iconst_0; istoreN` 标记；直接写 `ArrayList()` / `LinkedHashSet()` /
+`LinkedHashMap()` 构造器则没有。制品里莫名多出的 `iconst_0; istoreN` 几乎都是这个。
+已修：getCachedChapterContentSet(linkedSetOf)、getInvalidBookSources(arrayListOf)、
+backupToMongodb(linkedMapOf)、getTxtTocRules/searchBookMulti/SearchBookMultiSSE/saveBookSources/
+searchBookContent/deleteBooks/importBookPreview 的同类点。
+注意：带 vararg 的 arrayListOf(x) 不是 inline，无标记。
+
+### 规律 25：`mutex?.lock()` ≠ `if (mutex != null) mutex.lock()`
+safe-call 版本编译出 `aload; astore T; ifnonnull` 的临时槽（+1 槽），if 版本没有。
+saveShelfBookLatestChapter 的 LVT 槽差 1 即此因；改为 ?.lock()/?.unlock() 后 1.0000。
+
+### 规律 26：`else null as File?` 产生 `aconst_null; checkcast File`
+Ternary 值参与 finally 缓冲时，裸 null 无 checkcast；显式 `as File?` 才产生。
+createUserBackup 依赖此形态。
+
+### 规律 27：正条件包裹式 if ≠ 提前 return
+`if (x != null && !x.startsWith("/")) { 全体body }` 编译为 `ifnull → END; startsWith; ifne → END`；
+`if (x == null || x.startsWith("/")) return` 则是 ifeq + 内联 Unit;areturn。两者不同！
+saveBookCover 需前者。
+
+### 规律 28：`com.script.ScriptException`（rhino-1.7.13-1.jar 的包名）
+不是 javax.script.ScriptException！getSpeakStream 的 catch 分支必须用 com.script 版本。
+
+### 本批清零（1.0000）
+setBookSource、createUserBackup、getCachedChapterContentSet、getInvalidBookSources、
+backupToMongodb、deleteBookCache、saveShelfBookLatestChapter、getLocalChapterList$default
+### 接近（>0.95）
+saveBookCover 0.991、getLastBackFileFromWebdav 0.979、getBookShelfBooks 0.986、
+getLocalChapterList 0.993、importBookPreview 0.969、getSpeakStream 0.890
+### 挂起的大件（下轮）
+getBookContent 0.628（中段 171 行错位，需整段重排）、getChapterList 0.777（状态机 +2 槽）、
+getBookInfo 0.626（+2 槽）、saveBook 0.676（spill 含 book + checkNNE("book") 悬疑）、
+searchBookContent 0.659、cacheBookSSE 0.720、saveToWebdav/syncFromWebdav/等小方法槽差
