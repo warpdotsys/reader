@@ -112,7 +112,8 @@ import kotlinx.coroutines.ensureActive
 import okhttp3.Response
 import java.net.ConnectException
 import java.net.SocketTimeoutException
-import javax.script.ScriptException
+import com.script.ScriptException
+import org.mozilla.javascript.WrappedException
 import kotlinx.coroutines.CancellationException
 import io.legado.app.exception.NoStackTraceException
 import com.htmake.reader.utils.success
@@ -2932,56 +2933,63 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         }
     }
 
-    suspend fun getSpeakStream(httpTts: HttpTTS, speakText: String, speechRate: Int): InputStream? {
+    suspend fun getSpeakStream(
+        httpTts: HttpTTS,
+        speakText: String,
+        speechRate: Int
+    ): InputStream? {
         val downloadErrorNo = Ref.IntRef()
         while (true) {
-            val analyzeUrl = AnalyzeUrl(
-                httpTts.url,
-                speakText = speakText,
-                speakSpeed = speechRate,
-                source = httpTts,
-                headerMapF = httpTts.getHeaderMap(true),
-                debugLog = Debug
-            )
-            val response = Ref.ObjectRef<Response>()
             try {
-                response.element = analyzeUrl.getResponseAwait()
-                ensureActive()
+                val analyzeUrl = AnalyzeUrl(
+                    mUrl = httpTts.url,
+                    speakText = speakText,
+                    speakSpeed = speechRate,
+                    source = httpTts,
+                    headerMapF = httpTts.getHeaderMap(true),
+                    debugLog = Debug
+                )
+                var response = analyzeUrl.getResponseAwait()
+                coroutineContext.ensureActive()
                 val checkJs = httpTts.loginCheckJs
-                if (!checkJs.isNullOrBlank()) {
-                    response.element = analyzeUrl.evalJS(checkJs, response.element) as Response
+                if (checkJs?.isNotBlank() == true) {
+                    response = analyzeUrl.evalJS(checkJs, response) as okhttp3.Response
                 }
-                response.element?.headers?.get("Content-Type")?.let { contentType ->
+                response.headers.get("Content-Type")?.let { contentType ->
                     val ct = httpTts.contentType
                     if (contentType == "application/json") {
-                        throw NoStackTraceException(response.element!!.body!!.string())
+                        throw NoStackTraceException(response.body!!.string())
                     }
                     if (!ct.isNullOrBlank() && !Regex(ct).matches(contentType)) {
                         throw NoStackTraceException(
-                            "TTS服务器返回错误：" + response.element!!.body!!.string()
+                            "TTS服务器返回错误：" + response.body!!.string()
                         )
                     }
                 }
-                ensureActive()
-                val stream = response.element!!.body!!.byteStream()
-                downloadErrorNo.element = 0
-                return stream
+                coroutineContext.ensureActive()
+                response.body!!.byteStream().let { stream ->
+                    downloadErrorNo.element = 0
+                    return stream
+                }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
-                if (e is ScriptException) {
+                if (e is ScriptException || e is WrappedException) {
                     logger.error("js错误\n" + e.localizedMessage, e)
                     throw e
                 }
                 if (e is SocketTimeoutException || e is ConnectException) {
                     downloadErrorNo.element++
                     if (downloadErrorNo.element <= 5) continue
-                    logger.error("tts超时或连接错误超过5次\n" + e.localizedMessage, e)
+                    val msg = "tts超时或连接错误超过5次\n" + e.localizedMessage
+                    logger.error(msg, e)
                     throw e
                 }
                 downloadErrorNo.element++
-                logger.error("tts下载错误\n" + e.localizedMessage, e)
+                val msg = "tts下载错误\n" + e.localizedMessage
+                logger.error(msg, e)
                 if (downloadErrorNo.element > 5) {
-                    logger.error("TTS服务器连续5次错误，已暂停阅读。", e)
+                    val msg1 = "TTS服务器连续5次错误，已暂停阅读。"
+                    logger.error(msg1, e)
                     throw e
                 }
                 logger.error("TTS下载音频出错，使用无声音频代替。\n朗读文本：$speakText")
