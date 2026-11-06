@@ -539,3 +539,66 @@ Python 侧 `r.stdout.decode('utf-8', errors='replace')`。
 - HTTP 84 通过 / 1 假阳性（http14.txt）
 - 今夜共 15 个提交：bcaf729 → 0c45516
 - 工作区干净
+
+---
+
+## 2026-11-06 下午续战（14:00~15:40）——BookController 方法级清零
+
+提交链（全部已推送）：92230f5 → ef33db3 → 0eea422 → 本批（searchBook/exploreBook 等）
+
+### 新达成"逐条指令完全一致"（ratio 1.0000）的方法（BookController 内 40→49 个）
+
+cacheBookOnServer(JsonArray,String)、saveBookInfoCache、saveBookProgressToWebdav、
+bookSourceDebugSSE、searchBook、exploreBook、getChapterCacheDir、getResultAndQueryIndex、
+getBookSourceStringBySourceURLOpt（getHttpTTSByName 仅剩 1 块 areEqual/equals）
+
+### 本轮核心规律（全部经独立编译器实验 1.5.21 验证）
+
+21. **Kotlin `==` 永远编译成 Intrinsics.areEqual**（非空 String 也一样）。
+    制品里出现 `String.equals` 的地方 = 源码显式写了 `.equals(...)`。
+    接收者顺序以字节码为准（如 `"1".equals(options["base64"])`、`book.bookUrl.equals(url)`）。
+    已修：getShelfBookByURL、setBookSource、ttsByEdge、getHttpTTSByName。
+
+22. **空值判定三兄弟字节码各不相同**（看 inline 标记数）：
+    - `x.isEmpty()` → 1 个 iconst_0/istore 标记
+    - `x.isNullOrEmpty()`（x 非空）→ 2 个标记、无 ifnull
+    - `x.isNullOrEmpty()`（x 可空）→ 2 个标记 + ifnull
+    - `x.isNotEmpty()` → ifle + iconst_1（反向比较）
+    制品全文用 isNullOrEmpty 居多；per-method 按标记数选定。
+
+23. **非空 var 无初始化**（`var key: String` + 双分支赋值）：
+    - 编译出 `aconst_null; astore`（槽位重置）+ 平台值赋值的
+      `temp=call; checkNNE(temp, "调用表达式文本"); aload temp; astore var` 舞蹈
+    - 调用点直接 aload、无检查（definite assignment 保证）
+    - **我们误改成 `: String? = null` 反而编译不过**（平台赋值破坏 smart-cast）。
+      searchBook/exploreBook 的 key/page/ruleFindUrl 都是此形态。
+    - var 声明顺序影响槽位（exploreBook：page=5 在前、ruleFindUrl=6 在后）。
+
+24. **checkNNE 消息 = 源码写的表达式文本**，含变量名（`bookshelf.getJsonObject(i).map`、
+    `list.getJsonObject(i).toString()`、`parser.readValueAsTree()`）。
+    readValueAsTree 带泛型 `<JsonNode>` 会写出带泛型的消息——制品无泛型，
+    源码为 `val jsonNode: JsonNode = parser.readValueAsTree()`。
+
+25. **原作者风格**：正逻辑嵌套 if（不用 continue）、表达式内联（不做中间变量）、
+    数组直接 `.forEach {}`（不经过变量）。`continue` 会编译成 ifeq+goto，
+    包裹式 if 是 ifne 直落——语义相同但字节码不同。
+
+26. **for 循环两生种**：`list.indices` = size-1/if_icmpgt；`0 until list.size` = 双向比较。
+    索引循环若在 try/catch 挂起点内使用，需要**第二变量**（`val index = chapterIndex`）
+    才会产生制品的双拷贝布局（cacheBookOnServer 教训）。
+
+27. **制品里 searchBook/exploreBook 丢弃 checkAuth 结果**（bytecode: `aload v0; pop`，
+    方法内无 NEED_LOGIN 常量）。已按制品改为裸语句 `checkAuth(context)`。——
+    **这是制品行为**（未登录可搜书），跟制品对齐。
+
+28. **同名方法的两处脑裂教训**：getHttpTTSByName 的 checkNNE 消息变量名必须是 `list`；
+    数组 forEach 直接调用形态（`localCacheDir.listFiles().forEach`）才产生
+    `checkcast Object[]` 同槽布局。
+
+### 待续（BookController 内剩余大缺口）
+
+getAllContents 0.217 / getLocalChapterList 0.351 / ttsByApi 0.395（制品 228 vs 本地 106，缺分支）/
+getChapterList 0.459 / editShelfBook 0.468 / backupToMongodb 0.488（制品 282 vs 本地 120）/
+saveBookToShelf 0.509 / mergeBookCacheInfo 0.525（本地多 4 个 CS）/ getLastBackFileFromWebdav 0.539
+以及 0.90~0.99 一批（textToSpeech 0.900、deleteBooks 0.912、importBookPreview 0.922、
+exportToTxt 0.972 等）

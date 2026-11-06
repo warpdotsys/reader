@@ -740,15 +740,13 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
 
     suspend fun exploreBook(context: RoutingContext): ReturnData {
         val returnData = ReturnData()
-        if (!checkAuth(context)) {
-            return returnData.setData("NEED_LOGIN").setErrorMsg("请登录后使用")
-        }
+        checkAuth(context)
         val bookSource = getBookSourceString(context)
         if (bookSource.isNullOrEmpty()) {
             return returnData.setErrorMsg("未配置书源")
         }
-        var ruleFindUrl: String
         var page: Int
+        var ruleFindUrl: String
         if (context.request().method() == HttpMethod.POST) {
             ruleFindUrl = context.bodyAsJson.getString("ruleFindUrl")
             page = context.bodyAsJson.getInteger("page", 1)
@@ -764,9 +762,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
 
     suspend fun searchBook(context: RoutingContext): ReturnData {
         val returnData = ReturnData()
-        if (!checkAuth(context)) {
-            return returnData.setData("NEED_LOGIN").setErrorMsg("请登录后使用")
-        }
+        checkAuth(context)
         val bookSource = getBookSourceString(context)
         if (bookSource.isNullOrEmpty()) {
             return returnData.setErrorMsg("未配置书源")
@@ -780,7 +776,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             key = context.queryParam("key").firstOrNull() ?: ""
             page = context.queryParam("page").firstOrNull()?.toInt() ?: 1
         }
-        if (key.length == 0) {
+        if (key.isNullOrEmpty()) {
             return returnData.setErrorMsg("请输入搜索关键字")
         }
         val userNameSpace = getUserNameSpace(context)
@@ -1652,13 +1648,13 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             newBookUrl = context.queryParam("newUrl").firstOrNull() ?: ""
             bookSourceUrl = context.queryParam("bookSourceUrl").firstOrNull() ?: ""
         }
-        if (bookUrl.isEmpty()) {
+        if (bookUrl.isNullOrEmpty()) {
             return returnData.setErrorMsg("书籍链接不能为空")
         }
-        if (newBookUrl.isEmpty()) {
+        if (newBookUrl.isNullOrEmpty()) {
             return returnData.setErrorMsg("新源书籍链接不能为空")
         }
-        if (bookSourceUrl.isEmpty()) {
+        if (bookSourceUrl.isNullOrEmpty()) {
             return returnData.setErrorMsg("书源链接不能为空")
         }
         val userNameSpace = getUserNameSpace(context)
@@ -1733,7 +1729,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             bookUrl = context.queryParam("bookUrl").firstOrNull() ?: ""
             pdfImageWidth.element = context.queryParam("pdfImageWidth").firstOrNull()?.toFloat() ?: 0f
         }
-        if (bookUrl.isEmpty()) {
+        if (bookUrl.isNullOrEmpty()) {
             return returnData.setErrorMsg("书籍链接不能为空")
         }
         val userNameSpace = getUserNameSpace(context)
@@ -1764,7 +1760,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             bookUrl = context.queryParam("bookUrl").firstOrNull() ?: ""
             groupId.element = context.queryParam("groupId").firstOrNull()?.toLong() ?: 0L
         }
-        if (bookUrl.isEmpty()) {
+        if (bookUrl.isNullOrEmpty()) {
             return returnData.setErrorMsg("书籍链接不能为空")
         }
         val userNameSpace = getUserNameSpace(context)
@@ -2099,15 +2095,16 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             val objectMapper = ObjectMapper()
             val factory = objectMapper.factory
             var bookSourceString: String? = null
-            factory.createParser(file).use { closeable ->
-                val parser = closeable as JsonParser
+            factory.createParser(file).use { parser ->
                 if (parser.nextToken() == JsonToken.START_ARRAY) {
                     while (parser.nextToken() != JsonToken.END_ARRAY) {
-                        if (parser.currentToken() != JsonToken.START_OBJECT) continue
-                        val jsonNode = parser.readValueAsTree<JsonNode>()
-                        if (!sourceUrl.equals(jsonNode.get("bookSourceUrl").asText())) continue
-                        bookSourceString = jsonNode.toString()
-                        break
+                        if (parser.currentToken() == JsonToken.START_OBJECT) {
+                            val jsonNode: JsonNode = parser.readValueAsTree()
+                            if (sourceUrl.equals(jsonNode.get("bookSourceUrl").asText())) {
+                                bookSourceString = jsonNode.toString()
+                                break
+                            }
+                        }
                     }
                 }
             }
