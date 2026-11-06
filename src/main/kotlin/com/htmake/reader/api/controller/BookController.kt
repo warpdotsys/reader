@@ -1656,12 +1656,12 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         if (bookSourceUrl.isNullOrEmpty()) {
             return returnData.setErrorMsg("书源链接不能为空")
         }
-        val userNameSpace = getUserNameSpace(context)
-        val book = getShelfBookByURL(bookUrl, userNameSpace)
+        var userNameSpace = getUserNameSpace(context)
+        var book = getShelfBookByURL(bookUrl, userNameSpace)
         if (book == null) {
             return returnData.setErrorMsg("书籍信息错误")
         }
-        val bookSourceString = (getBookSourceStringBySourceURLOpt(bookSourceUrl, userNameSpace) ?: "")
+        var bookSourceString = getBookSourceStringBySourceURLOpt(bookSourceUrl, userNameSpace)
         var searchBook: Book? = null
         if (bookSourceString.isNullOrEmpty()) {
             val localBookSourceList = asJsonArray(
@@ -1669,7 +1669,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             )
             if (localBookSourceList != null) {
                 for (i in 0 until localBookSourceList.size()) {
-                    val _searchBook = localBookSourceList.getJsonObject(i)
+                    var _searchBook = localBookSourceList.getJsonObject(i)
                         .mapTo(SearchBook::class.java)
                     if (_searchBook.bookUrl.equals(newBookUrl)) {
                         searchBook = _searchBook.toBook()
@@ -1681,39 +1681,33 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                 return returnData.setErrorMsg("书源信息错误")
             }
         }
-        val newBookInfo = Ref.ObjectRef<Book>()
-        if (searchBook != null) {
-            newBookInfo.element = searchBook
+        var newBookInfo = if (searchBook != null) {
+            searchBook
         } else {
             if (bookSourceString.isNullOrEmpty()) {
                 return returnData.setErrorMsg("书源信息错误")
             }
-            newBookInfo.element = WebBook(
-                bookSourceString, appConfig.debugLog, userNameSpace = userNameSpace
-            ).getBookInfo(newBookUrl)
+            WebBook(bookSourceString, appConfig.debugLog, userNameSpace = userNameSpace)
+                .getBookInfo(newBookUrl)
         }
         editShelfBook(book, userNameSpace) { existBook ->
-            existBook.origin = newBookInfo.element!!.origin
-            existBook.originName = newBookInfo.element!!.originName
-            existBook.bookUrl = newBookInfo.element!!.bookUrl
-            existBook.tocUrl = newBookInfo.element!!.tocUrl
+            existBook.origin = newBookInfo.origin
+            existBook.originName = newBookInfo.originName
+            existBook.bookUrl = newBookInfo.bookUrl
+            existBook.tocUrl = newBookInfo.tocUrl
             existBook.isInShelf = true
-            if (existBook.coverUrl.isNullOrEmpty()) {
-                if (!newBookInfo.element!!.coverUrl.isNullOrEmpty()) {
-                    existBook.coverUrl = newBookInfo.element!!.coverUrl
-                }
+            if (existBook.coverUrl.isNullOrEmpty() && !newBookInfo.coverUrl.isNullOrEmpty()) {
+                existBook.coverUrl = newBookInfo.coverUrl
             }
             logger.info("setBookSource: {}", existBook)
-            newBookInfo.element = existBook
+            newBookInfo = existBook
             existBook
         }
         try {
-            getLocalChapterList(
-                newBookInfo.element!!, bookSourceString ?: "", true, userNameSpace
-            )
+            getLocalChapterList(newBookInfo, bookSourceString ?: "", true, userNameSpace, false)
         } catch (e: Exception) {
         }
-        return returnData.setData(newBookInfo.element)
+        return returnData.setData(newBookInfo)
     }
 
     suspend fun saveBookConfig(context: RoutingContext): ReturnData {
@@ -2355,14 +2349,13 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         if (progressFile == null) {
             return
         }
-        val book = Ref.ObjectRef<Book>()
-        book.element = asJsonObject(progressFile.readText())?.mapTo(Book::class.java)
-        if (book.element != null) {
-            editShelfBook(book.element, userNameSpace) { existBook ->
-                existBook.durChapterIndex = book.element!!.durChapterIndex
-                existBook.durChapterPos = book.element!!.durChapterPos
-                existBook.durChapterTime = book.element!!.durChapterTime
-                existBook.durChapterTitle = book.element!!.durChapterTitle
+        var book = asJsonObject(progressFile.readText())?.mapTo(Book::class.java)
+        if (book != null) {
+            editShelfBook(book, userNameSpace) { existBook ->
+                existBook.durChapterIndex = book.durChapterIndex
+                existBook.durChapterPos = book.durChapterPos
+                existBook.durChapterTime = book.durChapterTime
+                existBook.durChapterTitle = book.durChapterTitle
                 logger.info("syncShelfBookProgress: {}", existBook)
                 existBook
             }
@@ -2485,8 +2478,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             val backupFile = FileUtils.createFileWithReplace(
                 backupDir + File.separator + "backup" + today + ".zip"
             )
-            val files: Array<File> = descDirFile.listFiles()
-            return if (ZipUtils.zipFiles(arrayListOf(*files), backupFile, null)) backupFile else null
+            return if (ZipUtils.zipFiles(arrayListOf(*descDirFile.listFiles()), backupFile, null)) backupFile else null
         } catch (e: Exception) {
             e.printStackTrace()
         } finally {

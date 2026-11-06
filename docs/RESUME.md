@@ -642,3 +642,39 @@ exportToTxt 0.972 等）
 getLocalChapterList 0.354（制品 767 vs 本地 692：多一个挂起点 tableswitch 0..5、getBookChaptersCache 早取、
 preUpdateJs 分支、isInShelf 分支）/ getChapterList 0.461 / editShelfBook 0.463 / saveBookToShelf 0.509 /
 mergeBookCacheInfo 0.525 / getLastBackFileFromWebdav 0.539 / getSpeakStream 0.573 / getBookContent 0.628（2197 行）
+
+
+## 2026-11-06 晚 · 重大发现批（方法级 61→68/116）
+
+### 发现 1：Ref 装箱 = 编译器行为，源码回归普通变量
+制品字节码中出现的 `kotlin.jvm.internal.Ref$ObjectRef/LongRef/FloatRef/IntRef/BooleanRef`
+绝大多数是 **Kotlin 编译器对「被闭包捕获的普通局部 var」的自动装箱**，不是源码显式 `Ref.Xxx()`。
+- 显式 `Ref.ObjectRef<T>()` 写法会引入额外 `checkNNE`（反馈字段读取的灵活性）与 `!!` 舞蹈，
+  且 @Metadata 可空性不一致；普通 `var x = ...` + 捕获则：自动装箱、元素读取无检查、语义类型受信。
+- 已按此修正并清零：searchBookWithSource、getAvailableBookSource、editShelfBook、
+  syncBookProgressFromWebdav、getBookShelfBooks（0.986，剩捕获顺序微差）、setBookSource（0.998）。
+- 对照实验：T33~T39（scrub/），核心证据 = 显式 Ref 的 `.element` 读取产生
+  `astore; ldc "x.element"; checkNNE; aload`，编译器装箱则直接 `getfield; checkcast; invoke`。
+
+### 发现 2：javap -l（LocalVariableTable）= 强力工具
+制品带完整 LVT：可直接读取**原始变量名**、lambda 标签（$files$1 vs $2）、作用域与槽位、
+捕获列表字段名（$bookshelf/$bookList 等）、甚至判断 withLock 是否被使用过（$i$f$withLock 痕迹）。
+- 死存储变量名、`mutex` vs `locker` 等命名差异都靠它确认。
+- lambda 捕获顺序差异（getBookShelfBooks $2 构造）也从 desc 参数顺序读出。
+
+### 发现 3：上游源码 = 公开仓库，作为风格参照系（不直接抄，只对形状）
+- github.com/warpdotsys/reader-dev（用户自己的 fork）`legacy` 分支 = 上游 hectorqin/reader 旧线完整代码。
+  提取：`git show origin/legacy:src/main/java/com/htmake/reader/api/controller/BookController.kt`
+  （本次存为 scrub/BC_legacy.kt，3642 行）。
+- reader-pro 3.2.14 = 该线的改版（Ref 装箱版 = 编译产物一致，上游为普通变量版，正好同构）。
+- 用法：每个待还原方法先对照 legacy 的结构（条件正负、return 位置、运算符风格），
+  再按制品字节码修正 pro 特异处（如 getBookInfo 调用去掉了 `, false` 恢复默认参数形式）。
+
+### 发现 4：kotlin-reflect 探针可读 @Metadata 可空性
+scratch/probe/ProbeBC.java：kotlin-reflect 1.5.21 + 制品类路径，读方法参数/返回的可空标注。
+用于验证「可空返回 hack」与制品 metadata 的一致性（如 searchBookWithSource 返回实为不可空）。
+
+### 本批方法级战绩（68/116 逐指令一致）
+新增：mergeBookCacheInfo、getLastBackFileFromWebdav（0.979）、searchBookWithSource、
+getAvailableBookSource、editShelfBook、syncBookProgressFromWebdav、saveBookGroupId（复核）、
+saveBookConfig（复核）、cacheBookOnServer（复核 1.0000）、setBookSource（0.998）。
