@@ -704,7 +704,9 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         }
         val userNameSpace = getUserNameSpace(context)
         val bookInfo = getShelfBookByURL(bookUrl, userNameSpace)
-            ?: return returnData.setErrorMsg("获取书籍信息失败")
+        if (bookInfo == null) {
+            return returnData.setErrorMsg("获取书籍信息失败")
+        }
         val localCacheDir = getChapterCacheDir(bookInfo, userNameSpace)
         val chapterCacheFile =
             File(localCacheDir.absolutePath + File.separator + chapterIndex + ".txt")
@@ -1582,9 +1584,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
 
     private suspend fun saveLocalBookCover(book: Book, userNameSpace: String) {
         val coverUrl = book.getDisplayCover()
-        if (coverUrl == null || coverUrl.startsWith("/")) {
-            return
-        }
+        if (coverUrl != null && !coverUrl.startsWith("/")) {
         val ext = getFileExt(coverUrl, "jpg")
         val md5Encode = MD5Utils.md5Encode(coverUrl).toString()
         val cachePath = getWorkDir("storage", "assets", userNameSpace, "covers", "$md5Encode.$ext")
@@ -1601,6 +1601,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         if (bodyBytes != null) {
             cacheFile.writeBytes(bodyBytes)
             book.coverUrl = cachedCoverUrl
+        }
         }
     }
 
@@ -1661,7 +1662,9 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         }
         val userNameSpace = getUserNameSpace(context)
         val book = getShelfBookByURL(bookUrl, userNameSpace)
-            ?: return returnData.setErrorMsg("书籍信息错误")
+        if (book == null) {
+            return returnData.setErrorMsg("书籍信息错误")
+        }
         val bookSourceString = (getBookSourceStringBySourceURLOpt(bookSourceUrl, userNameSpace) ?: "")
         var searchBook: Book? = null
         if (bookSourceString.isNullOrEmpty()) {
@@ -1757,7 +1760,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         val groupId = Ref.LongRef()
         if (context.request().method() == HttpMethod.POST) {
             bookUrl = context.bodyAsJson.getString("bookUrl")
-            groupId.element = context.bodyAsJson.getLong("groupId", 0L)
+            groupId.element = context.bodyAsJson.getLong("groupId", 0)
         } else {
             bookUrl = context.queryParam("bookUrl").firstOrNull() ?: ""
             groupId.element = context.queryParam("groupId").firstOrNull()?.toLong() ?: 0L
@@ -1785,7 +1788,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         if (!checkAuth(context)) {
             return returnData.setData("NEED_LOGIN").setErrorMsg("请登录后使用")
         }
-        val groupId: Long = context.bodyAsJson.getLong("groupId", 0L)
+        val groupId: Long = context.bodyAsJson.getLong("groupId", 0)
         if (groupId <= 0L) {
             return returnData.setErrorMsg("分组信息错误")
         }
@@ -1807,7 +1810,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         if (!checkAuth(context)) {
             return returnData.setData("NEED_LOGIN").setErrorMsg("请登录后使用")
         }
-        val groupId: Long = context.bodyAsJson.getLong("groupId", 0L)
+        val groupId: Long = context.bodyAsJson.getLong("groupId", 0)
         if (groupId <= 0L) {
             return returnData.setErrorMsg("分组信息错误")
         }
@@ -3284,15 +3287,15 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             if (!appConfig.exportNoChapterName) {
                 content += chapter.title + '\n'
             }
-            content = if (book.isLocalTxt()) {
-                content + (LocalBook.getContent(book, chapter) ?: "")
+            if (book.isLocalTxt()) {
+                content += LocalBook.getContent(book, chapter) ?: ""
             } else {
                 val chapterCacheFile =
                     File(localCacheDir.absolutePath + File.separator + index + ".txt")
                 if (chapterCacheFile.exists()) {
-                    content + chapterCacheFile.readText() + '\n'
+                    content += chapterCacheFile.readText() + '\n'
                 } else {
-                    content + "暂无缓存内容。\n"
+                    content += "暂无缓存内容。\n"
                 }
             }
             val content1 = fixPic(epubBook, book, content, chapter)
