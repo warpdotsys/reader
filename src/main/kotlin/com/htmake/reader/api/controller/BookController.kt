@@ -1275,25 +1275,23 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
     }
 
     suspend fun searchBookWithSource(
-        key: String,
+        bookSourceString: String,
         book: Book,
         accurate: Boolean = true,
         userNameSpace: String = "default"
     ): ArrayList<SearchBook> {
-        val resultList = Ref.ObjectRef<ArrayList<SearchBook>>()
-        resultList.element = arrayListOf()
-        val bookSource = Ref.ObjectRef<BookSource>()
-        bookSource.element = BookSource.fromJson(key).getOrNull()
-        if (bookSource.element == null) {
-            return resultList.element
+        var resultList = arrayListOf<SearchBook>()
+        var bookSource = BookSource.fromJson(bookSourceString).getOrNull()
+        if (bookSource == null) {
+            return resultList
         }
-        if (isInvalidBookSource(bookSource.element, userNameSpace)) {
-            return resultList.element
+        if (isInvalidBookSource(bookSource, userNameSpace)) {
+            return resultList
         }
         withContext(Dispatchers.IO) {
             val start = System.currentTimeMillis()
             try {
-                val result = WebBook(bookSource.element, false, userNameSpace = userNameSpace)
+                val result = WebBook(bookSource, false, userNameSpace = userNameSpace)
                     .searchBook(book.name, 1)
                 val end = System.currentTimeMillis()
                 if (result.isNotEmpty()) {
@@ -1301,7 +1299,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                         if (accurate && _book.name == book.name) {
                             if (book.author.isEmpty() || _book.author == book.author) {
                                 _book.time = end - start
-                                resultList.element.add(_book)
+                                resultList.add(_book)
                                 continue
                             }
                         }
@@ -1309,21 +1307,21 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                                 _book.author.contains(book.name, true))
                         ) {
                             _book.time = end - start
-                            resultList.element.add(_book)
+                            resultList.add(_book)
                         }
                     }
                 }
             } catch (e: Exception) {
                 val info: MutableMap<String, Any> = mutableMapOf(
-                    "sourceUrl" to (bookSource.element.bookSourceUrl ?: ""),
+                    "sourceUrl" to (bookSource.bookSourceUrl ?: ""),
                     "time" to System.currentTimeMillis(),
                     "error" to e.toString()
                 )
-                addInvalidBookSource(bookSource.element.bookSourceUrl ?: "", info, userNameSpace)
+                addInvalidBookSource(bookSource.bookSourceUrl ?: "", info, userNameSpace)
                 e.printStackTrace()
             }
         }
-        return resultList.element
+        return resultList
     }
 
     suspend fun getAvailableBookSource(context: RoutingContext): ReturnData {
@@ -1340,62 +1338,57 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             bookUrl = context.queryParam("url").firstOrNull() ?: ""
             refresh = context.queryParam("refresh").firstOrNull()?.toInt() ?: 0
         }
-        if (bookUrl.isEmpty()) {
+        if (bookUrl.isNullOrEmpty()) {
             return returnData.setErrorMsg("请输入书籍链接")
         }
-        val userNameSpace = Ref.ObjectRef<String>()
-        userNameSpace.element = getUserNameSpace(context)
-        val book = Ref.ObjectRef<Book>()
-        book.element = getShelfBookByURL(bookUrl, userNameSpace.element)
-        if (book.element == null) {
-            book.element = bookInfoCache.getAsString(bookUrl)?.toMap()?.toDataClass<Book>()
+        var userNameSpace = getUserNameSpace(context)
+        var book = getShelfBookByURL(bookUrl, userNameSpace)
+        if (book == null) {
+            book = bookInfoCache.getAsString(bookUrl)?.toMap()?.toDataClass<Book>()
         }
-        if (book.element == null) {
+        if (book == null) {
             return returnData.setErrorMsg("书籍信息错误")
         }
-        val bookSourceList = Ref.ObjectRef<JsonArray>()
-        bookSourceList.element =
-            asJsonArray(getUserStorage(userNameSpace.element, book.element!!.name + "_" + book.element!!.author, "bookSource"))
-        if (bookSourceList.element == null || bookSourceList.element!!.size() <= 0) {
-            return returnData.setData(arrayListOf<SearchBook>())
-        }
-        if (refresh <= 0) {
-            return returnData.setData(bookSourceList.element!!.list)
-        }
-        val resultList = Ref.ObjectRef<ArrayList<SearchBook>>()
-        resultList.element = arrayListOf()
-        val concurrentCount = 16
-        limitConcurrent(
-            concurrentCount, 0, bookSourceList.element!!.size(),
-            { index ->
-                val searchBook = bookSourceList.element!!.getJsonObject(index)
-                    .mapTo(SearchBook::class.java)
-                if (searchBook.origin.equals("loc_book")) {
-                    arrayListOf(searchBook)
-                } else {
-                    val bookSource =
-                        (getBookSourceStringBySourceURLOpt(searchBook.origin, userNameSpace.element) ?: "")
-                    if (bookSource == null) {
-                        arrayListOf<SearchBook>()
-                    } else {
-                        searchBookWithSource(
-                            bookSource, book.element!!, false, userNameSpace.element
-                        )
-                    }
-                }
-            },
-            { list, _ ->
-                list.forEach { it ->
-                    (it as? Collection<*>)?.let { c ->
-                        @Suppress("UNCHECKED_CAST")
-                        resultList.element.addAll(c as Collection<SearchBook>)
-                    }
-                }
-                true
+        var bookSourceList = asJsonArray(getUserStorage(userNameSpace, book.name + "_" + book.author, "bookSource"))
+        if (bookSourceList != null && bookSourceList.size() > 0) {
+            if (refresh <= 0) {
+                return returnData.setData(bookSourceList.getList())
             }
-        )
-        saveBookSources(book.element!!, resultList.element, userNameSpace.element, true)
-        return returnData.setData(resultList.element)
+            var resultList = arrayListOf<SearchBook>()
+            val concurrentCount = 16
+            limitConcurrent(
+                concurrentCount, 0, bookSourceList.size(),
+                { index ->
+                    val searchBook = bookSourceList.getJsonObject(index)
+                        .mapTo(SearchBook::class.java)
+                    if (searchBook.origin.equals("loc_book")) {
+                        arrayListOf(searchBook)
+                    } else {
+                        val bookSource =
+                            (getBookSourceStringBySourceURLOpt(searchBook.origin, userNameSpace) ?: "")
+                        if (bookSource == null) {
+                            arrayListOf<SearchBook>()
+                        } else {
+                            searchBookWithSource(
+                                bookSource, book, false, userNameSpace
+                            )
+                        }
+                    }
+                },
+                { list, _ ->
+                    list.forEach { it ->
+                        (it as? Collection<*>)?.let { c ->
+                            @Suppress("UNCHECKED_CAST")
+                            resultList.addAll(c as Collection<SearchBook>)
+                        }
+                    }
+                    true
+                }
+            )
+            saveBookSources(book, resultList, userNameSpace, true)
+            return returnData.setData(resultList)
+        }
+        return returnData.setData(arrayListOf<SearchBook>())
     }
 
     suspend fun getBookshelf(context: RoutingContext): ReturnData {
