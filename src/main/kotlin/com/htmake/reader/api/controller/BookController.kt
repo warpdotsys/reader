@@ -3580,6 +3580,11 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                 }
             }
         }
+        val usersFile = File(getWorkDir("storage", "users.json"))
+        if (usersFile.exists()) {
+            usersFile.delete()
+        }
+        getStorage("users")
         return returnData.setData("")
     }
 }
