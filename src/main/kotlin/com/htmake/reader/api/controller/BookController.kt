@@ -1873,11 +1873,13 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         }
         val bookJsonArray = context.bodyAsJsonArray
         val userNameSpace = getUserNameSpace(context)
-        var bookshelf = asJsonArray(getUserStorage(userNameSpace, "bookshelf")) ?: JsonArray()
-        val infoMap = linkedMapOf<String, Int>()
+        var bookshelf = asJsonArray(getUserStorage(userNameSpace, "bookshelf"))
+        if (bookshelf == null) {
+            bookshelf = JsonArray()
+        }
+        val infoMap: MutableMap<String, Int> = linkedMapOf()
         for (i in 0 until bookJsonArray.size()) {
-            val bookUrl = bookJsonArray.getJsonObject(i).getString("bookUrl", "")
-            infoMap[bookUrl] = i
+            infoMap[bookJsonArray.getJsonObject(i).getString("bookUrl", "")] = i
             infoMap[bookJsonArray.getJsonObject(i).getString("name", "") + '_' +
                 bookshelf.getJsonObject(i).getString("author", "")] = i
         }
