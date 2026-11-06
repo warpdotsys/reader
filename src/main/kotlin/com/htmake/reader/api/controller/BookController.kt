@@ -93,6 +93,7 @@ import java.util.Locale
 import java.util.function.BiConsumer
 import javax.imageio.ImageIO
 import com.htmake.reader.utils.parseJsonStringList
+import com.htmake.reader.utils.saveStorage
 import com.htmake.reader.utils.getStorage
 import com.htmake.reader.utils.getStorageFile
 import com.fasterxml.jackson.databind.node.ObjectNode
@@ -3502,16 +3503,39 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         if (!MongoManager.isInit()) {
             return returnData.setErrorMsg("请先设置 mongoUri")
         }
+        if (!checkManagerAuth(context)) {
+            return returnData.setData("NEED_SECURE_KEY").setErrorMsg("请输入管理密码")
+        }
         val syncDataFileList = arrayListOf(*backupFileNames)
         val handler = { userNameSpace: String ->
-            syncDataFileList.forEach { fileName ->
-                val content = getUserStorage(userNameSpace, fileName)
+            syncDataFileList.forEach { it ->
+                val content = getUserStorage(userNameSpace, it)
                 if (content != null) {
-                    saveMongoFile("$userNameSpace/$fileName", content)
+                    saveUserStorage(userNameSpace, it, content)
                 }
             }
         }
         handler("default")
+        if (appConfig.secure) {
+            var userMap: MutableMap<String, Map<String, Any>> = LinkedHashMap()
+            val userMapJson = asJsonObject(getStorage("data", "users"))
+            if (userMapJson != null) {
+                userMap = userMapJson.map as MutableMap<String, Map<String, Any>>
+            }
+            userMap.forEach { it ->
+                try {
+                    val ns = it.value.getOrDefault("username", "") as String? ?: ""
+                    if (ns.isNotEmpty()) {
+                        handler(ns)
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+        getStorage("users")?.let {
+            saveStorage("users", value = it)
+        }
         return returnData.setData("")
     }
 

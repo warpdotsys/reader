@@ -602,3 +602,43 @@ getChapterList 0.459 / editShelfBook 0.468 / backupToMongodb 0.488（制品 282 
 saveBookToShelf 0.509 / mergeBookCacheInfo 0.525（本地多 4 个 CS）/ getLastBackFileFromWebdav 0.539
 以及 0.90~0.99 一批（textToSpeech 0.900、deleteBooks 0.912、importBookPreview 0.922、
 exportToTxt 0.972 等）
+
+---
+
+## 2026-11-06 傍晚续战（15:50~16:15）——方法级一致 59/116
+
+提交：db3ee6b → 9638827 → 本批
+
+### 新达成逐指令一致
+
+- **getAllContents（0.220 → 1.0000）**：制品是「导出 TXT」实现（读章节缓存文件），不是读正文！
+  - 头部 = 字符串模板 `"${book.name}\n作者：${book.getRealAuthor()}\n简介：${HtmlFormatter.format(book.getDisplayIntro())}"`
+    （显式 StringBuilder 链会多 checkNNE(整段多行表达式) 5 条指令；模板没有）
+  - `append: (String, ArrayList<Triple<String, Int, String>>?) -> Unit`（第二参可空，call 传 null）
+  - chapterList.forEachIndexed；content 拼接 `+= title + '\n'` / `+= readText() + '\n'` / `+= "暂无缓存内容。\n"`；
+    最后 `append("\n\n" + content, null)`
+- **exportToTxt（0.981 → 1.0000）**：lambda 内联 `bookFile.appendText(text, Charset.forName(appConfig.exportCharset))`
+  （无中间变量时 lambda 类字段顺序/检查消息全对齐）
+- **ttsByApi（0.394 → 1.0000）**：签名实为 `(response, text, userNameSpace, options)`（LocalVariableTable 确认），
+  逻辑：voice=options["voice"] isNullOrEmpty→404；getHttpTTSByName(voice, userNameSpace)；
+  speechRate=options["rate"]?.toDouble() ?: 1.0，再 `5 + (speechRate-0.5)*30`；
+  getSpeakStream(httpTTS, text, speechRate.toInt())；stream null→404；
+  options["base64"]=="1" → Base64+jsonEncode response；否则 Content-Type = httpTTS.contentType ?: "audio/mpeg"
+- **backupToMongodb（0.487 → 0.996）**：补 checkManagerAuth(NEED_SECURE_KEY)、saveUserStorage 替换 saveMongoFile、
+  appConfig.secure 下 userMap.forEach handler(ns)、尾块 `getStorage("users")?.let { saveStorage("users", value = it) }`
+  （`?.let` 内联后无 lambda 类）；剩 1 条 iconst_0/istore7 死存储
+
+### 新规律
+
+29. **`saveStorage(vararg name: String, value: Any, ...)` 的调用必须写 `value = x`**（vararg 后有必填参数）。
+30. **`x?.let { saveStorage("users", value = it) }`**：无捕获 lambda 被完全内联，不产生 $N 类；
+    字节码 = `ifnonnull; [aload x astore]; iconst_0×3 marker; saveStorage$default; nop; nop`。
+31. **死存储伪影家族**（`iconst_0; istoreN` 无用途）：出现在「create Collection / listFiles 后」且该槽
+    随后被循环内部槽复用时——getCachedChapterContentSet / backupToMongodb / getInvalidBookSources 三处，
+    编译器内部槽预分配，源码形态未解，暂接受（各 2 指令）。
+
+### 剩余大件（BookController 内）
+
+getLocalChapterList 0.354（制品 767 vs 本地 692：多一个挂起点 tableswitch 0..5、getBookChaptersCache 早取、
+preUpdateJs 分支、isInShelf 分支）/ getChapterList 0.461 / editShelfBook 0.463 / saveBookToShelf 0.509 /
+mergeBookCacheInfo 0.525 / getLastBackFileFromWebdav 0.539 / getSpeakStream 0.573 / getBookContent 0.628（2197 行）
