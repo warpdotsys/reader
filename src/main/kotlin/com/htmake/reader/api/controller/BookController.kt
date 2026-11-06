@@ -1286,13 +1286,13 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         if (bookSource.element == null) {
             return resultList.element
         }
-        if (isInvalidBookSource(bookSource.element!!, userNameSpace)) {
+        if (isInvalidBookSource(bookSource.element, userNameSpace)) {
             return resultList.element
         }
         withContext(Dispatchers.IO) {
             val start = System.currentTimeMillis()
             try {
-                val result = WebBook(bookSource.element!!, false, userNameSpace = userNameSpace)
+                val result = WebBook(bookSource.element, false, userNameSpace = userNameSpace)
                     .searchBook(book.name, 1)
                 val end = System.currentTimeMillis()
                 if (result.isNotEmpty()) {
@@ -1314,11 +1314,11 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                 }
             } catch (e: Exception) {
                 val info: MutableMap<String, Any> = mutableMapOf(
-                    "sourceUrl" to (bookSource.element!!.bookSourceUrl ?: ""),
+                    "sourceUrl" to (bookSource.element.bookSourceUrl ?: ""),
                     "time" to System.currentTimeMillis(),
                     "error" to e.toString()
                 )
-                addInvalidBookSource(bookSource.element!!.bookSourceUrl ?: "", info, userNameSpace)
+                addInvalidBookSource(bookSource.element.bookSourceUrl ?: "", info, userNameSpace)
                 e.printStackTrace()
             }
         }
@@ -3207,14 +3207,14 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         bookSource: String,
         userNameSpace: String
     ): File {
-        val fileName = "${book.name}（${book.getRealAuthor()}）.epub"
+        val fileName = "《${book.name}》作者：${book.getRealAuthor()}.epub"
         val filePath = FileUtils.getPath(exportDir, fileName)
         val file = FileUtils.createFileWithReplace(filePath)
         val epubBook = EpubBook()
         epubBook.version = "2.0"
         setEpubMetadata(book, epubBook)
-        val assets = setAssets(book, epubBook)
         setCover(book, epubBook, bookSource)
+        val assets = setAssets(book, epubBook)
         setEpubContent(assets, book, epubBook, bookSource, userNameSpace)
         EpubWriter().write(epubBook, FileOutputStream(file))
         return file
