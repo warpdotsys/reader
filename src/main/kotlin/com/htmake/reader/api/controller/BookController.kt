@@ -1922,52 +1922,47 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
     }
 
     suspend fun getBookShelfBooks(refresh: Boolean = false, userNameSpace: String): List<Book> {
-        val bookshelf = Ref.ObjectRef<JsonArray>()
-        bookshelf.element = asJsonArray(getUserStorage(userNameSpace, "bookshelf"))
-        if (bookshelf.element == null) {
+        var bookshelf: JsonArray? = asJsonArray(getUserStorage(userNameSpace, "bookshelf"))
+        if (bookshelf == null) {
             return arrayListOf()
         }
-        if (bookshelf.element!!.size() == 0) {
+        if (bookshelf.size() == 0) {
             return arrayListOf()
         }
-        val bookList = Ref.ObjectRef<ArrayList<Book>>()
-        bookList.element = arrayListOf()
+        var bookList = arrayListOf<Book>()
         val concurrentCount = 16
         val mutex = Mutex()
         val syncMutex = Mutex()
         limitConcurrent(
-            concurrentCount, 0, bookshelf.element!!.size(),
+            concurrentCount, 0, bookshelf.size(),
             { index ->
-                val book = Ref.ObjectRef<Book>()
-                book.element = bookshelf.element!!.getJsonObject(index).mapTo(Book::class.java)
-                book.element!!.isInShelf = true
-                if (!book.element!!.isLocalBook() && book.element!!.canUpdate && refresh) {
-                    val bookSource = Ref.ObjectRef<String>()
-                    bookSource.element =
-                        (getBookSourceStringBySourceURLOpt(book.element!!.origin, userNameSpace) ?: "")
-                    if (bookSource.element != null) {
-                        try {
+                var book = bookshelf.getJsonObject(index).mapTo(Book::class.java)
+                book.isInShelf = true
+                if (!book.isLocalBook() && book.canUpdate && refresh) {
+                    try {
+                        var bookSource = getBookSourceStringBySourceURLOpt(book.origin, userNameSpace)
+                        if (bookSource != null) {
                             withContext(Dispatchers.IO) {
                                 getLocalChapterList(
-                                    book.element!!,
-                                    bookSource.element,
+                                    book,
+                                    bookSource,
                                     refresh,
                                     userNameSpace,
                                     false,
                                     mutex
                                 )
                             }
-                        } catch (e: Exception) {
-                            e.printStackTrace()
                         }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
                     }
                 }
                 syncMutex.withLock {
-                    bookList.element.add(book.element)
+                    bookList.add(book)
                 }
                 true
             })
-        return bookList.element
+        return bookList
     }
 
     suspend fun getLocalChapterList(
@@ -2182,38 +2177,42 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         userNameSpace: String,
         handler: (Book) -> Book
     ): Book? {
-        val locker = UserMutex.getLocker("$userNameSpace@bookshelf")
+        val mutex = UserMutex.getLocker("$userNameSpace@bookshelf")
         logger.info("wait for lock {}", "$userNameSpace@bookshelf")
-        return locker.withLock {
+        mutex.lock()
+        try {
             logger.info("lock success")
-            var bookshelf = asJsonArray(getUserStorage(userNameSpace, "bookshelf")) ?: JsonArray()
+            var bookshelf: JsonArray? = asJsonArray(getUserStorage(userNameSpace, "bookshelf"))
+            if (bookshelf == null) {
+                bookshelf = JsonArray()
+            }
             var existIndex = -1
             for (i in 0 until bookshelf.size()) {
-                val _book = bookshelf.getJsonObject(i).mapTo(Book::class.java)
-                if (book.bookUrl.length > 0 && _book.bookUrl == book.bookUrl) {
+                var _book = bookshelf.getJsonObject(i).mapTo(Book::class.java)
+                if (book.bookUrl.isNotEmpty() && _book.bookUrl.equals(book.bookUrl)) {
                     existIndex = i
                     break
                 }
-                if (book.name.length > 0 && _book.name == book.name &&
-                    book.author.length > 0 && _book.author == book.author
+                if (book.name.isNotEmpty() && _book.name.equals(book.name) &&
+                    book.author.isNotEmpty() && _book.author.equals(book.author)
                 ) {
                     existIndex = i
                     break
                 }
             }
             if (existIndex >= 0) {
-                val list = bookshelf.list
-                val existBook: Book = handler(
-                    bookshelf.getJsonObject(existIndex).mapTo(Book::class.java) as Book
-                )
-                list.set(existIndex, JsonObject.mapFrom(existBook))
-                bookshelf = JsonArray(list)
+                var bookList = bookshelf.getList()
+                var existBook = bookshelf.getJsonObject(existIndex).mapTo(Book::class.java)
+                existBook = handler(existBook)
+                bookList.set(existIndex, JsonObject.mapFrom(existBook))
+                bookshelf = JsonArray(bookList)
                 saveUserStorage(userNameSpace, "bookshelf", bookshelf)
-                existBook
-            } else {
-                null
+                return existBook
             }
+        } finally {
+            mutex.unlock()
         }
+        return null
     }
 
     fun saveBookSources(
