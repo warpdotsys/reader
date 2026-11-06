@@ -1433,7 +1433,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         var book = context.bodyAsJson.mapTo(Book::class.java)
         val userNameSpace = getUserNameSpace(context)
         if (!book.isLocalBook()) {
-            val bookSource = (getBookSourceStringBySourceURLOpt(book.origin, userNameSpace) ?: "")
+            val bookSource = getBookSourceStringBySourceURLOpt(book.origin, userNameSpace)
             if (bookSource == null) {
                 return returnData.setErrorMsg("书源信息错误")
             }
@@ -3433,47 +3433,39 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         )
     }
 
-    suspend fun searchChapter(
-        book: Book,
-        bookChapter: BookChapter,
-        query: String
-    ): List<SearchResult> {
-        val content = BookHelp.getContent(book, bookChapter) ?: return arrayListOf()
-        if (content.isEmpty()) {
-            return arrayListOf()
-        }
-        val positions = searchPosition(content, query)
-        val resultList = ArrayList<SearchResult>()
-        positions.forEachIndexed { index, position ->
-            val (queryIndex, resultText) = getResultAndQueryIndex(content, position, query)
-            resultList.add(
-                SearchResult(
-                    resultCount = positions.size,
-                    resultCountWithinChapter = positions.size,
-                    resultText = resultText,
-                    chapterTitle = bookChapter.title,
+    suspend fun searchChapter(book: Book, chapter: BookChapter, query: String): List<SearchResult> {
+        val searchResultsWithinChapter: MutableList<SearchResult> = mutableListOf()
+        val chapterContent = BookHelp.getContent(book, chapter)
+        if (chapterContent != null) {
+            val positions = searchPosition(chapterContent, query)
+            logger.info("positions: {}", positions)
+            positions.forEachIndexed { index, position ->
+                val construct = getResultAndQueryIndex(chapterContent, position, query)
+                val result = SearchResult(
+                    resultCountWithinChapter = index,
+                    resultText = construct.second,
+                    chapterTitle = chapter.title,
                     query = query,
-                    chapterIndex = bookChapter.index,
-                    pageIndex = index,
-                    queryIndexInResult = queryIndex,
+                    chapterIndex = chapter.index,
+                    queryIndexInResult = construct.first,
                     queryIndexInChapter = position
                 )
-            )
+                searchResultsWithinChapter.add(result)
+            }
         }
-        return resultList
+        return searchResultsWithinChapter
     }
 
     private suspend fun searchPosition(mContent: String, pattern: String): List<Int> {
-        val positions = ArrayList<Int>()
-        if (pattern.isEmpty()) {
-            return positions
-        }
+        val position: MutableList<Int> = mutableListOf()
         var index = mContent.indexOf(pattern)
-        while (index >= 0) {
-            positions.add(index)
-            index = mContent.indexOf(pattern, index + pattern.length)
+        if (index >= 0) {
+            while (index >= 0) {
+                position.add(index)
+                index = mContent.indexOf(pattern, index + 1)
+            }
         }
-        return positions
+        return position
     }
 
     private fun getResultAndQueryIndex(
