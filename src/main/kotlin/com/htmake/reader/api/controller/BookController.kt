@@ -2068,20 +2068,22 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         }
         val userNameSpace = getUserNameSpace(context)
         if (bookSourceString.isNullOrEmpty()) {
-            val bookSourceUrl = if (context.request().method() == HttpMethod.POST) {
-                context.bodyAsJson.getString("bookSourceUrl", "")
+            var bookSourceUrl: String
+            if (context.request().method() == HttpMethod.POST) {
+                bookSourceUrl = context.bodyAsJson.getString("bookSourceUrl", "")
             } else {
-                context.queryParam("bookSourceUrl").firstOrNull() ?: ""
+                bookSourceUrl = context.queryParam("bookSourceUrl").firstOrNull() ?: ""
             }
-            if (bookSourceUrl.isNotBlank()) {
-                bookSourceString = (getBookSourceStringBySourceURLOpt(bookSourceUrl, userNameSpace) ?: "")
+            if (!bookSourceUrl.isNullOrBlank()) {
+                bookSourceString = getBookSourceStringBySourceURLOpt(bookSourceUrl, userNameSpace)
             }
         }
-        if (bookSourceString.isNullOrEmpty() && sourceUrl.isNotEmpty()) {
-            bookSourceString = (getBookSourceStringBySourceURLOpt(sourceUrl, userNameSpace) ?: "")
+        if (bookSourceString.isNullOrEmpty() && !sourceUrl.isNullOrEmpty()) {
+            bookSourceString = getBookSourceStringBySourceURLOpt(sourceUrl, userNameSpace)
         }
         return bookSourceString
     }
+
 
     fun getBookSourceStringBySourceURLOpt(sourceUrl: String, userNameSpace: String): String? {
         if (sourceUrl.isBlank()) {
@@ -2823,16 +2825,16 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             response.setStatusCode(404).end("参数错误")
             return
         }
+        val exceptionHandler = CoroutineExceptionHandler { _, ex ->
+            logger.info("tts error: {}", ex.message)
+            response.setStatusCode(404).end()
+        }
         val options = mapOf(
             "voice" to voice,
             "pitch" to pitch,
             "rate" to rate,
             "base64" to base64
         )
-        val exceptionHandler = CoroutineExceptionHandler { _, ex ->
-            logger.info("tts error: {}", ex.message)
-            response.setStatusCode(404).end()
-        }
         launch(MDCContext() + Dispatchers.IO + exceptionHandler) {
             when (type.element) {
                 "edge" -> ttsByEdge(response, text.element!!, options)
