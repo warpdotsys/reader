@@ -1454,19 +1454,23 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
     }
 
     // TODO(restore): 本方法尚未按 CFR 还原，先返回占位错误以保证 ABI 不新增差异。
-    fun saveBookToShelf(book: Book, userNameSpace: String, context: RoutingContext): Pair<Book, String> {
+    fun saveBookToShelf(_book: Book, userNameSpace: String, context: RoutingContext): Pair<Book, String?> {
+        var book = _book
         if (book.origin.isNullOrEmpty()) {
             return Pair(book, "未找到书源信息")
         }
         if (book.bookUrl.isNullOrEmpty()) {
             return Pair(book, "书籍链接不能为空")
         }
-        var bookshelf = asJsonArray(getUserStorage(userNameSpace, "bookshelf")) ?: JsonArray()
+        var bookshelf: JsonArray? = asJsonArray(getUserStorage(userNameSpace, "bookshelf"))
+        if (bookshelf == null) {
+            bookshelf = JsonArray()
+        }
         var existIndex = -1
         for (i in 0 until bookshelf.size()) {
             val name = bookshelf.getJsonObject(i).getString("name", "")
             val author = bookshelf.getJsonObject(i).getString("author", "")
-            if (name == book.name && author == book.author) {
+            if (name.equals(book.name) && author.equals(book.author)) {
                 existIndex = i
                 break
             }
@@ -1485,18 +1489,17 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                 }
                 val relativeLocalFilePath = Paths.get(
                     "storage", "data", userNameSpace,
-                    book.name + '_' + book.author, tempFile.name
+                    book.name + "_" + book.author, tempFile.name
                 ).toString()
-                val relativeLocalFileUrl =
-                    "storage/data/$userNameSpace/${book.name}_${book.author}/${tempFile.name}"
+                val relativeLocalFileUrl = "storage/data/" + userNameSpace + "/" + book.name + "_" + book.author + "/" + tempFile.name
                 val localFilePath = getWorkDir(relativeLocalFilePath)
                 logger.info("localFilePath: {}", localFilePath)
-                val localFile = File(localFilePath)
+                var localFile = File(localFilePath)
                 localFile.deleteRecursively()
                 if (!localFile.parentFile.exists()) {
                     localFile.parentFile.mkdirs()
                 }
-                if (!tempFile.copyRecursively(localFile, overwrite = false)) {
+                if (!tempFile.copyRecursively(localFile)) {
                     return Pair(book, "导入本地书籍失败")
                 }
                 tempFile.deleteRecursively()
@@ -1510,16 +1513,18 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                     if (!extractCbz(book)) {
                         return Pair(book, "导入本地CBZ书籍失败")
                     }
-                } else if (book.isPdf() && !convertPdfToImage(book)) {
-                    return Pair(book, "本地PDF书籍转换失败")
+                } else if (book.isPdf()) {
+                    if (!convertPdfToImage(book)) {
+                        return Pair(book, "本地PDF书籍转换失败")
+                    }
                 }
-            } else if (book.bookUrl.contains("localStore")) {
+            } else if (book.bookUrl.indexOf("localStore") >= 0) {
                 val tempFile = File(getWorkDir(book.bookUrl))
                 if (!tempFile.exists()) {
                     return Pair(book, "本地书仓书籍不存在")
                 }
-                book.bookUrl =
-                    "storage/data/$userNameSpace/${book.name}_${book.author}/${tempFile.name}"
+                val relativeLocalFileUrl = "storage/data/" + userNameSpace + "/" + book.name + "_" + book.author + "/" + tempFile.name
+                book.bookUrl = relativeLocalFileUrl
                 if (book.isEpub()) {
                     if (!extractEpub(book)) {
                         return Pair(book, "导入本地Epub书籍失败")
@@ -1528,16 +1533,18 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                     if (!extractCbz(book)) {
                         return Pair(book, "导入本地CBZ书籍失败")
                     }
-                } else if (book.isPdf() && !convertPdfToImage(book)) {
-                    return Pair(book, "本地PDF书籍转换失败")
+                } else if (book.isPdf()) {
+                    if (!convertPdfToImage(book)) {
+                        return Pair(book, "本地PDF书籍转换失败")
+                    }
                 }
-            } else if (book.bookUrl.contains("webdav")) {
+            } else if (book.bookUrl.indexOf("webdav") >= 0) {
                 val tempFile = File(getWorkDir(book.bookUrl))
                 if (!tempFile.exists()) {
                     return Pair(book, "webdav书仓书籍不存在")
                 }
-                book.bookUrl =
-                    "storage/data/$userNameSpace/${book.name}_${book.author}/${tempFile.name}"
+                val relativeLocalFileUrl = "storage/data/" + userNameSpace + "/" + book.name + "_" + book.author + "/" + tempFile.name
+                book.bookUrl = relativeLocalFileUrl
                 if (book.isEpub()) {
                     if (!extractEpub(book)) {
                         return Pair(book, "导入本地Epub书籍失败")
@@ -1546,33 +1553,35 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                     if (!extractCbz(book)) {
                         return Pair(book, "导入本地CBZ书籍失败")
                     }
-                } else if (book.isPdf() && !convertPdfToImage(book)) {
-                    return Pair(book, "本地PDF书籍转换失败")
+                } else if (book.isPdf()) {
+                    if (!convertPdfToImage(book)) {
+                        return Pair(book, "本地PDF书籍转换失败")
+                    }
                 }
             }
         }
         book.isInShelf = true
         if (existIndex >= 0) {
-            val bookList = bookshelf.list
-            val existBook = bookshelf.getJsonObject(existIndex).mapTo(Book::class.java)
+            var bookList = bookshelf.getList()
+            var existBook = bookshelf.getJsonObject(existIndex).mapTo(Book::class.java)
             book.durChapterIndex = existBook.durChapterIndex
             book.durChapterTitle = existBook.durChapterTitle
             book.durChapterTime = existBook.durChapterTime
-            val existCover = existBook.getDisplayCover()
-            if (!existCover.isNullOrEmpty() && existCover.startsWith("/") &&
-                existCover != book.getDisplayCover()
+            if (!existBook.getDisplayCover().isNullOrEmpty() && existBook.getDisplayCover()!!.startsWith("/") &&
+                !existBook.getDisplayCover()!!.equals(book.getDisplayCover())
             ) {
-                FileUtils.deleteFile(getWorkDir("storage" + existCover))
+                val cachePath = getWorkDir("storage", existBook.getDisplayCover()!!)
+                FileUtils.deleteFile(cachePath)
             }
-            bookList[existIndex] = JsonObject.mapFrom(book)
+            bookList.set(existIndex, JsonObject.mapFrom(book))
             bookshelf = JsonArray(bookList)
         } else {
             bookshelf.add(JsonObject.mapFrom(book))
         }
         val sourceList = listOf(book.toSearchBook())
-        saveBookSources(book, sourceList, userNameSpace, false)
+        saveBookSources(book, sourceList, userNameSpace)
         saveUserStorage(userNameSpace, "bookshelf", bookshelf)
-        return Pair(book, null as String)
+        return Pair(book, null)
     }
 
     private suspend fun saveLocalBookCover(book: Book, userNameSpace: String) {
