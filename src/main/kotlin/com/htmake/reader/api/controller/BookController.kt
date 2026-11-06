@@ -277,7 +277,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             return returnData.setErrorMsg("请上传书籍文件")
         }
         val userNameSpace = getUserNameSpace(context)
-        val fileList = ArrayList<Map<String, Any>>()
+        val fileList = arrayListOf<Map<String, Any>>()
         context.fileUploads().forEach { it ->
             val file = File(it.uploadedFileName())
             logger.info("uploadFile: {} {} {}", it.uploadedFileName(), it.fileName(), file)
@@ -290,7 +290,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                 }
                 fileName = FileUtils.getNameExcludeExtension(fileName)
                 fileName = AppPattern.fileNameRegex.replace(fileName, "")
-                fileName = fileName.substring(0, minOf(50, fileName.length)) + "." + ext
+                fileName = fileName.substring(0, Math.min(50, fileName.length)) + "." + ext
                 val localFilePath =
                     Paths.get("storage", "assets", userNameSpace, "book", fileName).toString()
                 val localFileUrl = "/assets/$userNameSpace/book/$fileName"

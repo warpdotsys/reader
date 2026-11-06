@@ -717,3 +717,15 @@ getLocalChapterList 0.993、importBookPreview 0.969、getSpeakStream 0.890
 getBookContent 0.628（中段 171 行错位，需整段重排）、getChapterList 0.777（状态机 +2 槽）、
 getBookInfo 0.626（+2 槽）、saveBook 0.676（spill 含 book + checkNNE("book") 悬疑）、
 searchBookContent 0.659、cacheBookSSE 0.720、saveToWebdav/syncFromWebdav/等小方法槽差
+
+### 规律 29：`Math.min` vs `minOf`（编译器内联差异）
+制品 `bipush 50; aload; length; Math.min` 直出 = 源码写 **`Math.min(50, x.length)`**；
+1.5.21 的 `minOf(50, x)` 会产生 istore/iload 临时槽 + 标记。importBookPreview 用 Math.min 更近。
+同理注意 `arrayListOf()` 无参 inline 标记 vs `ArrayList()`。
+
+### 已知 lambda 编号偏移（文件级计数器）
+BookController.kt 的 $lambda-N（影响 $lambda-N 方法名和 $$inlined$ 类名）：
+- searchBookMulti 段：制品 5..8，本地 4..7（本地少 1，位置在 841 行前）
+- getLastBackFileFromWebdav：制品 16，本地 17（净 +1）
+- bookSourceDebugSSE/cacheBookSSE/searchBookContent：制品 18/19/30，本地 19/20/31（+1）
+⇒ 本地在 841 行前少 1 个 lambda、在 1185-2570 段多 2 个。修编号需找到这两处源头（未完成）。
