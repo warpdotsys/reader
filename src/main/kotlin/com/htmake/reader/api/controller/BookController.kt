@@ -1141,7 +1141,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         val bookSourceGroup = Ref.ObjectRef<String>()
         var refresh = 0
         if (context.request().method() == HttpMethod.POST) {
-            bookUrl = context.bodyAsJson.getString("url") ?: ""
+            bookUrl = context.bodyAsJson.getString("url")
             lastIndex.element = context.bodyAsJson.getInteger("lastIndex", -1)
             searchSize.element = context.bodyAsJson.getInteger("searchSize", 30)
             bookSourceGroup.element = context.bodyAsJson.getString("bookSourceGroup", "")
