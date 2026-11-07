@@ -104,6 +104,7 @@ extends Encoding {
     }
 
     int gb2312_probability(byte[] rawtext) {
+        int i;
         int rawtextlen = 0;
         int dbchars = 1;
         int gbchars = 1;
@@ -112,7 +113,7 @@ extends Encoding {
         float rangeval = 0.0f;
         float freqval = 0.0f;
         rawtextlen = rawtext.length;
-        for (int i = 0; i < rawtextlen - 1; ++i) {
+        for (i = 0; i < rawtextlen - 1; ++i) {
             if (rawtext[i] >= 0) continue;
             ++dbchars;
             if (-95 <= rawtext[i] && rawtext[i] <= -9 && -95 <= rawtext[i + 1] && rawtext[i + 1] <= -2) {
@@ -134,6 +135,7 @@ extends Encoding {
     }
 
     int gbk_probability(byte[] rawtext) {
+        int i;
         int rawtextlen = 0;
         int dbchars = 1;
         int gbchars = 1;
@@ -142,7 +144,7 @@ extends Encoding {
         float rangeval = 0.0f;
         float freqval = 0.0f;
         rawtextlen = rawtext.length;
-        for (int i = 0; i < rawtextlen - 1; ++i) {
+        for (i = 0; i < rawtextlen - 1; ++i) {
             int column;
             int row;
             if (rawtext[i] >= 0) continue;
@@ -174,6 +176,7 @@ extends Encoding {
     }
 
     int gb18030_probability(byte[] rawtext) {
+        int i;
         int rawtextlen = 0;
         int dbchars = 1;
         int gbchars = 1;
@@ -182,7 +185,7 @@ extends Encoding {
         float rangeval = 0.0f;
         float freqval = 0.0f;
         rawtextlen = rawtext.length;
-        for (int i = 0; i < rawtextlen - 1; ++i) {
+        for (i = 0; i < rawtextlen - 1; ++i) {
             int column;
             int row;
             if (rawtext[i] >= 0) continue;
@@ -216,6 +219,7 @@ extends Encoding {
     }
 
     int hz_probability(byte[] rawtext) {
+        int i;
         int hzchars = 0;
         int dbchars = 1;
         long hzfreq = 0L;
@@ -225,7 +229,7 @@ extends Encoding {
         int hzstart = 0;
         int hzend = 0;
         int rawtextlen = rawtext.length;
-        block0: for (int i = 0; i < rawtextlen; ++i) {
+        block0: for (i = 0; i < rawtextlen; ++i) {
             if (rawtext[i] != 126) continue;
             if (rawtext[i + 1] == 123) {
                 ++hzstart;
@@ -278,6 +282,7 @@ extends Encoding {
     }
 
     int big5_probability(byte[] rawtext) {
+        int i;
         int rawtextlen = 0;
         int dbchars = 1;
         int bfchars = 1;
@@ -286,7 +291,7 @@ extends Encoding {
         long bffreq = 0L;
         long totalfreq = 1L;
         rawtextlen = rawtext.length;
-        for (int i = 0; i < rawtextlen - 1; ++i) {
+        for (i = 0; i < rawtextlen - 1; ++i) {
             if (rawtext[i] >= 0) continue;
             ++dbchars;
             if (-95 <= rawtext[i] && rawtext[i] <= -7 && (64 <= rawtext[i + 1] && rawtext[i + 1] <= 126 || -95 <= rawtext[i + 1] && rawtext[i + 1] <= -2)) {
@@ -308,6 +313,7 @@ extends Encoding {
     }
 
     int big5plus_probability(byte[] rawtext) {
+        int i;
         int rawtextlen = 0;
         int dbchars = 1;
         int bfchars = 1;
@@ -316,7 +322,7 @@ extends Encoding {
         float rangeval = 0.0f;
         float freqval = 0.0f;
         rawtextlen = rawtext.length;
-        for (int i = 0; i < rawtextlen - 1; ++i) {
+        for (i = 0; i < rawtextlen - 1; ++i) {
             int column;
             int row;
             if (rawtext[i] >= 128) continue;
@@ -348,6 +354,7 @@ extends Encoding {
     }
 
     int euc_tw_probability(byte[] rawtext) {
+        int i;
         int rawtextlen = 0;
         int dbchars = 1;
         int cnschars = 1;
@@ -356,7 +363,7 @@ extends Encoding {
         float rangeval = 0.0f;
         float freqval = 0.0f;
         rawtextlen = rawtext.length;
-        for (int i = 0; i < rawtextlen - 1; ++i) {
+        for (i = 0; i < rawtextlen - 1; ++i) {
             if (rawtext[i] >= 0) continue;
             ++dbchars;
             if (i + 3 < rawtextlen && -114 == rawtext[i] && -95 <= rawtext[i + 1] && rawtext[i + 1] <= -80 && -95 <= rawtext[i + 2] && rawtext[i + 2] <= -2 && -95 <= rawtext[i + 3] && rawtext[i + 3] <= -2) {
@@ -382,6 +389,7 @@ extends Encoding {
     }
 
     int iso_2022_cn_probability(byte[] rawtext) {
+        int i;
         int rawtextlen = 0;
         int dbchars = 1;
         int isochars = 1;
@@ -390,7 +398,7 @@ extends Encoding {
         float rangeval = 0.0f;
         float freqval = 0.0f;
         rawtextlen = rawtext.length;
-        for (int i = 0; i < rawtextlen - 1; ++i) {
+        for (i = 0; i < rawtextlen - 1; ++i) {
             int column;
             int row;
             if (rawtext[i] != 27 || i + 3 >= rawtextlen) continue;
@@ -496,6 +504,7 @@ extends Encoding {
     }
 
     int euc_kr_probability(byte[] rawtext) {
+        int i;
         int rawtextlen = 0;
         int dbchars = 1;
         int krchars = 1;
@@ -504,7 +513,7 @@ extends Encoding {
         float rangeval = 0.0f;
         float freqval = 0.0f;
         rawtextlen = rawtext.length;
-        for (int i = 0; i < rawtextlen - 1; ++i) {
+        for (i = 0; i < rawtextlen - 1; ++i) {
             if (rawtext[i] >= 0) continue;
             ++dbchars;
             if (-95 <= rawtext[i] && rawtext[i] <= -2 && -95 <= rawtext[i + 1] && rawtext[i + 1] <= -2) {
@@ -526,6 +535,7 @@ extends Encoding {
     }
 
     int cp949_probability(byte[] rawtext) {
+        int i;
         int rawtextlen = 0;
         int dbchars = 1;
         int krchars = 1;
@@ -534,7 +544,7 @@ extends Encoding {
         float rangeval = 0.0f;
         float freqval = 0.0f;
         rawtextlen = rawtext.length;
-        for (int i = 0; i < rawtextlen - 1; ++i) {
+        for (i = 0; i < rawtextlen - 1; ++i) {
             if (rawtext[i] >= 0) continue;
             ++dbchars;
             if (-127 <= rawtext[i] && rawtext[i] <= -2 && (65 <= rawtext[i + 1] && rawtext[i + 1] <= 90 || 97 <= rawtext[i + 1] && rawtext[i + 1] <= 122 || -127 <= rawtext[i + 1] && rawtext[i + 1] <= -2)) {
@@ -554,7 +564,8 @@ extends Encoding {
     }
 
     int iso_2022_kr_probability(byte[] rawtext) {
-        for (int i = 0; i < rawtext.length; ++i) {
+        int i;
+        for (i = 0; i < rawtext.length; ++i) {
             if (i + 3 >= rawtext.length || rawtext[i] != 27 || (char)rawtext[i + 1] != '$' || (char)rawtext[i + 2] != ')' || (char)rawtext[i + 3] != 'C') continue;
             return 100;
         }
@@ -562,6 +573,7 @@ extends Encoding {
     }
 
     int euc_jp_probability(byte[] rawtext) {
+        int i;
         int rawtextlen = 0;
         int dbchars = 1;
         int jpchars = 1;
@@ -570,7 +582,7 @@ extends Encoding {
         float rangeval = 0.0f;
         float freqval = 0.0f;
         rawtextlen = rawtext.length;
-        for (int i = 0; i < rawtextlen - 1; ++i) {
+        for (i = 0; i < rawtextlen - 1; ++i) {
             if (rawtext[i] >= 0) continue;
             ++dbchars;
             if (-95 <= rawtext[i] && rawtext[i] <= -2 && -95 <= rawtext[i + 1] && rawtext[i + 1] <= -2) {
@@ -592,7 +604,8 @@ extends Encoding {
     }
 
     int iso_2022_jp_probability(byte[] rawtext) {
-        for (int i = 0; i < rawtext.length; ++i) {
+        int i;
+        for (i = 0; i < rawtext.length; ++i) {
             if (i + 2 >= rawtext.length || rawtext[i] != 27 || (char)rawtext[i + 1] != '$' || (char)rawtext[i + 2] != 'B') continue;
             return 100;
         }
@@ -600,6 +613,7 @@ extends Encoding {
     }
 
     int sjis_probability(byte[] rawtext) {
+        int i;
         int rawtextlen = 0;
         int dbchars = 1;
         int jpchars = 1;
@@ -608,7 +622,7 @@ extends Encoding {
         float rangeval = 0.0f;
         float freqval = 0.0f;
         rawtextlen = rawtext.length;
-        for (int i = 0; i < rawtextlen - 1; ++i) {
+        for (i = 0; i < rawtextlen - 1; ++i) {
             if (rawtext[i] >= 0) continue;
             ++dbchars;
             if (i + 1 < rawtext.length && (-127 <= rawtext[i] && rawtext[i] <= -97 || -32 <= rawtext[i] && rawtext[i] <= -17) && (64 <= rawtext[i + 1] && rawtext[i + 1] <= 126 || -128 <= rawtext[i + 1] && rawtext[i + 1] <= -4)) {
