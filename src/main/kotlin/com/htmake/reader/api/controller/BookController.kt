@@ -798,7 +798,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         var key: String
         var lastIndex = 0
         var searchSize = 0
-        var bookSourceGroup = ""
+        var bookSourceGroup: String
         var concurrentCount: Int
         if (context.request().method() == HttpMethod.POST) {
             key = context.bodyAsJson.getString("key", "")
@@ -908,7 +908,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         var key: String
         var lastIndex = 0
         var searchSize = 0
-        var bookSourceGroup = ""
+        var bookSourceGroup: String
         var concurrentCount: Int
         if (context.request().method() == HttpMethod.POST) {
             key = context.bodyAsJson.getString("key", "")
