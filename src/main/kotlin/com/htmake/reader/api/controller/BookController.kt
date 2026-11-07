@@ -1398,8 +1398,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         if (context.request().method() == HttpMethod.POST) {
             refresh = context.bodyAsJson.getInteger("refresh", 0)
         } else {
-            val refreshStr = context.queryParam("refresh").firstOrNull()
-            refresh = refreshStr?.toIntOrNull() ?: 0
+            refresh = context.queryParam("refresh").firstOrNull()?.toIntOrNull() ?: 0
         }
         val bookList = getBookShelfBooks(refresh > 0, getUserNameSpace(context))
         return returnData.setData(bookList)
@@ -1611,7 +1610,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
     suspend fun saveBookCover(book: Book, userNameSpace: String, bookSource: String? = null) {
         val coverUrl = book.getDisplayCover()
         if (coverUrl != null && !coverUrl.startsWith("/")) {
-            val sourceString = bookSource ?: getBookSourceStringBySourceURLOpt(book.origin, userNameSpace)
+            val bookSource = bookSource ?: getBookSourceStringBySourceURLOpt(book.origin, userNameSpace)
             val ext = getFileExt(coverUrl, "jpg")
             val md5Encode = MD5Utils.md5Encode(coverUrl).toString()
             val cachePath = getWorkDir("storage", "assets", userNameSpace, "covers", "$md5Encode.$ext")
@@ -1623,7 +1622,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             }
             val analyzeUrl = AnalyzeUrl(
                 coverUrl,
-                source = BookSource.fromJson(sourceString!!).getOrNull()
+                source = BookSource.fromJson(bookSource!!).getOrNull()
             )
             try {
                 analyzeUrl.getByteArrayAwait().let {
