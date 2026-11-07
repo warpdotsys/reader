@@ -803,3 +803,24 @@ getLocalChapterList$default 掩码形态）。0.699→0.742。
 ### 规律 43：判断挂起点数量对比法
 对 suspend 方法先数两边的"挂起调用"清单（扫描 invoke* + Continuation 参数），数量/顺序不一致 =
 源码结构差异（多余/缺少 suspend 调用），比逐块 diff 快得多。searchBookContent 即由此定位。
+
+## 2026-11-07 晚批（全局 v56 基线 + getBookContent 试验）
+
+### 全局基线 v56（bcdiff_v56.json）
+- 类级：779/934 完全一致（83.4%），155 类差
+- 指令级：制品 253,421 / 本地 251,803；逐方法 LCS 后未对齐 55,720 →
+  pair 对齐 449,504/505,224 = 88.97%
+- 差的指令量 72.1% 集中在 155 个差异类里（小类转正不改变指令级大盘）
+- BookController total_delta 9278→7645；top 缺口类：BookController 7645 / YueduApi 2709 /
+  ExtKt 1656 / UserController 1628 / BytesEncodingDetect 1549
+
+### 教训：巨型方法（>2000 指令）禁散弹式小改
+getBookContent 2197 指令：对头部两三行做 isNotEmpty()/去 ?: "" 试验，LCS ratio 从 0.628 跌到
+0.581——对齐对全方法敏感，小改会整体漂移。必须先完整解码目标区域（逐块看 opcode 目标偏移）
+再动手，或按挂起点+LVT 先锁定结构级差异。已回退到 6ea45ea。
+
+### 规律 44：`xxx.length > 0` → `isNotEmpty()`（CharSequence 内联）
+制品对 String 的非空判断是 isNotEmpty() 内联：[checkcast CharSequence; 零值标记;
+CharSequence.length; ifle; iconst_1; goto; iconst_0]（2 标记 + ifle 结构）。
+与 isEmpty()/isNullOrEmpty() 组成三兄弟。逐块解码 getBookContent 时可见。
+（注意：散弹试改巨型方法会适得其反，须配合槽位映射再改。）
