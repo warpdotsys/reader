@@ -2245,7 +2245,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         val urlMap: MutableMap<String, Int> = linkedMapOf()
         for (i in 0 until bookSourceList.size()) {
             val bookUrl: String = bookSourceList.getJsonObject(i).getString("bookUrl")
-            urlMap[bookUrl] = i
+            urlMap.put(bookUrl, i)
         }
         for (i in 0 until sourceList.size) {
             val searchBook = sourceList[i]
@@ -2254,7 +2254,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                 bookSourceList.set(existIndex, JsonObject.mapFrom(searchBook))
             } else {
                 bookSourceList.add(JsonObject.mapFrom(searchBook))
-                urlMap[searchBook.bookUrl] = bookSourceList.size() - 1
+                urlMap.put(searchBook.bookUrl, bookSourceList.size() - 1)
             }
         }
         saveUserStorage(
