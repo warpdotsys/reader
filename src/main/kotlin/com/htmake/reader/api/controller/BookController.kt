@@ -2625,7 +2625,12 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             response.end("data: " + jsonEncode(returnData.setErrorMsg("本地书籍无需缓存"), false)!! + "\n\n")
             return
         }
-        var bookSource = getBookSourceString(context, bookInfo.origin, false) ?: ""
+        var bookSource = getBookSourceString(context, bookInfo.origin, false)
+        if (bookSource.isNullOrEmpty()) {
+            response.write("event: error\n")
+            response.end("data: " + jsonEncode(returnData.setErrorMsg("未配置书源"), false) + "\n\n")
+            return
+        }
         var chapterList = WebBook(bookSource, appConfig.debugLog, userNameSpace = userNameSpace)
             .getChapterList(bookInfo)
         val cachedChapterContentSet = Ref.ObjectRef<MutableSet<Int>>()
@@ -2685,8 +2690,9 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                 "data: " + jsonEncode(
                     returnData.setData(
                         mapOf(
-                            "success" to successCount.element,
-                            "failed" to failedCount.element
+                            "cachedCount" to cachedChapterContentSet.element.size,
+                            "successCount" to successCount.element,
+                            "failedCount" to failedCount.element
                         )
                     ),
                     false
