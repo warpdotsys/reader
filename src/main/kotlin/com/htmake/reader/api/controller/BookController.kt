@@ -2002,7 +2002,8 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             } else {
                 try {
                     if (!bookSource.isNullOrEmpty()) {
-                        val bookSourceObject = BookSource.fromJson(bookSource).getOrNull()
+                        var bookSourceObject: BookSource? = null
+                        bookSourceObject = BookSource.fromJson(bookSource).getOrNull()
                         bookSourceObject?.ruleToc?.preUpdateJs?.let {
                             AnalyzeRule(book, bookSourceObject).evalJS(it)
                         }
