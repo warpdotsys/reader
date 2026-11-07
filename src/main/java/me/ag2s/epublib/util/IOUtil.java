@@ -46,7 +46,12 @@ public class IOUtil {
 
     public static byte[] toByteArray(InputStream in, int size) throws IOException {
         try {
-            ByteArrayOutputStream result2 = size > 0 ? new ByteArrayOutputStream(size) : new ByteArrayOutputStream();
+            ByteArrayOutputStream result2;
+            if (size > 0) {
+                result2 = new ByteArrayOutputStream(size);
+            } else {
+                result2 = new ByteArrayOutputStream();
+            }
             IOUtil.copy(in, (OutputStream)result2);
             result2.flush();
             return result2.toByteArray();
@@ -308,13 +313,12 @@ public class IOUtil {
     }
 
     public static void close(Closeable closeable, IOConsumer<IOException> consumer) throws IOException {
-        block3: {
-            if (closeable != null) {
-                try {
-                    closeable.close();
-                }
-                catch (IOException e) {
-                    if (consumer == null) break block3;
+        if (closeable != null) {
+            try {
+                closeable.close();
+            }
+            catch (IOException e) {
+                if (consumer != null) {
                     consumer.accept(e);
                 }
             }
@@ -330,8 +334,8 @@ public class IOUtil {
     public static String Stream2String(InputStream inputStream2) {
         ByteArrayOutputStream result2 = new ByteArrayOutputStream();
         try {
-            int length;
             byte[] buffer = new byte[8192];
+            int length;
             while ((length = inputStream2.read(buffer)) != -1) {
                 result2.write(buffer, 0, length);
             }
