@@ -820,14 +820,14 @@ fun getCommand(to: List<String>, subject: String, body: String): List<Pair<Strin
     val fromname = "Reader"
     val separator = "----=_Part_" + System.currentTimeMillis() + UUID.randomUUID()
     val command = mutableListOf(Pair("HELO sendmail\r\n", 250))
-    if (username.isNotEmpty()) {
+    if (!username.isNullOrEmpty()) {
         command.add(Pair("AUTH LOGIN\r\n", 334))
         command.add(Pair(encodeBase64(username) + "\r\n", 334))
         command.add(Pair(encodeBase64(password) + "\r\n", 235))
     }
     command.add(Pair("MAIL FROM: <" + from + ">\r\n", 250))
     var header = "FROM: " + fromname + '<' + from + ">\r\n"
-    if (to.isNotEmpty()) {
+    if (!to.isNullOrEmpty()) {
         val count = to.size
         if (count == 1) {
             command.add(Pair("RCPT TO: <" + to[0] + ">\r\n", 250))
