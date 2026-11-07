@@ -2405,7 +2405,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
     suspend fun syncFromWebdav(zipFilePath: String, userNameSpace: String): Boolean {
         val descDir = getWorkDir("storage", "data", userNameSpace, "tmp")
         val descDirFile = File(descDir)
-        try {
+        return try {
             val userHome = getUserWebdavHome(userNameSpace)
             val zipFile = File(zipFilePath)
             if (!zipFile.exists()) {
@@ -2436,17 +2436,18 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                     File(userHome + File.separator + "legado" + File.separator + "bookProgress")
             }
             if (bookProgressDir.exists() && bookProgressDir.isDirectory) {
-                bookProgressDir.listFiles()?.forEach { file ->
+                val files: Array<File> = bookProgressDir.listFiles()
+                files.forEach { file ->
                     syncBookProgressFromWebdav(file, userNameSpace)
                 }
             }
+            true
         } catch (e: Exception) {
             e.printStackTrace()
-            return false
+            false
         } finally {
             descDirFile.deleteRecursively()
         }
-        return true
     }
 
     suspend fun saveToWebdav(userNameSpace: String, latestZipFilePath: String? = null): Boolean {
