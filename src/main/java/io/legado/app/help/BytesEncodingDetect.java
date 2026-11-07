@@ -629,11 +629,11 @@ extends Encoding {
             if (rawtext[i] >= 0) continue;
             ++dbchars;
             if (i + 1 < rawtext.length && (-127 <= rawtext[i] && rawtext[i] <= -97 || -32 <= rawtext[i] && rawtext[i] <= -17) && (64 <= rawtext[i + 1] && rawtext[i + 1] <= 126 || -128 <= rawtext[i + 1] && rawtext[i + 1] <= -4)) {
-                int adjust;
                 ++jpchars;
                 totalfreq += 500L;
                 int row = rawtext[i] + 256;
                 int column = rawtext[i + 1] + 256;
+                int adjust;
                 if (column < 159) {
                     adjust = 1;
                     column = column > 127 ? (column -= 32) : (column -= 25);
