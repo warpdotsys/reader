@@ -12,6 +12,7 @@ import java.net.URL;
 
 class BytesEncodingDetect
 extends Encoding {
+    public boolean debug = false;
     int[][] GBFreq = new int[94][94];
     int[][] GBKFreq = new int[126][191];
     int[][] Big5Freq = new int[94][158];
@@ -19,7 +20,6 @@ extends Encoding {
     int[][] EUC_TWFreq = new int[94][94];
     int[][] KRFreq = new int[94][94];
     int[][] JPFreq = new int[94][94];
-    public boolean debug = false;
 
     public BytesEncodingDetect() {
         this.initialize_frequencies();
