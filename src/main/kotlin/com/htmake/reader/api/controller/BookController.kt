@@ -3119,7 +3119,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         val isEpub: Int
         if (context.request().method() == HttpMethod.POST) {
             bookUrl = context.bodyAsJson.getString("url")
-                ?: (context.bodyAsJson.getString("bookUrl") ?: "")
+                ?: context.bodyAsJson.getString("bookUrl") ?: ""
             isEpub = context.bodyAsJson.getInteger("isEpub", 0)
         } else {
             bookUrl = context.queryParam("url").firstOrNull() ?: ""
@@ -3162,8 +3162,8 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             context.success(returnData.setErrorMsg("未配置书源"))
             return
         }
-        val exportDir = File(getWorkDir("storage", "assets", "export"))
-        val file = if (isEpub == 1) {
+        val exportDir = File(getWorkDir("storage", "assets", userNameSpace, "export"))
+        val file = if (isEpub > 0) {
             exportToEpub(exportDir, book, bookSource, userNameSpace)
         } else {
             exportToTxt(exportDir, book, bookSource, userNameSpace)
