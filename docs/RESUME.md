@@ -788,3 +788,18 @@ ifeq/ifge。ttsByEdge 0.794→0.937、updateImageLinkInContent 0.823→0.852。
 BookController 内类集合 110 个 仅差 `getLastBackFileFromWebdav$lambda-16`（本地 15）。
 逐方法 invokedynamic 计数全部相等，但计数器差 1，疑与内联 lambda 的编号归属有关。
 getLastBackFileFromWebdav 卡 0.9785 全因此名。for→forEach+break 重写会崩到 0.68，勿试。
+
+### 规律 41：searchBookContent 的 chapterList 无 WebBook 分支
+制品 searchBookContent 只有 4 个挂起点（checkAuth / getBookSourceString / getLocalChapterList /
+searchChapter），根本没有 WebBook.getChapterList 挂起。chapterList 直接
+`getLocalChapterList(book, bookSource ?: "", userNameSpace = userNameSpace)`（命名参数 →
+getLocalChapterList$default 掩码形态）。0.699→0.742。
+
+### 规律 42：resultList 显式 MutableList 类型
+`val resultList: MutableList<SearchResult> = arrayListOf()`（制品 addAll/size 走 java.util.List
+接口指令）；`chapterResult.isNotEmpty()` 改 `.size > 0`（制品 [size; ifle] 无 isEmpty 标记）。
+0.742→0.753。
+
+### 规律 43：判断挂起点数量对比法
+对 suspend 方法先数两边的"挂起调用"清单（扫描 invoke* + Continuation 参数），数量/顺序不一致 =
+源码结构差异（多余/缺少 suspend 调用），比逐块 diff 快得多。searchBookContent 即由此定位。
