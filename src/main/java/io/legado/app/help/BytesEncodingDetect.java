@@ -65,9 +65,11 @@ extends Encoding {
     }
 
     public int detectEncoding(byte[] rawtext) {
+        int[] scores;
+        int index;
         int maxscore = 0;
         int encoding_guess = OTHER;
-        int[] scores = new int[TOTALTYPES];
+        scores = new int[TOTALTYPES];
         scores[BytesEncodingDetect.GB2312] = this.gb2312_probability(rawtext);
         scores[BytesEncodingDetect.GBK] = this.gbk_probability(rawtext);
         scores[BytesEncodingDetect.GB18030] = this.gb18030_probability(rawtext);
@@ -90,7 +92,7 @@ extends Encoding {
         scores[BytesEncodingDetect.ISO2022CN_GB] = 0;
         scores[BytesEncodingDetect.ISO2022CN_CNS] = 0;
         scores[BytesEncodingDetect.OTHER] = 0;
-        for (int index = 0; index < TOTALTYPES; ++index) {
+        for (index = 0; index < TOTALTYPES; ++index) {
             if (this.debug) {
                 System.err.println("Encoding " + nicename[index] + " score " + scores[index]);
             }
