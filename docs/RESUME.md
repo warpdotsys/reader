@@ -762,3 +762,29 @@ checkNNE 消息 = 完整表达式 "dir.listFiles()"，forEach 直连（无 ?.）
 
 ### 规律 37：`key.length == 0` → `key.isNullOrEmpty()`
 制品用 isNullOrEmpty 两标记内联形态（cs-cast + 2 markers + null 化）。SSE 0.985→0.998。
+
+## 2026-11-07 下午批（86/116 @ b0b6db4 之后）
+
+### 规律 37：`"x" in map` / `"x" !in coll` ≠ `containsKey`/`indexOf`
+制品 `options.containsKey("voice")` 的位置实为 `"voice" in options`：产生 in 算子的
+双标记 + 接收者/键副本（[astore key; iconst_0; istore; aload map; astore; iconst_0;
+istore; aload; aload; containsKey]）。字符串的 `!in` 编译为 `indexOf$default` +
+ifeq/ifge。ttsByEdge 0.794→0.937、updateImageLinkInContent 0.823→0.852。
+
+### 规律 38：被 lambda 捕获的 var 若制品无初值，源码必须写 `var x: T` 无初始化
+`var x = ""` 会生成捕获引用初始化 [new Ref; astore; aload; ldc ""; putfield]；
+`var x: String` 仅 [new Ref; astore]。searchBookMulti/SSE 双 1.0000。
+
+### 规律 39：五种空判定按制品的标记数严格选（补充）
+- `x.length == 0` → `x.isNullOrEmpty()`（两标记 + ifnull）
+- `containsKey` → `in`；`indexOf("_") >= 0` → `"_" in x`（含 !in 包裹式）
+- `options["pitch"] + "%"` 拼接不要 as 转换（stringPlus 直调）
+
+### 规律 40：`element = ...!!` 形状不符（1.5.21 差异）
+1.5.21 对赋值右侧表达式 `!!` 生成 [dup; checkNotNull]；制品（1.5.1）是
+[astore T; aload T; checkNNE(expr); aload T; putfield]。不可用，回退。
+
+### 待办：lambda 编号 +1 差
+BookController 内类集合 110 个 仅差 `getLastBackFileFromWebdav$lambda-16`（本地 15）。
+逐方法 invokedynamic 计数全部相等，但计数器差 1，疑与内联 lambda 的编号归属有关。
+getLastBackFileFromWebdav 卡 0.9785 全因此名。for→forEach+break 重写会崩到 0.68，勿试。
