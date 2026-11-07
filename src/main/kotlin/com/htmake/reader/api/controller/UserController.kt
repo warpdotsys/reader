@@ -39,9 +39,9 @@ class UserController(coroutineContext: CoroutineContext) : BaseController(corout
     private fun getUserLimit(context: RoutingContext): Int {
         val license = getInstalledLicense()
         if (license.validHost(context.request().host())) {
-            return min(max(appConfig.userLimit, 1), license.userMaxLimit)
+            return Math.min(Math.max(appConfig.userLimit, 1), license.userMaxLimit)
         }
-        return min(max(appConfig.userLimit, 1), userMaxCount)
+        return Math.min(Math.max(appConfig.userLimit, 1), userMaxCount)
     }
 
     suspend fun login(context: RoutingContext): ReturnData {
