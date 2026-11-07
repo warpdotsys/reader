@@ -3090,16 +3090,17 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         }
         val userNameSpace = getUserNameSpace(context)
         val bookList = getBookShelfBooks(false, userNameSpace)
-        val result = arrayListOf<Map<String, Any>>()
+        val result: MutableList<Any> = arrayListOf()
         var i = 0
-        val size = bookList.size
-        while (i < size) {
+        while (i < bookList.size) {
             val bookInfo = bookList[i++]
             if (!bookInfo.isLocalBook()) {
                 val cachedSet = getCachedChapterContentSet(bookInfo, userNameSpace)
-                val bookInfoMap = bookInfo.toMap().toMutableMap()
+                val bookInfoMap = bookInfo.toMap() as MutableMap<String, Any>
                 bookInfoMap.put("cachedChapterCount", cachedSet.size)
                 result.add(bookInfoMap)
+            } else {
+                result.add(bookInfo)
             }
         }
         return returnData.setData(result)
@@ -3410,14 +3411,20 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         }
         val userNameSpace = getUserNameSpace(context)
         val book = getShelfBookByURL(bookUrl, userNameSpace)
-            ?: return returnData.setErrorMsg("请先加入书架")
-        book.setRootDir(getWorkDir())
-        book.setUserNameSpace(userNameSpace)
-        val bookSource = (getBookSourceStringBySourceURLOpt(book.origin, userNameSpace) ?: "")
+        if (book == null) {
+            return returnData.setErrorMsg("请先加入书架")
+        }
+        var bookSource: String? = null
+        if (!book.isLocalBook()) {
+            bookSource = getBookSourceString(context, book.origin)
+            if (bookSource.isNullOrEmpty()) {
+                return returnData.setErrorMsg("未配置书源")
+            }
+        }
         val chapterList = if (book.isLocalBook()) {
-            getLocalChapterList(book, bookSource, false, userNameSpace)
+            getLocalChapterList(book, bookSource ?: "", false, userNameSpace)
         } else {
-            WebBook(bookSource, appConfig.debugLog, userNameSpace = userNameSpace).getChapterList(book)
+            WebBook(bookSource!!, appConfig.debugLog, userNameSpace = userNameSpace).getChapterList(book)
         }
         if (lastIndex >= chapterList.size) {
             return returnData.setErrorMsg("没有更多了")
