@@ -3125,7 +3125,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             bookUrl = context.queryParam("url").firstOrNull() ?: ""
             isEpub = context.queryParam("isEpub").firstOrNull()?.toInt() ?: 0
         }
-        if (bookUrl.length == 0) {
+        if (bookUrl.isNullOrEmpty()) {
             context.success(returnData.setErrorMsg("请输入书籍链接"))
             return
         }
@@ -3158,7 +3158,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             return
         }
         val bookSource = getBookSourceString(context, book.origin) ?: ""
-        if (!book.isLocalBook() && bookSource.length == 0) {
+        if (!book.isLocalBook() && bookSource.isNullOrEmpty()) {
             context.success(returnData.setErrorMsg("未配置书源"))
             return
         }
