@@ -3291,7 +3291,8 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
     }
 
     private suspend fun setCover(book: Book, epubBook: EpubBook, bookSourceString: String?) {
-        val coverUrl = book.getDisplayCover() ?: return
+        val coverUrl = book.getDisplayCover()
+        if (coverUrl == null) return
         if (coverUrl.startsWith("/")) {
             val coverFile = File(getWorkDir("storage", coverUrl.replace("/", File.separator).substring(1)))
             val byteArray = coverFile.readBytes()
