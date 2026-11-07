@@ -2076,7 +2076,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             } else {
                 bookSourceUrl = context.queryParam("bookSourceUrl").firstOrNull() ?: ""
             }
-            if (!bookSourceUrl.isNullOrBlank()) {
+            if (bookSourceUrl.isNotBlank()) {
                 bookSourceString = getBookSourceStringBySourceURLOpt(bookSourceUrl, userNameSpace)
             }
         }
