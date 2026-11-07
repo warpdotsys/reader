@@ -156,8 +156,8 @@ class WebdavController(
         if (!appConfig.secure) {
             return true
         }
-        val authorization: String? = context.request().getHeader("Authorization")
-        logger.info("authorization: ***", authorization)
+        var authorization: String? = context.request().getHeader("Authorization")
+        logger.info("authorization: {}", authorization)
         if (authorization == null || authorization.isEmpty()) {
             return false
         }
