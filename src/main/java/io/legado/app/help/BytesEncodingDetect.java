@@ -51,9 +51,10 @@ extends Encoding {
     }
 
     public static byte[] getFileBytes(File testfile) {
+        FileInputStream chinesefile;
         byte[] rawtext = new byte[2000];
         try {
-            FileInputStream chinesefile = new FileInputStream(testfile);
+            chinesefile = new FileInputStream(testfile);
             chinesefile.read(rawtext);
             chinesefile.close();
         }
