@@ -657,8 +657,8 @@ extends Encoding {
      * Opcode count of 23244 triggered aggressive code reduction.  Override with --aggressivesizethreshold.
      */
     void initialize_frequencies() {
-        int j;
         int i;
+        int j;
         for (i = 93; i >= 0; --i) {
             for (j = 93; j >= 0; --j) {
                 this.GBFreq[i][j] = 0;
