@@ -2858,15 +2858,15 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         var rate = "0"
         var pitch = "0%"
         if (options != null) {
-            if (options.containsKey("voice")) {
+            if ("voice" in options) {
                 voice = VoiceEnum.fromSortName(options["voice"] as String)
                     ?: VoiceEnum.zh_CN_XiaoxiaoNeural
             }
-            if (options.containsKey("rate")) {
+            if ("rate" in options) {
                 rate = (options["rate"] as String?) ?: "0"
             }
-            if (options.containsKey("pitch")) {
-                pitch = (options["pitch"] as String) + "%"
+            if ("pitch" in options) {
+                pitch = options["pitch"] + "%"
             }
         }
         val ttsService = TTSService.builder().build()
