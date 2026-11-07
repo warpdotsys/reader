@@ -1832,7 +1832,10 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         }
         val book = context.bodyAsJson.mapTo(Book::class.java)
         val userNameSpace = getUserNameSpace(context)
-        var bookshelf = asJsonArray(getUserStorage(userNameSpace, "bookshelf")) ?: JsonArray()
+        var bookshelf = asJsonArray(getUserStorage(userNameSpace, "bookshelf"))
+        if (bookshelf == null) {
+            bookshelf = JsonArray()
+        }
         var existIndex = -1
         var bookName = ""
         var bookAuthor = ""
