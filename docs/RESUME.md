@@ -824,3 +824,18 @@ getBookContent 2197 指令：对头部两三行做 isNotEmpty()/去 ?: "" 试验
 CharSequence.length; ifle; iconst_1; goto; iconst_0]（2 标记 + ifle 结构）。
 与 isEmpty()/isNullOrEmpty() 组成三兄弟。逐块解码 getBookContent 时可见。
 （注意：散弹试改巨型方法会适得其反，须配合槽位映射再改。）
+
+## 2026-11-08 凌晨批（Java 类大扫除）
+
+### Java 类还原规律（javac 侧，与 Kotlin 侧不同）
+- **循环变量提前声明**：`int i;` 独立在最前 + `for (i = 0; ...)` —— 制品 slot 明显更早。
+  批量修 BytesEncodingDetect 11 个方法。
+- **声明顺序 = 槽位顺序**：`int row; int column;` 顺序反了直接槽错位（gbk 等 6 方法）；
+  `int score; int i; int n;`、`int j;→int i;` 亦然。
+- **复合赋值展开**：`score -= 5`（iinc -5）→ `score = score - 5`（iload/isub/istore）。
+- **continue 习语**：`if (x > 0) continue; return 0;` → `if (x <= 0) return 0;`。
+- **字段声明顺序 = 初始化顺序**：`debug = false` 字段放最前 → 构造器字节码一致。
+- **三元 → if/else 双分支赋值**（制品逐分支 astore）；**去 block3 标签**改嵌套 if；
+  **catch 变量槽位**受 try 内局部变量作用域影响。
+- BytesEncodingDetect：9/23 全等（其余大多 0.96-0.998，剩 hz 0.17 深水区）；
+  IOUtil 7/8；两文件合修 ~600 delta。
