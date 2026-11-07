@@ -3433,15 +3433,11 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                 return returnData.setErrorMsg("未配置书源")
             }
         }
-        val chapterList = if (book.isLocalBook()) {
-            getLocalChapterList(book, bookSource ?: "", false, userNameSpace)
-        } else {
-            WebBook(bookSource!!, appConfig.debugLog, userNameSpace = userNameSpace).getChapterList(book)
-        }
+        val chapterList = getLocalChapterList(book, bookSource ?: "", userNameSpace = userNameSpace)
         if (lastIndex >= chapterList.size) {
             return returnData.setErrorMsg("没有更多了")
         }
-        val resultList = arrayListOf<SearchResult>()
+        val resultList: MutableList<SearchResult> = arrayListOf()
         val isEnd = Ref.BooleanRef()
         context.request().connection().closeHandler { isEnd.element = true }
         logger.info("searchBookContent keyword: {} lastIndex: {}", keyword, lastIndex)
@@ -3450,7 +3446,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             val chapter = chapterList[currentIndex]
             currentIndex++
             val chapterResult = searchChapter(book, chapter, keyword)
-            if (chapterResult.isNotEmpty()) {
+            if (chapterResult.size > 0) {
                 resultList.addAll(chapterResult)
             }
             if (resultList.size < size && !isEnd.element && currentIndex < chapterList.size) {
