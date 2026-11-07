@@ -2599,8 +2599,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         var refresh: Int
         var concurrentCount: Int
         if (context.request().method() == HttpMethod.POST) {
-            val url = context.bodyAsJson.getString("url")
-            bookUrl = if (url != null) url else (context.bodyAsJson.getString("bookUrl") ?: "")
+            bookUrl = context.bodyAsJson.getString("url") ?: context.bodyAsJson.getString("bookUrl") ?: ""
             refresh = context.bodyAsJson.getInteger("refresh", 0)
             concurrentCount = context.bodyAsJson.getInteger("concurrentCount", 24)
         } else {
@@ -2625,24 +2624,27 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             response.end("data: " + jsonEncode(returnData.setErrorMsg("本地书籍无需缓存"), false) + "\n\n")
             return
         }
-        var bookSource = getBookSourceString(context, bookInfo.origin, false)
+        var bookSource = getBookSourceString(context, bookInfo.origin)
         if (bookSource.isNullOrEmpty()) {
             response.write("event: error\n")
             response.end("data: " + jsonEncode(returnData.setErrorMsg("未配置书源"), false) + "\n\n")
             return
         }
-        var chapterList = WebBook(bookSource, appConfig.debugLog, userNameSpace = userNameSpace)
-            .getChapterList(bookInfo)
+        var chapterList = getLocalChapterList(bookInfo, bookSource, userNameSpace = userNameSpace)
+
         val cachedChapterContentSet = Ref.ObjectRef<MutableSet<Int>>()
-        cachedChapterContentSet.element = getCachedChapterContentSet(bookInfo, userNameSpace)
+        cachedChapterContentSet.element = linkedSetOf()
+        if (refresh <= 0) {
+            cachedChapterContentSet.element = getCachedChapterContentSet(bookInfo, userNameSpace)
+        }
         val localCacheDir = getChapterCacheDir(bookInfo, userNameSpace)
         val isEnd = Ref.BooleanRef()
         val successCount = Ref.IntRef()
         val failedCount = Ref.IntRef()
         context.request().connection().closeHandler { isEnd.element = true }
-        val count = if (concurrentCount > 0) concurrentCount else 24
-        logger.info("cacheBookSSE concurrentCount: {} refresh: {}", count, refresh)
-        limitConcurrent(count, 0, chapterList.size, handler = { it ->
+        concurrentCount = if (concurrentCount > 0) concurrentCount else 24
+        logger.info("cacheBookSSE concurrentCount: {} refresh: {}", concurrentCount, refresh)
+        limitConcurrent(concurrentCount, 0, chapterList.size, handler = { it ->
             val chapterIndex = it
             if (!cachedChapterContentSet.element.contains(chapterIndex)) {
                 val chapterInfo = chapterList[chapterIndex]
