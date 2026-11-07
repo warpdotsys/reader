@@ -57,10 +57,10 @@ open class YueduApi : RestVerticle() {
 
     override suspend fun initRouter(router: Router) {
         setupPort()
-        if (appConfig.mongoUri.length > 0) {
+        if (!appConfig.mongoUri.isNullOrEmpty()) {
             MongoManager.connect(appConfig.mongoUri)
         }
-        if (appConfig.remoteWebviewApi.length > 0) {
+        if (!appConfig.remoteWebviewApi.isNullOrEmpty()) {
             RemoteWebview.setRemoteApi(appConfig.remoteWebviewApi)
         }
         ReaderAdapterHelper.setAdapter(ReaderAdapter)
