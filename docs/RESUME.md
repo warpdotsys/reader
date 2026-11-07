@@ -729,3 +729,25 @@ BookController.kt 的 $lambda-N（影响 $lambda-N 方法名和 $$inlined$ 类�
 - getLastBackFileFromWebdav：制品 16，本地 17（净 +1）
 - bookSourceDebugSSE/cacheBookSSE/searchBookContent：制品 18/19/30，本地 19/20/31（+1）
 ⇒ 本地在 841 行前少 1 个 lambda、在 1185-2570 段多 2 个。修编号需找到这两处源头（未完成）。
+
+
+## 2026-11-07 上午批（方法级 81→83/116 @ 4b32edb 之后）
+
+### 规律 30：`.put(k,v)` 直调 ≠ `map[k] = v` 下标设值
+下标设值走 inline `set` 算子 → 产生 `$i$f$` 标记 + 接收者/键/值三连溢出槽；
+`.put` 直调无标记无溢出。deleteBooks 两处 put 改直调后 0.949→0.9932。
+
+### 规律 31：`var` 局部在 checkNNE/智能转换处增稳定化副本
+`val` 读 [load] 直接用；`var` 读 [load; store t; load t; check; load t]（防并发改写）。
+deleteBooks 的 bookUrl 由 val 改 var 后 1.0000；getLocalChapterList 的 bookSourceObject
+val→var（预置 null）后 0.9928→0.9954。
+
+### 规律 32：`?.toIntOrNull()` ≠ `?.toInt()`
+制品用 `firstOrNull()?.toInt() ?: 0`（= Integer.parseInt + 空判），toIntOrNull 编译为
+StringsKt.toIntOrNull 不同。getBookshelf 改后 0.813→1.0000。
+
+### 规律 33：`return try {} catch {} finally {}` 表达式值形式
+syncFromWebdav 等：`return try { ...; true } catch { ...; false } finally {}`。
+
+### 规律 34：`val files: Array<File> = dir.listFiles()`（显式类型）
+checkNNE 消息 = 完整表达式 "dir.listFiles()"，forEach 直连（无 ?.）。

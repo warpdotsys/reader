@@ -1398,7 +1398,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         if (context.request().method() == HttpMethod.POST) {
             refresh = context.bodyAsJson.getInteger("refresh", 0)
         } else {
-            refresh = context.queryParam("refresh").firstOrNull()?.toIntOrNull() ?: 0
+            refresh = context.queryParam("refresh").firstOrNull()?.toInt() ?: 0
         }
         val bookList = getBookShelfBooks(refresh > 0, getUserNameSpace(context))
         return returnData.setData(bookList)
