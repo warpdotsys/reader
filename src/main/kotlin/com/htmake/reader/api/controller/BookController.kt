@@ -2234,22 +2234,21 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         }
         var bookSourceList = JsonArray()
         if (!replace) {
-            asJsonArray(
+            bookSourceList = asJsonArray(
                 getUserStorage(
                     userNameSpace,
                     book.name + '_' + book.author,
                     "bookSource"
                 )
-            )?.let {
-                bookSourceList = it
-            }
+            ) ?: bookSourceList
         }
-        val urlMap = linkedMapOf<String, Int>()
+        val urlMap: MutableMap<String, Int> = linkedMapOf()
         for (i in 0 until bookSourceList.size()) {
             val bookUrl: String = bookSourceList.getJsonObject(i).getString("bookUrl")
             urlMap[bookUrl] = i
         }
-        sourceList.forEach { searchBook ->
+        for (i in 0 until sourceList.size) {
+            val searchBook = sourceList[i]
             val existIndex = urlMap.getOrDefault(searchBook.bookUrl, -1)
             if (existIndex >= 0) {
                 bookSourceList.set(existIndex, JsonObject.mapFrom(searchBook))
