@@ -751,3 +751,14 @@ syncFromWebdav 等：`return try { ...; true } catch { ...; false } finally {}`�
 
 ### 规律 34：`val files: Array<File> = dir.listFiles()`（显式类型）
 checkNNE 消息 = 完整表达式 "dir.listFiles()"，forEach 直连（无 ?.）。
+
+### 规律 35：制品 LVT 里没有的中间 val 一律内联
+本地自造 `val x = F(k)` 再 `x.g(...)` 会在 LVT 里多出一个变量名；制品直接
+`F(k).g(...)`。bookSourceController 四方法内联后 +10~15 点（searchBookMulti 0.834→0.998）。
+同类：`BookSourceController(coroutineContext).getBookSourceMap(...)`。
+
+### 规律 36：`jsonEncode(...)!!` 的 !! 要去掉
+制品无 checkNotNull（!! 产生 dup+checkNotNull 两指令）。全文件 10 处已清。
+
+### 规律 37：`key.length == 0` → `key.isNullOrEmpty()`
+制品用 isNullOrEmpty 两标记内联形态（cs-cast + 2 markers + null 化）。SSE 0.985→0.998。
