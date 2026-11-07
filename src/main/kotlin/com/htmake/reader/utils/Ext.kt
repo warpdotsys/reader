@@ -3,6 +3,7 @@ package com.htmake.reader.utils
 
 import com.fasterxml.jackson.core.JsonToken
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
@@ -564,7 +565,8 @@ fun parseJsonStringList(
                             if (currentIndex > endIndex) {
                                 break
                             }
-                            val objectNode = parser.readValueAsTree<ObjectNode>()
+                            val jsonNode: JsonNode = parser.readValueAsTree()
+                            val objectNode = jsonNode as ObjectNode
                             if (!exclude.isNullOrEmpty()) {
                                 exclude.forEach {
                                     objectNode.remove(it)
@@ -572,7 +574,8 @@ fun parseJsonStringList(
                             }
                             resultList.add(objectNode.toString())
                         } else {
-                            val objectNode = parser.readValueAsTree<ObjectNode>()
+                            val jsonNode: JsonNode = parser.readValueAsTree()
+                            val objectNode = jsonNode as ObjectNode
                             if (filter.invoke(objectNode)) {
                                 currentIndex++
                             }
