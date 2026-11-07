@@ -732,11 +732,14 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             val matcher = AppPattern.imgPattern.matcher(text)
             while (matcher.find()) {
                 val src = matcher.group(1) ?: continue
-                val imageUrlSrc = NetworkUtils.getAbsoluteURL(chapter.url, src)
-                val imageFile = BookHelp.getImage(book, imageUrlSrc)
-                if (src.indexOf("__API_ROOT__") >= 0 || !imageFile.exists()) continue
-                val imageUrl = "__API_ROOT__" + imageFile.path.replace(dataDir, "/book-assets")
-                text1 = text1.replace(src, imageUrl + "\" data-error=\"" + src)
+                if ("__API_ROOT__" !in src) {
+                    val imageUrlSrc = NetworkUtils.getAbsoluteURL(chapter.url, src)
+                    val imageFile = BookHelp.getImage(book, imageUrlSrc)
+                    if (imageFile.exists()) {
+                        val imageUrl = "__API_ROOT__" + imageFile.path.replace(dataDir, "/book-assets")
+                        text1 = text1.replace(src, imageUrl + "\" data-error=\"" + src)
+                    }
+                }
             }
             data.append(text1).append("\n")
         }
