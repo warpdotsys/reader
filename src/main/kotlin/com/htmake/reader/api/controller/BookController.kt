@@ -3301,12 +3301,12 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                 epubBook.coverImage = Resource(byteArray, "Images/cover.jpg")
                 return
             }
-            val bookSource = BookSource.fromJson(bookSourceString).getOrNull()
-            val analyzeUrl = AnalyzeUrl(coverUrl, source = bookSource)
+            val analyzeUrl = AnalyzeUrl(
+                coverUrl,
+                source = BookSource.fromJson(bookSourceString).getOrNull()
+            )
             try {
-                analyzeUrl.getByteArrayAwait()?.let {
-                    epubBook.coverImage = Resource(it, "Images/cover.jpg")
-                }
+                epubBook.coverImage = Resource(analyzeUrl.getByteArrayAwait(), "Images/cover.jpg")
             } catch (e: Exception) {
                 e.printStackTrace()
             }
