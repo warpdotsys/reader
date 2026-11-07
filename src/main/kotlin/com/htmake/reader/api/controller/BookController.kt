@@ -335,7 +335,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         }
         val userNameSpace = getUserNameSpace(context)
         val txtTocRules = getUserStorage(userNameSpace, "txtTocRule")
-        val rules = arrayListOf<TxtTocRule>()
+        val rules: MutableList<TxtTocRule> = arrayListOf()
         rules.addAll(DefaultData.txtTocRules)
         if (txtTocRules != null) {
             val customRule = GSON.fromJsonArray<TxtTocRule>(txtTocRules).getOrNull() ?: emptyList()
@@ -1854,9 +1854,8 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         saveUserStorage(userNameSpace, "bookshelf", bookshelf)
         val localBookPath = File(getWorkDir("storage", "data", userNameSpace, bookName + '_' + bookAuthor))
         localBookPath.deleteRecursively()
-        val coverUrl = existBook.getString("coverUrl")
-        if (!coverUrl.isNullOrEmpty() && coverUrl.startsWith("/")) {
-            FileUtils.deleteFile(getWorkDir("storage" + existBook.getString("coverUrl")))
+        if (!existBook.getString("coverUrl").isNullOrEmpty() && existBook.getString("coverUrl")!!.startsWith("/")) {
+            FileUtils.deleteFile(getWorkDir("storage", existBook.getString("coverUrl")!!))
         }
         return returnData.setData("删除书籍成功")
     }
@@ -2709,10 +2708,10 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         if (bookUrlList.size() <= 0) {
             return returnData.setErrorMsg("请输入书籍链接")
         }
-        val userNameSpace = getUserNameSpace(context)
         val exceptionHandler = CoroutineExceptionHandler { _, ex ->
             logger.info("cacheBookOnServer error: {}", ex.message)
         }
+        val userNameSpace = getUserNameSpace(context)
         launch(MDCContext() + Dispatchers.IO + exceptionHandler) {
             cacheBookOnServer(bookUrlList, userNameSpace)
         }
