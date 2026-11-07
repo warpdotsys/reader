@@ -148,8 +148,8 @@ extends Encoding {
         float freqval = 0.0f;
         rawtextlen = rawtext.length;
         for (i = 0; i < rawtextlen - 1; ++i) {
-            int column;
             int row;
+            int column;
             if (rawtext[i] >= 0) continue;
             ++dbchars;
             if (-95 <= rawtext[i] && rawtext[i] <= -9 && -95 <= rawtext[i + 1] && rawtext[i + 1] <= -2) {
@@ -189,8 +189,8 @@ extends Encoding {
         float freqval = 0.0f;
         rawtextlen = rawtext.length;
         for (i = 0; i < rawtextlen - 1; ++i) {
-            int column;
             int row;
+            int column;
             if (rawtext[i] >= 0) continue;
             ++dbchars;
             if (-95 <= rawtext[i] && rawtext[i] <= -9 && i + 1 < rawtextlen && -95 <= rawtext[i + 1] && rawtext[i + 1] <= -2) {
@@ -238,8 +238,8 @@ extends Encoding {
                 ++hzstart;
                 i += 2;
                 while (i < rawtextlen - 1 && rawtext[i] != 10 && rawtext[i] != 13) {
-                    int column;
                     int row;
+                    int column;
                     if (rawtext[i] == 126 && rawtext[i + 1] == 125) {
                         ++hzend;
                         ++i;
@@ -326,8 +326,8 @@ extends Encoding {
         float freqval = 0.0f;
         rawtextlen = rawtext.length;
         for (i = 0; i < rawtextlen - 1; ++i) {
-            int column;
             int row;
+            int column;
             if (rawtext[i] >= 128) continue;
             ++dbchars;
             if (161 <= rawtext[i] && rawtext[i] <= 249 && (64 <= rawtext[i + 1] && rawtext[i + 1] <= 126 || 161 <= rawtext[i + 1] && rawtext[i + 1] <= 254)) {
@@ -402,8 +402,8 @@ extends Encoding {
         float freqval = 0.0f;
         rawtextlen = rawtext.length;
         for (i = 0; i < rawtextlen - 1; ++i) {
-            int column;
             int row;
+            int column;
             if (rawtext[i] != 27 || i + 3 >= rawtextlen) continue;
             if (rawtext[i + 1] == 36 && rawtext[i + 2] == 41 && rawtext[i + 3] == 65) {
                 i += 4;
@@ -551,8 +551,8 @@ extends Encoding {
             if (rawtext[i] >= 0) continue;
             ++dbchars;
             if (-127 <= rawtext[i] && rawtext[i] <= -2 && (65 <= rawtext[i + 1] && rawtext[i + 1] <= 90 || 97 <= rawtext[i + 1] && rawtext[i + 1] <= 122 || -127 <= rawtext[i + 1] && rawtext[i + 1] <= -2)) {
-                int column;
                 int row;
+                int column;
                 ++krchars;
                 totalfreq += 500L;
                 if (-95 <= rawtext[i] && rawtext[i] <= -2 && -95 <= rawtext[i + 1] && rawtext[i + 1] <= -2 && this.KRFreq[row = rawtext[i] + 256 - 161][column = rawtext[i + 1] + 256 - 161] != 0) {
