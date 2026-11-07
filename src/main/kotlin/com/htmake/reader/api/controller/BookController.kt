@@ -1074,7 +1074,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         searchSize.element = if (searchSize.element > 0) searchSize.element else 5
         val resultList = Ref.ObjectRef<ArrayList<SearchBook>>()
         resultList.element = arrayListOf()
-        val concurrentCount = max(searchSize.element * 2, 24)
+        val concurrentCount = Math.max(searchSize.element * 2, 24)
         val maxSize = Ref.IntRef()
         maxSize.element = urlMap.size
         val bookSourceFile = Ref.ObjectRef<File>()
@@ -1193,7 +1193,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         searchSize.element = if (searchSize.element > 0) searchSize.element else 30
         val resultList = Ref.ObjectRef<ArrayList<SearchBook>>()
         resultList.element = arrayListOf()
-        val concurrentCount = max(searchSize.element * 2, 24)
+        val concurrentCount = Math.max(searchSize.element * 2, 24)
         logger.info(
             "searchBookMulti from lastIndex: {} concurrentCount: {} searchSize: {}",
             lastIndex.element, concurrentCount, searchSize.element
