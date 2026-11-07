@@ -818,7 +818,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         if (urlMap.size <= 0) {
             return returnData.setErrorMsg("未配置书源")
         }
-        if (key.length == 0) {
+        if (key.isNullOrEmpty()) {
             return returnData.setErrorMsg("请输入搜索关键字")
         }
         var accurate = false
@@ -927,13 +927,13 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         val urlMap = BookSourceController(coroutineContext).getBookSourceMap(userNameSpace)
         if (urlMap.size <= 0) {
             response.write("event: error\n")
-            response.end("data: " + jsonEncode(returnData.setErrorMsg("未配置书源"), false)!! + "\n\n")
+            response.end("data: " + jsonEncode(returnData.setErrorMsg("未配置书源"), false) + "\n\n")
             return
         }
-        if (key.length == 0) {
+        if (key.isNullOrEmpty()) {
             response.write("event: error\n")
             response.end(
-                "data: " + jsonEncode(returnData.setErrorMsg("请输入搜索关键字"), false)!! + "\n\n"
+                "data: " + jsonEncode(returnData.setErrorMsg("请输入搜索关键字"), false) + "\n\n"
             )
             return
         }
@@ -945,13 +945,13 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         if (key.isNullOrEmpty()) {
             response.write("event: error\n")
             response.end(
-                "data: " + jsonEncode(returnData.setErrorMsg("请输入搜索关键字"), false)!! + "\n\n"
+                "data: " + jsonEncode(returnData.setErrorMsg("请输入搜索关键字"), false) + "\n\n"
             )
             return
         }
         if (lastIndex >= urlMap.size - 1) {
             response.write("event: error\n")
-            response.end("data: " + jsonEncode(returnData.setErrorMsg("没有更多了"), false)!! + "\n\n")
+            response.end("data: " + jsonEncode(returnData.setErrorMsg("没有更多了"), false) + "\n\n")
             return
         }
         searchSize = if (searchSize > 0) searchSize else 50
@@ -1158,13 +1158,13 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         val urlMap = BookSourceController(coroutineContext).getBookSourceMap(userNameSpace.element)
         if (urlMap.size <= 0) {
             response.write("event: error\n")
-            response.end("data: " + jsonEncode(returnData.setErrorMsg("未配置书源"), false)!! + "\n\n")
+            response.end("data: " + jsonEncode(returnData.setErrorMsg("未配置书源"), false) + "\n\n")
             return
         }
         if (bookUrl.isEmpty()) {
             response.write("event: error\n")
             response.end(
-                "data: " + jsonEncode(returnData.setErrorMsg("请输入书籍链接"), false)!! + "\n\n"
+                "data: " + jsonEncode(returnData.setErrorMsg("请输入书籍链接"), false) + "\n\n"
             )
             return
         }
@@ -1176,7 +1176,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         if (book.element == null) {
             response.write("event: error\n")
             response.end(
-                "data: " + jsonEncode(returnData.setErrorMsg("书籍信息错误"), false)!! + "\n\n"
+                "data: " + jsonEncode(returnData.setErrorMsg("书籍信息错误"), false) + "\n\n"
             )
             return
         }
@@ -2609,19 +2609,19 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         }
         if (bookUrl.isEmpty()) {
             response.write("event: error\n")
-            response.end("data: " + jsonEncode(returnData.setErrorMsg("请输入书籍链接"), false)!! + "\n\n")
+            response.end("data: " + jsonEncode(returnData.setErrorMsg("请输入书籍链接"), false) + "\n\n")
             return
         }
         var userNameSpace = getUserNameSpace(context)
         val bookInfo = getShelfBookByURL(bookUrl, userNameSpace)
         if (bookInfo == null) {
             response.write("event: error\n")
-            response.end("data: " + jsonEncode(returnData.setErrorMsg("请先加入书架"), false)!! + "\n\n")
+            response.end("data: " + jsonEncode(returnData.setErrorMsg("请先加入书架"), false) + "\n\n")
             return
         }
         if (bookInfo.isLocalBook()) {
             response.write("event: error\n")
-            response.end("data: " + jsonEncode(returnData.setErrorMsg("本地书籍无需缓存"), false)!! + "\n\n")
+            response.end("data: " + jsonEncode(returnData.setErrorMsg("本地书籍无需缓存"), false) + "\n\n")
             return
         }
         var bookSource = getBookSourceString(context, bookInfo.origin, false)
