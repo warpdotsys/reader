@@ -1878,24 +1878,26 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         }
         val infoMap: MutableMap<String, Int> = linkedMapOf()
         for (i in 0 until bookJsonArray.size()) {
-            infoMap[bookJsonArray.getJsonObject(i).getString("bookUrl", "")] = i
-            infoMap[bookJsonArray.getJsonObject(i).getString("name", "") + '_' +
-                bookshelf.getJsonObject(i).getString("author", "")] = i
+            infoMap.put(bookJsonArray.getJsonObject(i).getString("bookUrl", ""), i)
+            infoMap.put(bookJsonArray.getJsonObject(i).getString("name", "") + '_' +
+                bookshelf.getJsonObject(i).getString("author", ""), i)
         }
         val iterator = bookshelf.iterator()
         while (iterator.hasNext()) {
             val book = iterator.next() as JsonObject
             val bookName = book.getString("name", "")
             val bookAuthor = book.getString("author", "")
-            val bookUrl = book.getString("bookUrl", "")
+            var bookUrl = book.getString("bookUrl", "")
             val existIndex = infoMap.getOrDefault(
                 bookUrl,
                 infoMap.getOrDefault(bookName + '_' + bookAuthor, -1)
             )
-            if (existIndex < 0) continue
-            iterator.remove()
-            val localBookPath = File(getWorkDir("storage", "data", userNameSpace, bookName + '_' + bookAuthor))
-            localBookPath.deleteRecursively()
+            if (existIndex >= 0) {
+                iterator.remove()
+                val localBookPath =
+                    File(getWorkDir("storage", "data", userNameSpace, bookName + '_' + bookAuthor))
+                localBookPath.deleteRecursively()
+            }
         }
         saveUserStorage(userNameSpace, "bookshelf", bookshelf)
         return returnData.setData("")
