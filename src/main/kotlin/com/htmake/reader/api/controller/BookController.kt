@@ -2452,8 +2452,8 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
 
     suspend fun saveToWebdav(userNameSpace: String, latestZipFilePath: String? = null): Boolean {
         val userHome = getUserWebdavHome(userNameSpace)
-        val _latestZipFilePath = latestZipFilePath ?: getLastBackFileFromWebdav(userNameSpace)
         var legadoHome = userHome
+        val _latestZipFilePath = latestZipFilePath ?: getLastBackFileFromWebdav(userNameSpace)
         if (_latestZipFilePath == null) {
             legadoHome = userHome + File.separator + "legado"
         } else if (_latestZipFilePath.indexOf("legado") > 0) {
