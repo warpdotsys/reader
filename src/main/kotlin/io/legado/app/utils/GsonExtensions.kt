@@ -26,21 +26,21 @@ val GSON: Gson by lazy {
 inline fun <reified T> genericType(): Type = object : TypeToken<T>() {}.type
 
 inline fun <reified T> Gson.fromJsonObject(json: String?): Result<T?> =
-    runCatching { fromJson<T>(json, genericType<T>()) }
+    runCatching { this.fromJson<T>(json, genericType<T>()) as T }
 
 inline fun <reified T> Gson.fromJsonArray(json: String?): Result<List<T>?> =
-    runCatching { fromJson<List<T>>(json, ParameterizedTypeImpl(T::class.java)) }
+    runCatching { this.fromJson(json, ParameterizedTypeImpl(T::class.java)) as? List<T> }
 
 inline fun <reified T> Gson.fromJsonObject(inputStream: InputStream?): Result<T?> =
     runCatching {
         val reader = InputStreamReader(inputStream)
-        fromJson<T>(reader, genericType<T>())
+        this.fromJson<T>(reader, genericType<T>()) as T
     }
 
 inline fun <reified T> Gson.fromJsonArray(inputStream: InputStream?): Result<List<T>?> =
     runCatching {
         val reader = InputStreamReader(inputStream)
-        fromJson<List<T>>(reader, ParameterizedTypeImpl(T::class.java))
+        this.fromJson(reader, ParameterizedTypeImpl(T::class.java)) as? List<T>
     }
 
 fun Gson.writeToOutputStream(out: OutputStream, any: Any) {
