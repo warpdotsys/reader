@@ -289,7 +289,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                     return returnData.setErrorMsg("不支持导入${ext}格式的书籍文件")
                 }
                 fileName = FileUtils.getNameExcludeExtension(fileName)
-                fileName = AppPattern.fileNameRegex.replace(fileName, "")
+                fileName = AppPattern.fileNameRegex.replace(fileName!!, "")
                 fileName = fileName.substring(0, Math.min(50, fileName.length)) + "." + ext
                 val localFilePath =
                     Paths.get("storage", "assets", userNameSpace, "book", fileName).toString()
