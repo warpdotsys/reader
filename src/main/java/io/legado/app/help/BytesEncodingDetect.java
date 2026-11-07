@@ -441,11 +441,12 @@ extends Encoding {
 
     int utf8_probability(byte[] rawtext) {
         int score = 0;
+        int i;
         int rawtextlen = 0;
         int goodbytes = 0;
         int asciibytes = 0;
         rawtextlen = rawtext.length;
-        for (int i = 0; i < rawtextlen; ++i) {
+        for (i = 0; i < rawtextlen; i++) {
             if ((rawtext[i] & 0x7F) == rawtext[i]) {
                 ++asciibytes;
                 continue;
@@ -481,15 +482,15 @@ extends Encoding {
 
     int ascii_probability(byte[] rawtext) {
         int score = 75;
-        int rawtextlen = rawtext.length;
-        for (int i = 0; i < rawtextlen; ++i) {
+        int i;
+        int n = rawtext.length;
+        for (i = 0; i < n; i++) {
             if (rawtext[i] < 0) {
-                score -= 5;
+                score = score - 5;
             } else if (rawtext[i] == 27) {
-                score -= 5;
+                score = score - 5;
             }
-            if (score > 0) continue;
-            return 0;
+            if (score <= 0) return 0;
         }
         return score;
     }

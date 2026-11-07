@@ -445,14 +445,11 @@ class BookSourceController(coroutineContext: CoroutineContext) : BaseController(
         userNameSpace: String,
         bookSourceList: JsonArray? = null
     ): Map<String, Int> {
-        var bookSourceJsonArray = bookSourceList ?: getUserBookSourceJson(userNameSpace)
-        if (bookSourceJsonArray == null) {
-            bookSourceJsonArray = JsonArray()
-        }
+        val bookSourceJsonArray = bookSourceList ?: getUserBookSourceJson(userNameSpace) ?: JsonArray()
         val urlMap = LinkedHashMap<String, Int>()
         val exploreList = ArrayList<Map<String, String?>>()
         for (i in 0 until bookSourceJsonArray.size()) {
-            urlMap[bookSourceJsonArray.getJsonObject(i).getString("bookSourceUrl")] = i
+            urlMap.put(bookSourceJsonArray.getJsonObject(i).getString("bookSourceUrl"), i)
             val exploreUrl = bookSourceJsonArray.getJsonObject(i).getString("exploreUrl")
             if (exploreUrl.isNullOrEmpty()) continue
             exploreList.add(
