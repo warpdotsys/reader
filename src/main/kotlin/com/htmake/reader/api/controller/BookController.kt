@@ -2981,28 +2981,32 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                     return stream
                 }
             } catch (e: Exception) {
-                if (e is CancellationException) throw e
-                if (e is ScriptException || e is WrappedException) {
-                    logger.error("js错误\n" + e.localizedMessage, e)
-                    throw e
+                when (e) {
+                    is CancellationException -> throw e
+                    is ScriptException, is WrappedException -> {
+                        logger.error("js错误\n" + e.localizedMessage, e)
+                        throw e
+                    }
+                    is SocketTimeoutException, is ConnectException -> {
+                        downloadErrorNo.element++
+                        if (downloadErrorNo.element <= 5) continue
+                        val msg = "tts超时或连接错误超过5次\n" + e.localizedMessage
+                        logger.error(msg, e)
+                        throw e
+                    }
+                    else -> {
+                        downloadErrorNo.element++
+                        val msg = "tts下载错误\n" + e.localizedMessage
+                        logger.error(msg, e)
+                        if (downloadErrorNo.element > 5) {
+                            val msg1 = "TTS服务器连续5次错误，已暂停阅读。"
+                            logger.error(msg1, e)
+                            throw e
+                        }
+                        logger.error("TTS下载音频出错，使用无声音频代替。\n朗读文本：$speakText")
+                        return null
+                    }
                 }
-                if (e is SocketTimeoutException || e is ConnectException) {
-                    downloadErrorNo.element++
-                    if (downloadErrorNo.element <= 5) continue
-                    val msg = "tts超时或连接错误超过5次\n" + e.localizedMessage
-                    logger.error(msg, e)
-                    throw e
-                }
-                downloadErrorNo.element++
-                val msg = "tts下载错误\n" + e.localizedMessage
-                logger.error(msg, e)
-                if (downloadErrorNo.element > 5) {
-                    val msg1 = "TTS服务器连续5次错误，已暂停阅读。"
-                    logger.error(msg1, e)
-                    throw e
-                }
-                logger.error("TTS下载音频出错，使用无声音频代替。\n朗读文本：$speakText")
-                return null
             }
         }
     }
