@@ -208,8 +208,9 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             bookInfo = getShelfBookByURL(bookUrl, userNameSpace)
         }
         if (bookInfo == null) {
-            bookInfo = bookInfoCache.getAsString(bookUrl)?.toMap()?.toDataClass<Book>()
             var bookSource: String? = null
+            val cacheInfo = bookInfoCache.getAsString(bookUrl)
+            bookInfo = cacheInfo?.toMap()?.toDataClass<Book>()
             if (bookInfo != null) {
                 bookSource = getBookSourceString(context, bookInfo.origin)
             }
@@ -226,9 +227,8 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             ).getBookInfo(bookUrl)
             bookInfo = mergeBookCacheInfo(bookInfo)
         }
-        val book = bookInfo
-        saveBookInfoCache(arrayListOf(book))
-        return returnData.setData(book)
+        saveBookInfoCache(arrayListOf(bookInfo!!))
+        return returnData.setData(bookInfo)
     }
 
     suspend fun getBookCover(context: RoutingContext) {
