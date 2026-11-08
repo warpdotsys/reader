@@ -89,7 +89,7 @@ public class NCXDocumentV3 {
         if (navpoints == null) {
             return new ArrayList<TOCReference>();
         }
-        ArrayList<TOCReference> result2 = new ArrayList<TOCReference>(navpoints.getLength());
+        List<TOCReference> result2 = new ArrayList<TOCReference>(navpoints.getLength());
         for (int i = 0; i < navpoints.getLength(); ++i) {
             Node node = navpoints.item(i);
             if (node == null || node.getNodeType() != 1) continue;
