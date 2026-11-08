@@ -118,12 +118,12 @@ fun File.deleteRecursively() {
 }
 
 fun File.listFilesRecursively(): List<File> {
-    val list = ArrayList<File>()
+    val list = arrayListOf<File>()
     if (exists()) {
         if (isFile) {
             list.add(this)
         } else {
-            listFiles().forEach {
+            this.listFiles().forEach {
                 list.add(it)
                 if (it.isDirectory) {
                     list.addAll(it.listFilesRecursively())
@@ -699,8 +699,8 @@ fun jsonEncode(value: Any, pretty: Boolean = false): String {
 }
 
 fun File.deepListFiles(allowExtensions: Array<String>?): List<File> {
-    val fileList = ArrayList<File>()
-    listFiles().forEach {
+    val fileList = arrayListOf<File>()
+    this.listFiles().forEach {
         if (it.isDirectory) {
             fileList.addAll(it.deepListFiles(allowExtensions))
         } else {
