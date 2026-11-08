@@ -736,7 +736,7 @@ open class YueduApi : RestVerticle() {
 
     @Scheduled(cron = "0 59 23 * * ?")
     fun clearUser() {
-        if (appConfig.autoClearInactiveUser <= 0 || appConfig.secure) {
+        if (appConfig.autoClearInactiveUser <= 0 || !appConfig.secure) {
             return
         }
         MDC.put("traceId", getTraceId())
@@ -785,7 +785,7 @@ open class YueduApi : RestVerticle() {
     @Scheduled(cron = "0 4/15 7-23 * * ?")
     fun checkLicense() {
         val license = getInstalledLicense(true)
-        if ("default" == license.type) {
+        if ("default".equals(license.type)) {
             return
         }
         MDC.put("traceId", getTraceId())

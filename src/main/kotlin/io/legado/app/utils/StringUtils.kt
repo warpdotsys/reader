@@ -259,7 +259,7 @@ object StringUtils {
         val m = p.matcher(data)
         val buf = StringBuffer(data.length)
         while (m.find()) {
-            val ch = Integer.parseInt(m.group(1), 16).toChar().toString()
+            val ch = Integer.parseInt(m.group(1)!!, 16).toChar().toString()
             m.appendReplacement(buf, java.util.regex.Matcher.quoteReplacement(ch))
         }
         m.appendTail(buf)
