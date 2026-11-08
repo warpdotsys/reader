@@ -62,10 +62,9 @@ public class CharsetDetector {
         ArrayList<CharsetMatch> matches = new ArrayList<CharsetMatch>();
         this.MungeInput();
         for (int i = 0; i < ALL_CS_RECOGNIZERS.size(); ++i) {
-            CharsetMatch m;
-            boolean active;
             CSRecognizerInfo rcinfo = ALL_CS_RECOGNIZERS.get(i);
-            boolean bl = active = this.fEnabledRecognizers != null ? this.fEnabledRecognizers[i] : rcinfo.isDefaultEnabled;
+            boolean active = this.fEnabledRecognizers != null ? this.fEnabledRecognizers[i] : rcinfo.isDefaultEnabled;
+            CharsetMatch m;
             if (!active || (m = rcinfo.recognizer.match(this)) == null) continue;
             matches.add(m);
         }

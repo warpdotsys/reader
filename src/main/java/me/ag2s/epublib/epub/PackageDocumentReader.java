@@ -203,10 +203,11 @@ extends PackageDocumentBase {
         }
         tocResource = resources.findFirstResourceByMediaType(MediaTypes.NCX);
         if (tocResource == null) {
-            String possibleNcxItemId;
-            String[] stringArray = POSSIBLE_NCX_ITEM_IDS;
-            int n = stringArray.length;
-            for (int i = 0; i < n && (tocResource = resources.getByIdOrHref(possibleNcxItemId = stringArray[i])) == null && (tocResource = resources.getByIdOrHref(possibleNcxItemId.toUpperCase())) == null; ++i) {
+            for (String possibleNcxItemId : POSSIBLE_NCX_ITEM_IDS) {
+                tocResource = resources.getByIdOrHref(possibleNcxItemId);
+                if (tocResource != null) break;
+                tocResource = resources.getByIdOrHref(possibleNcxItemId.toUpperCase());
+                if (tocResource != null) break;
             }
         }
         if (tocResource == null) {
@@ -216,21 +217,21 @@ extends PackageDocumentBase {
     }
 
     static Set<String> findCoverHrefs(Document packageDocument) {
-        String coverHref;
-        HashSet<String> result2 = new HashSet<String>();
+        Set<String> result = new HashSet<String>();
         String coverResourceId = DOMUtil.getFindAttributeValue(packageDocument, "http://www.idpf.org/2007/opf", "meta", "name", "cover", "content");
+        String coverHref;
         if (StringUtil.isNotBlank(coverResourceId)) {
             coverHref = DOMUtil.getFindAttributeValue(packageDocument, "http://www.idpf.org/2007/opf", "item", "id", coverResourceId, "href");
             if (StringUtil.isNotBlank(coverHref)) {
-                result2.add(coverHref);
+                result.add(coverHref);
             } else {
-                result2.add(coverResourceId);
+                result.add(coverResourceId);
             }
         }
         if (StringUtil.isNotBlank(coverHref = DOMUtil.getFindAttributeValue(packageDocument, "http://www.idpf.org/2007/opf", "reference", "type", "cover", "href"))) {
-            result2.add(coverHref);
+            result.add(coverHref);
         }
-        return result2;
+        return result;
     }
 
     private static void readCover(Document packageDocument, EpubBook book) {
