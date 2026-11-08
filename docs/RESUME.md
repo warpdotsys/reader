@@ -886,3 +886,15 @@ bcdiff 是更严口径（可能含注释/常量池文本残差），汇报全局
 - **Collection/List 接口声明** → invokeinterface（readCover 的 Collection.iterator、genSpine 的 List.iterator 实证）
 - **字符串常量不折叠** = 显式 StringBuilder.append 链（readManifest/findToc/readSpine 全线实证）
 - BytesEncodingDetect 剩余 11 个 0.96~0.998：utf8/sjis 的条件链尾双跳差异属编译器细粒度行为，暂挂
+
+## 2026-11-09 01:00 凌晨批次
+
+- v59 全量：**787/934**（84.3%），147 类仍有差异
+- YueduApi.clearUser 1.0（`!appConfig.secure` 取反修复——原移植漏了 `!`）
+- YueduApi.checkLicense 1.0（`"default".equals(license.type)` 常量当接收者；`==` 走 areEqual 是错的）
+- StringUtils.removeUTFCharacters 1.0（`m.group(1)!!`）
+- ExtKt.deepListFiles / listFilesRecursively：arrayListOf 标记 + 显式 this（0.966→0.986 / 0.958→0.986）
+- BookController.ttsByTextToSpeechCn：forEach 改 lambda 调用式（add 去 -23 后缀）
+- 新工具：`cache/scratch/bc/scan_close.py` + `scan_methods.json`（批量方法差异扫描器）
+- 规律：待收方法的判定看 `javap -c` 里 checkNotNullExpressionValue 的**消息字符串**——
+  直接暴露源码表达式写法（如 "file.absolutePath" vs "file.absoluteFile"、"{\n gson.toJson(value)\n }" 块形态）
