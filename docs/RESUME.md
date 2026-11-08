@@ -875,3 +875,14 @@ bcdiff 是更严口径（可能含注释/常量池文本残差），汇报全局
 - **javap 解析器必须容忍 throws 子句**（`^  [a-zA-Z].*\([^)]*\).*;\s*$`），否则方法体合并、数字全错
 - **三元 vs if/else 判定**：制品 `astore` 在分支内 = if/else 双赋值；值随栈走（goto 无 store）= 三元
 - **`String x;` 空声明也占槽位**（readNavLabel：label 先于 labelElement）
+
+## 2026-11-08 23:00 追加（Java 整类 8 连 + BytesEncodingDetect 13/23）
+
+整类清零（8）：EpubWriter / IOUtil / XmlStreamReader / NCXDocumentV2 / ResourcesLoader / NCXDocumentV3 / CharsetDetector / PackageDocumentReader。
+
+新规律：
+- **`&&` 正向包围 vs `||` 守卫**：制品单跳 `if_icmpXX` + 正向体 = 源码 `if (A && B && C) { body }`；
+  负向 `|| continue` 会产生 ifeq+goto 双跳（iso_2022_jp/kr 实证：&& 形式 1.0）
+- **Collection/List 接口声明** → invokeinterface（readCover 的 Collection.iterator、genSpine 的 List.iterator 实证）
+- **字符串常量不折叠** = 显式 StringBuilder.append 链（readManifest/findToc/readSpine 全线实证）
+- BytesEncodingDetect 剩余 11 个 0.96~0.998：utf8/sjis 的条件链尾双跳差异属编译器细粒度行为，暂挂
