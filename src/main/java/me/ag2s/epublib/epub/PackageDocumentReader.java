@@ -135,7 +135,7 @@ extends PackageDocumentBase {
     private static Spine readSpine(Document packageDocument, Resources resources, Map<String, String> idMapping) {
         Element spineElement = DOMUtil.getFirstElementByTagNameNS(packageDocument.getDocumentElement(), "http://www.idpf.org/2007/opf", "spine");
         if (spineElement == null) {
-            System.err.println(TAG + " Element " + "spine" + " not found in package document, generating one automatically");
+            System.err.println(new StringBuilder().append(TAG).append(" Element").append("spine").append(" not found in package document, generating one automatically").toString());
             return PackageDocumentReader.generateSpineFromResources(resources);
         }
         Spine result2 = new Spine();
@@ -149,7 +149,6 @@ extends PackageDocumentBase {
         }
         ArrayList<SpineReference> spineReferences = new ArrayList<SpineReference>(spineNodes.getLength());
         for (int i = 0; i < spineNodes.getLength(); ++i) {
-            Resource resource;
             Element spineItem = (Element)spineNodes.item(i);
             String itemref = DOMUtil.getAttribute(spineItem, "http://www.idpf.org/2007/opf", "idref");
             if (StringUtil.isBlank(itemref)) {
@@ -160,6 +159,7 @@ extends PackageDocumentBase {
             if (id == null) {
                 id = itemref;
             }
+            Resource resource;
             if ((resource = resources.getByIdOrHref(id)) == null) {
                 System.err.println(TAG + " resource with id '" + id + "' not found");
                 continue;
