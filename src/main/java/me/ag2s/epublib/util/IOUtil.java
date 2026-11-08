@@ -153,7 +153,6 @@ public class IOUtil {
 
     public static long copyLarge(InputStream input, OutputStream output, long inputOffset, long length, byte[] buffer) throws IOException {
         int bufferLength;
-        int read;
         if (inputOffset > 0L) {
             IOUtil.skipFully(input, inputOffset);
         }
@@ -165,6 +164,7 @@ public class IOUtil {
         if (length > 0L && length < (long)bufferLength) {
             bytesToRead = (int)length;
         }
+        int read;
         long totalRead = 0L;
         while (bytesToRead > 0 && -1 != (read = input.read(buffer, 0, bytesToRead))) {
             output.write(buffer, 0, read);
@@ -194,7 +194,6 @@ public class IOUtil {
     }
 
     public static long copyLarge(Reader input, Writer output, long inputOffset, long length, char[] buffer) throws IOException {
-        int read;
         if (inputOffset > 0L) {
             IOUtil.skipFully(input, inputOffset);
         }
@@ -205,6 +204,7 @@ public class IOUtil {
         if (length > 0L && length < (long)buffer.length) {
             bytesToRead = (int)length;
         }
+        int read;
         long totalRead = 0L;
         while (bytesToRead > 0 && -1 != (read = input.read(buffer, 0, bytesToRead))) {
             output.write(buffer, 0, read);
