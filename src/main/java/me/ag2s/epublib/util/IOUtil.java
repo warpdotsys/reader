@@ -98,8 +98,8 @@ public class IOUtil {
     }
 
     public static long copy(Reader input, Appendable output, CharBuffer buffer) throws IOException {
-        int n;
         long count = 0L;
+        int n;
         while (-1 != (n = input.read(buffer))) {
             buffer.flip();
             output.append(buffer, 0, n);
@@ -179,8 +179,8 @@ public class IOUtil {
     }
 
     public static long copyLarge(Reader input, Writer output, char[] buffer) throws IOException {
-        int n;
         long count = 0L;
+        int n;
         while (-1 != (n = input.read(buffer))) {
             output.write(buffer, 0, n);
             count += (long)n;
