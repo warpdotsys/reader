@@ -137,9 +137,10 @@ public class NCXDocumentV3 {
     }
 
     private static String readNavLabel(Element navpointElement) {
+        String label;
         Element labelElement = DOMUtil.getFirstElementByTagNameNS(navpointElement, "", "a");
         assert (labelElement != null);
-        String label = labelElement.getTextContent();
+        label = labelElement.getTextContent();
         if (StringUtil.isNotBlank(label)) {
             return label;
         }
