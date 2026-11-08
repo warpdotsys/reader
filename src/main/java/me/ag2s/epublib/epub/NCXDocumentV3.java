@@ -93,8 +93,9 @@ public class NCXDocumentV3 {
         for (int i = 0; i < navpoints.getLength(); ++i) {
             Node node = navpoints.item(i);
             Element el;
-            if (node == null || node.getNodeType() != 1 || !(el = (Element)node).getTagName().equals("li")) continue;
-            result2.add(NCXDocumentV3.readTOCReference(el, book));
+            if (node != null && node.getNodeType() == 1 && (el = (Element)node).getTagName().equals("li")) {
+                result2.add(NCXDocumentV3.readTOCReference(el, book));
+            }
         }
         return result2;
     }
