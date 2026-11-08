@@ -839,3 +839,21 @@ CharSequence.length; ifle; iconst_1; goto; iconst_0]（2 标记 + ifle 结构）
   **catch 变量槽位**受 try 内局部变量作用域影响。
 - BytesEncodingDetect：9/23 全等（其余大多 0.96-0.998，剩 hz 0.17 深水区）；
   IOUtil 7/8；两文件合修 ~600 delta。
+
+## 2026-11-08 下午批（Java 类连环修 + v58 基线）
+
+### 已修（本轮）
+- BytesEncodingDetect：hz 0.174→0.974（rawtextlen 声明位）、cp949/detectEncoding(URL)/sjis/构造器转正，
+  现 11/23 全等、其余 0.96~0.998
+- IOUtil 7/8、CharsetDetector 10/13（List 接口类型、正条件包裹、detectAll 合取式最优）、
+  PackageDocumentReader 两难方法 0.675→0.963 / 0.712→0.981
+- v58 全局：类级 779/934 不变，delta 54,966→54,918；CharsetDetector 295→161、PackageDocumentReader 327→276
+
+### 指标口径注意
+bcdiff 的 total_delta 与本地方法级 LCS 比率不完全对应（如 hz 方法级 ratio 0.974 但 bcdiff delta 249）——
+bcdiff 是更严口径（可能含注释/常量池文本残差），汇报全局百分比时按 bcdiff、判断单方法是否对齐按方法级 LCS。
+
+### 下一步队列
+- CharsetDetector：MungeInput（phantom slot3 疑为提前声明）、setText(InputStream) 变量序
+- epublib：readSpine/readCover/readManifest（0.87~0.98）、NCXDocumentV3、XmlStreamReader
+- icu4j 其余：CharsetMatch、CharsetRecog_2022/UTF8/mbcs、sbcs
