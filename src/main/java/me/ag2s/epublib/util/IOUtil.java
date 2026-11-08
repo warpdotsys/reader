@@ -220,7 +220,11 @@ public class IOUtil {
         if (toSkip < 0L) {
             throw new IllegalArgumentException("Skip count must be non-negative, actual: " + toSkip);
         }
-        for (remain = toSkip; remain > 0L && (n = (long)input.read(SKIP_BYTE_BUFFER, 0, (int)Math.min(remain, (long)SKIP_BYTE_BUFFER.length))) >= 0L; remain -= n) {
+        for (remain = toSkip; remain > 0L; remain -= n) {
+            n = (long)input.read(SKIP_BYTE_BUFFER, 0, (int)Math.min(remain, (long)SKIP_BYTE_BUFFER.length));
+            if (n < 0L) {
+                break;
+            }
         }
         return toSkip - remain;
     }
@@ -250,7 +254,11 @@ public class IOUtil {
         if (SKIP_CHAR_BUFFER == null) {
             SKIP_CHAR_BUFFER = new char[SKIP_BYTE_BUFFER.length];
         }
-        for (remain = toSkip; remain > 0L && (n = (long)input.read(SKIP_CHAR_BUFFER, 0, (int)Math.min(remain, (long)SKIP_BYTE_BUFFER.length))) >= 0L; remain -= n) {
+        for (remain = toSkip; remain > 0L; remain -= n) {
+            n = (long)input.read(SKIP_CHAR_BUFFER, 0, (int)Math.min(remain, (long)SKIP_BYTE_BUFFER.length));
+            if (n < 0L) {
+                break;
+            }
         }
         return toSkip - remain;
     }
