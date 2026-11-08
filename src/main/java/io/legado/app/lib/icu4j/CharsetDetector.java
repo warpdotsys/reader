@@ -176,9 +176,8 @@ public class CharsetDetector {
     public String[] getDetectableCharsets() {
         ArrayList<String> csnames = new ArrayList<String>(ALL_CS_RECOGNIZERS.size());
         for (int i = 0; i < ALL_CS_RECOGNIZERS.size(); ++i) {
-            boolean active;
             CSRecognizerInfo rcinfo = ALL_CS_RECOGNIZERS.get(i);
-            boolean bl = active = this.fEnabledRecognizers == null ? rcinfo.isDefaultEnabled : this.fEnabledRecognizers[i];
+            boolean active = this.fEnabledRecognizers == null ? rcinfo.isDefaultEnabled : this.fEnabledRecognizers[i];
             if (!active) continue;
             csnames.add(rcinfo.recognizer.getName());
         }
@@ -187,9 +186,9 @@ public class CharsetDetector {
 
     @Deprecated
     public CharsetDetector setDetectableCharset(String encoding, boolean enabled) {
-        int i;
         int modIdx = -1;
         boolean isDefaultVal = false;
+        int i;
         for (i = 0; i < ALL_CS_RECOGNIZERS.size(); ++i) {
             CSRecognizerInfo csrinfo = ALL_CS_RECOGNIZERS.get(i);
             if (!csrinfo.recognizer.getName().equals(encoding)) continue;
