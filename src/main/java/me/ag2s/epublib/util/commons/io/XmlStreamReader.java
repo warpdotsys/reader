@@ -283,18 +283,21 @@ extends Reader {
     static String getContentTypeEncoding(String httpContentType) {
         String encoding = null;
         int i;
-        if (httpContentType != null && (i = httpContentType.indexOf(";")) > -1) {
-            String postMime = httpContentType.substring(i + 1);
-            Matcher m = CHARSET_PATTERN.matcher(postMime);
-            if (m.find()) {
-                encoding = m.group(1);
-            } else {
-                encoding = null;
-            }
-            if (encoding != null) {
-                encoding = encoding.toUpperCase(Locale.ROOT);
-            } else {
-                encoding = null;
+        if (httpContentType != null) {
+            i = httpContentType.indexOf(";");
+            if (i > -1) {
+                String postMime = httpContentType.substring(i + 1);
+                Matcher m = CHARSET_PATTERN.matcher(postMime);
+                if (m.find()) {
+                    encoding = m.group(1);
+                } else {
+                    encoding = null;
+                }
+                if (encoding != null) {
+                    encoding = encoding.toUpperCase(Locale.ROOT);
+                } else {
+                    encoding = null;
+                }
             }
         }
         return encoding;
