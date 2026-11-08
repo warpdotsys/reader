@@ -167,7 +167,11 @@ extends Encoding {
                 ++gbchars;
                 totalfreq += 500L;
                 row = rawtext[i] + 256 - 129;
-                column = 64 <= rawtext[i + 1] && rawtext[i + 1] <= 126 ? rawtext[i + 1] - 64 : rawtext[i + 1] + 256 - 64;
+                if (64 <= rawtext[i + 1] && rawtext[i + 1] <= 126) {
+                    column = rawtext[i + 1] - 64;
+                } else {
+                    column = rawtext[i + 1] + 256 - 64;
+                }
                 if (this.GBKFreq[row][column] != 0) {
                     gbfreq += (long)this.GBKFreq[row][column];
                 }
@@ -208,7 +212,11 @@ extends Encoding {
                 ++gbchars;
                 totalfreq += 500L;
                 row = rawtext[i] + 256 - 129;
-                column = 64 <= rawtext[i + 1] && rawtext[i + 1] <= 126 ? rawtext[i + 1] - 64 : rawtext[i + 1] + 256 - 64;
+                if (64 <= rawtext[i + 1] && rawtext[i + 1] <= 126) {
+                    column = rawtext[i + 1] - 64;
+                } else {
+                    column = rawtext[i + 1] + 256 - 64;
+                }
                 if (this.GBKFreq[row][column] != 0) {
                     gbfreq += (long)this.GBKFreq[row][column];
                 }
@@ -303,7 +311,12 @@ extends Encoding {
                 ++bfchars;
                 totalfreq += 500L;
                 int row = rawtext[i] + 256 - 161;
-                int column = 64 <= rawtext[i + 1] && rawtext[i + 1] <= 126 ? rawtext[i + 1] - 64 : rawtext[i + 1] + 256 - 97;
+                int column;
+                if (64 <= rawtext[i + 1] && rawtext[i + 1] <= 126) {
+                    column = rawtext[i + 1] - 64;
+                } else {
+                    column = rawtext[i + 1] + 256 - 97;
+                }
                 if (this.Big5Freq[row][column] != 0) {
                     bffreq += (long)this.Big5Freq[row][column];
                 } else if (3 <= row && row <= 37) {
@@ -336,7 +349,11 @@ extends Encoding {
                 ++bfchars;
                 totalfreq += 500L;
                 row = rawtext[i] - 161;
-                column = 64 <= rawtext[i + 1] && rawtext[i + 1] <= 126 ? rawtext[i + 1] - 64 : rawtext[i + 1] - 97;
+                if (64 <= rawtext[i + 1] && rawtext[i + 1] <= 126) {
+                    column = rawtext[i + 1] - 64;
+                } else {
+                    column = rawtext[i + 1] - 97;
+                }
                 if (this.Big5Freq[row][column] != 0) {
                     bffreq += (long)this.Big5Freq[row][column];
                 } else if (3 <= row && row < 37) {
@@ -346,7 +363,11 @@ extends Encoding {
                 ++bfchars;
                 totalfreq += 500L;
                 row = rawtext[i] - 129;
-                column = 64 <= rawtext[i + 1] && rawtext[i + 1] <= 126 ? rawtext[i + 1] - 64 : rawtext[i + 1] - 64;
+                if (64 <= rawtext[i + 1] && rawtext[i + 1] <= 126) {
+                    column = rawtext[i + 1] - 64;
+                } else {
+                    column = rawtext[i + 1] - 64;
+                }
                 if (this.Big5PFreq[row][column] != 0) {
                     bffreq += (long)this.Big5PFreq[row][column];
                 }
@@ -644,7 +665,11 @@ extends Encoding {
                 int adjust;
                 if (column < 159) {
                     adjust = 1;
-                    column = column > 127 ? (column -= 32) : (column -= 25);
+                    if (column > 127) {
+                        column = (column -= 32);
+                    } else {
+                        column = (column -= 25);
+                    }
                 } else {
                     adjust = 0;
                     column -= 126;
