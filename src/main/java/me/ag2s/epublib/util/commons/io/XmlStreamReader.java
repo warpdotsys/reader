@@ -84,7 +84,11 @@ extends Reader {
         InputStream inputStream2 = conn.getInputStream();
         BOMInputStream bom = new BOMInputStream((InputStream)new BufferedInputStream(inputStream2, 8192), false, BOMS);
         BOMInputStream pis = new BOMInputStream((InputStream)bom, true, XML_GUESS_BYTES);
-        this.encoding = conn instanceof HttpURLConnection || contentType != null ? this.processHttpStream(bom, pis, contentType, true) : this.doRawStream(bom, pis, true);
+        if (conn instanceof HttpURLConnection || contentType != null) {
+            encoding = this.processHttpStream(bom, pis, contentType, true);
+        } else {
+            encoding = this.doRawStream(bom, pis, true);
+        }
         this.reader = new InputStreamReader((InputStream)pis, this.encoding);
     }
 
@@ -307,7 +311,9 @@ extends Reader {
             int firstGT = -1;
             String xmlProlog = "";
             while (c != -1 && firstGT == -1 && offset < 8192) {
-                c = inputStream2.read(bytes2, offset += c, max -= c);
+                offset += c;
+                max -= c;
+                c = inputStream2.read(bytes2, offset, max);
                 xmlProlog = new String(bytes2, 0, offset, guessedEnc);
                 firstGT = xmlProlog.indexOf(62);
             }
