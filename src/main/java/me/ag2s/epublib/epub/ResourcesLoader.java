@@ -32,9 +32,9 @@ public class ResourcesLoader {
         Enumeration<? extends ZipEntry> entries = zipFile.entries();
         while (entries.hasMoreElements()) {
             ZipEntry zipEntry = entries.nextElement();
-            Resource resource;
             if (zipEntry == null || zipEntry.isDirectory()) continue;
             String href = zipEntry.getName();
+            Resource resource;
             if (ResourcesLoader.shouldLoadLazy(href, lazyLoadedTypes)) {
                 resource = new LazyResource((LazyResourceProvider)resourceProvider, zipEntry.getSize(), href);
             } else {
@@ -61,10 +61,11 @@ public class ResourcesLoader {
     }
 
     public static Resources loadResources(ZipInputStream zipInputStream, String defaultHtmlEncoding) throws IOException {
-        ZipEntry zipEntry;
         Resources result2 = new Resources();
+        ZipEntry zipEntry;
         do {
-            if ((zipEntry = ResourcesLoader.getNextZipEntry(zipInputStream)) == null || zipEntry.isDirectory()) continue;
+            zipEntry = ResourcesLoader.getNextZipEntry(zipInputStream);
+            if (zipEntry == null || zipEntry.isDirectory()) continue;
             String href = zipEntry.getName();
             Resource resource = ResourceUtil.createResource(zipEntry, zipInputStream);
             if (href.endsWith("opf")) {
