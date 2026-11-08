@@ -38,13 +38,19 @@ public class CharsetDetector {
     }
 
     public CharsetDetector setText(InputStream in) throws IOException {
-        int bytesRead;
         this.fInputStream = in;
         this.fInputStream.mark(8000);
         this.fRawInput = new byte[8000];
         this.fRawLength = 0;
-        for (int remainingLength = 8000; remainingLength > 0 && (bytesRead = this.fInputStream.read(this.fRawInput, this.fRawLength, remainingLength)) > 0; remainingLength -= bytesRead) {
+        int remainingLength = 8000;
+        int bytesRead;
+        while (remainingLength > 0) {
+            bytesRead = this.fInputStream.read(this.fRawInput, this.fRawLength, remainingLength);
+            if (bytesRead <= 0) {
+                break;
+            }
             this.fRawLength += bytesRead;
+            remainingLength -= bytesRead;
         }
         this.fInputStream.reset();
         return this;
@@ -64,9 +70,12 @@ public class CharsetDetector {
         for (int i = 0; i < ALL_CS_RECOGNIZERS.size(); ++i) {
             CSRecognizerInfo rcinfo = ALL_CS_RECOGNIZERS.get(i);
             boolean active = this.fEnabledRecognizers != null ? this.fEnabledRecognizers[i] : rcinfo.isDefaultEnabled;
-            CharsetMatch m;
-            if (!active || (m = rcinfo.recognizer.match(this)) == null) continue;
-            matches.add(m);
+            if (active) {
+                CharsetMatch m = rcinfo.recognizer.match(this);
+                if (m != null) {
+                    matches.add(m);
+                }
+            }
         }
         Collections.sort(matches);
         Collections.reverse(matches);
