@@ -31,8 +31,8 @@ public class ResourcesLoader {
         Resources result2 = new Resources();
         Enumeration<? extends ZipEntry> entries = zipFile.entries();
         while (entries.hasMoreElements()) {
-            Resource resource;
             ZipEntry zipEntry = entries.nextElement();
+            Resource resource;
             if (zipEntry == null || zipEntry.isDirectory()) continue;
             String href = zipEntry.getName();
             if (ResourcesLoader.shouldLoadLazy(href, lazyLoadedTypes)) {

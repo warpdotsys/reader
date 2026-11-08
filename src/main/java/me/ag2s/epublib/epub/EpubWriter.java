@@ -50,8 +50,8 @@ public class EpubWriter {
     }
 
     private void initTOCResource(EpubBook book) {
+        Resource tocResource;
         try {
-            Resource tocResource;
             if (book.isEpub3()) {
                 tocResource = NCXDocumentV3.createNCXResource(book);
             } else {
