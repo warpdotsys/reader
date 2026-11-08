@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -178,7 +179,7 @@ extends PackageDocumentBase {
 
     private static Spine generateSpineFromResources(Resources resources) {
         Spine result2 = new Spine();
-        ArrayList<String> resourceHrefs = new ArrayList<String>(resources.getAllHrefs());
+        List<String> resourceHrefs = new ArrayList<String>(resources.getAllHrefs());
         Collections.sort(resourceHrefs, String.CASE_INSENSITIVE_ORDER);
         for (String resourceHref : resourceHrefs) {
             Resource resource = resources.getByHref(resourceHref);
@@ -186,8 +187,9 @@ extends PackageDocumentBase {
                 result2.setTocResource(resource);
                 continue;
             }
-            if (resource.getMediaType() != MediaTypes.XHTML) continue;
-            result2.addSpineReference(new SpineReference(resource));
+            if (resource.getMediaType() == MediaTypes.XHTML) {
+                result2.addSpineReference(new SpineReference(resource));
+            }
         }
         return result2;
     }
@@ -213,7 +215,7 @@ extends PackageDocumentBase {
             }
         }
         if (tocResource == null) {
-            System.err.println(TAG + " Could not find table of contents resource. Tried resource with id '" + tocResourceId + "', " + "toc" + ", " + "toc".toUpperCase() + " and any NCX resource.");
+            System.err.println(new StringBuilder().append(TAG).append(" Could not find table of contents resource. Tried resource with id '").append(tocResourceId).append("',").append("toc").append(",").append("toc".toUpperCase()).append(" and any NCX resource.").toString());
         }
         return tocResource;
     }
@@ -238,7 +240,7 @@ extends PackageDocumentBase {
     }
 
     private static void readCover(Document packageDocument, EpubBook book) {
-        Set<String> coverHrefs = PackageDocumentReader.findCoverHrefs(packageDocument);
+        Collection<String> coverHrefs = PackageDocumentReader.findCoverHrefs(packageDocument);
         for (String coverHref : coverHrefs) {
             Resource resource = book.getResources().getByHref(coverHref);
             if (resource == null) {
@@ -249,8 +251,9 @@ extends PackageDocumentBase {
                 book.setCoverPage(resource);
                 continue;
             }
-            if (!MediaTypes.isBitmapImage(resource.getMediaType())) continue;
-            book.setCoverImage(resource);
+            if (MediaTypes.isBitmapImage(resource.getMediaType())) {
+                book.setCoverImage(resource);
+            }
         }
     }
 }
