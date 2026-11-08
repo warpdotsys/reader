@@ -91,8 +91,8 @@ public class NCXDocumentV3 {
         }
         ArrayList<TOCReference> result2 = new ArrayList<TOCReference>(navpoints.getLength());
         for (int i = 0; i < navpoints.getLength(); ++i) {
-            Element el;
             Node node = navpoints.item(i);
+            Element el;
             if (node == null || node.getNodeType() != 1 || !(el = (Element)node).getTagName().equals("li")) continue;
             result2.add(NCXDocumentV3.readTOCReference(el, book));
         }
