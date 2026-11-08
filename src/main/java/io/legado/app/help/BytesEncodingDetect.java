@@ -286,11 +286,20 @@ extends Encoding {
                     ++i;
                     continue;
                 }
-                if (rawtext[i + 1] != 126) continue;
-                ++i;
+                if (rawtext[i + 1] == 126) {
+                    ++i;
+                }
             }
         }
-        rangeval = hzstart > 4 ? 50.0f : (hzstart > 1 ? 41.0f : (hzstart > 0 ? 39.0f : 0.0f));
+        if (hzstart > 4) {
+            rangeval = 50.0f;
+        } else if (hzstart > 1) {
+            rangeval = 41.0f;
+        } else if (hzstart > 0) {
+            rangeval = 39.0f;
+        } else {
+            rangeval = 0.0f;
+        }
         freqval = 50.0f * ((float)hzfreq / (float)totalfreq);
         return (int)(rangeval + freqval);
     }
@@ -667,17 +676,22 @@ extends Encoding {
                 if (column < 159) {
                     adjust = 1;
                     if (column > 127) {
-                        column = (column -= 32);
+                        column -= 32;
                     } else {
-                        column = (column -= 25);
+                        column -= 25;
                     }
                 } else {
                     adjust = 0;
                     column -= 126;
                 }
-                row = row < 160 ? (row - 112 << 1) - adjust : (row - 176 << 1) - adjust;
+                if (row < 160) {
+                    row = (row - 112 << 1) - adjust;
+                } else {
+                    row = (row - 176 << 1) - adjust;
+                }
+                row -= 32;
                 column = 32;
-                if ((row -= 32) < this.JPFreq.length && column < this.JPFreq[row].length && this.JPFreq[row][column] != 0) {
+                if (row < this.JPFreq.length && column < this.JPFreq[row].length && this.JPFreq[row][column] != 0) {
                     jpfreq += (long)this.JPFreq[row][column];
                 }
                 ++i;
