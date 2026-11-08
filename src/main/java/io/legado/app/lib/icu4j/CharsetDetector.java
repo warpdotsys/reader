@@ -174,12 +174,13 @@ public class CharsetDetector {
 
     @Deprecated
     public String[] getDetectableCharsets() {
-        ArrayList<String> csnames = new ArrayList<String>(ALL_CS_RECOGNIZERS.size());
+        List<String> csnames = new ArrayList<String>(ALL_CS_RECOGNIZERS.size());
         for (int i = 0; i < ALL_CS_RECOGNIZERS.size(); ++i) {
             CSRecognizerInfo rcinfo = ALL_CS_RECOGNIZERS.get(i);
             boolean active = this.fEnabledRecognizers == null ? rcinfo.isDefaultEnabled : this.fEnabledRecognizers[i];
-            if (!active) continue;
-            csnames.add(rcinfo.recognizer.getName());
+            if (active) {
+                csnames.add(rcinfo.recognizer.getName());
+            }
         }
         return csnames.toArray(new String[0]);
     }
@@ -191,10 +192,11 @@ public class CharsetDetector {
         int i;
         for (i = 0; i < ALL_CS_RECOGNIZERS.size(); ++i) {
             CSRecognizerInfo csrinfo = ALL_CS_RECOGNIZERS.get(i);
-            if (!csrinfo.recognizer.getName().equals(encoding)) continue;
-            modIdx = i;
-            isDefaultVal = csrinfo.isDefaultEnabled == enabled;
-            break;
+            if (csrinfo.recognizer.getName().equals(encoding)) {
+                modIdx = i;
+                isDefaultVal = csrinfo.isDefaultEnabled == enabled;
+                break;
+            }
         }
         if (modIdx < 0) {
             throw new IllegalArgumentException("Invalid encoding: \"" + encoding + "\"");
@@ -212,7 +214,7 @@ public class CharsetDetector {
     }
 
     static {
-        ArrayList<CSRecognizerInfo> list2 = new ArrayList<CSRecognizerInfo>();
+        List<CSRecognizerInfo> list2 = new ArrayList<CSRecognizerInfo>();
         list2.add(new CSRecognizerInfo(new CharsetRecog_UTF8(), true));
         list2.add(new CSRecognizerInfo(new CharsetRecog_Unicode.CharsetRecog_UTF_16_BE(), true));
         list2.add(new CSRecognizerInfo(new CharsetRecog_Unicode.CharsetRecog_UTF_16_LE(), true));
