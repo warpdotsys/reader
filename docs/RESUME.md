@@ -857,3 +857,21 @@ bcdiff 是更严口径（可能含注释/常量池文本残差），汇报全局
 - CharsetDetector：MungeInput（phantom slot3 疑为提前声明）、setText(InputStream) 变量序
 - epublib：readSpine/readCover/readManifest（0.87~0.98）、NCXDocumentV3、XmlStreamReader
 - icu4j 其余：CharsetMatch、CharsetRecog_2022/UTF8/mbcs、sbcs
+
+## 2026-11-08 晚 22:20 整类清零榜（Java 侧 6 连）
+
+| 类 | 方法数 | 说明 |
+|---|---|---|
+| EpubWriter | 12/12 | tocResource 声明移出 try |
+| IOUtil | 39/39 | count 在 n 前；skip 条件拆体 + break；continue 改正向包裹 |
+| XmlStreamReader | 23/23 | 三元回退、声明序、line 后移 |
+| NCXDocumentV2 | 15/15 | 双 continue 守卫 |
+| ResourcesLoader | 6/6 | 声明对调 + 赋值拆句 |
+| NCXDocumentV3 | 21/21 | List 声明接口化、三元→if/else、守卫形态 |
+
+### 新增 Java 规律（11-08 晚）
+- **`if_icmpeq → fall-past / goto → continue` 布局 = continue 守卫**（`if (x != n) continue;`），非嵌套 if、非 &&
+- **`List` 接口声明 → invokeinterface；`ArrayList` → invokevirtual**（result2 逐方法核对）
+- **javap 解析器必须容忍 throws 子句**（`^  [a-zA-Z].*\([^)]*\).*;\s*$`），否则方法体合并、数字全错
+- **三元 vs if/else 判定**：制品 `astore` 在分支内 = if/else 双赋值；值随栈走（goto 无 store）= 三元
+- **`String x;` 空声明也占槽位**（readNavLabel：label 先于 labelElement）
