@@ -126,12 +126,13 @@ public class CharsetDetector {
     private void MungeInput() {
         int srci;
         int dsti = 0;
+        byte b;
         boolean inMarkup = false;
         int openTags = 0;
         int badTags = 0;
         if (this.fStripTags) {
             for (srci = 0; srci < this.fRawLength && dsti < this.fInputBytes.length; ++srci) {
-                byte b = this.fRawInput[srci];
+                b = this.fRawInput[srci];
                 if (b == 60) {
                     if (inMarkup) {
                         ++badTags;
@@ -159,9 +160,8 @@ public class CharsetDetector {
         }
         Arrays.fill(this.fByteStats, (short)0);
         for (srci = 0; srci < this.fInputLen; ++srci) {
-            int val;
-            int n = val = this.fInputBytes[srci] & 0xFF;
-            this.fByteStats[n] = (short)(this.fByteStats[n] + 1);
+            int val = this.fInputBytes[srci] & 0xFF;
+            this.fByteStats[val] = (short)(this.fByteStats[val] + 1);
         }
         this.fC1Bytes = false;
         for (int i = 128; i <= 159; ++i) {
