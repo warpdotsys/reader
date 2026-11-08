@@ -325,10 +325,10 @@ extends Reader {
             }
             int bytesRead = offset;
             if (bytesRead > 0) {
-                String line;
                 inputStream2.reset();
                 BufferedReader bReader = new BufferedReader(new StringReader(xmlProlog.substring(0, firstGT + 1)));
                 StringBuffer prolog = new StringBuffer();
+                String line;
                 while ((line = bReader.readLine()) != null) {
                     prolog.append(line);
                 }
