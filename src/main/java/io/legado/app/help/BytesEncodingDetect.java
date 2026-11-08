@@ -30,8 +30,9 @@ extends Encoding {
         int bytesread = 0;
         int byteoffset = 0;
         int guess = OTHER;
+        InputStream chinesestream;
         try {
-            InputStream chinesestream = testurl.openStream();
+            chinesestream = testurl.openStream();
             while ((bytesread = chinesestream.read(rawtext, byteoffset, rawtext.length - byteoffset)) > 0) {
                 byteoffset += bytesread;
             }
@@ -556,8 +557,12 @@ extends Encoding {
                 int column;
                 ++krchars;
                 totalfreq += 500L;
-                if (-95 <= rawtext[i] && rawtext[i] <= -2 && -95 <= rawtext[i + 1] && rawtext[i + 1] <= -2 && this.KRFreq[row = rawtext[i] + 256 - 161][column = rawtext[i + 1] + 256 - 161] != 0) {
-                    krfreq += (long)this.KRFreq[row][column];
+                if (-95 <= rawtext[i] && rawtext[i] <= -2 && -95 <= rawtext[i + 1] && rawtext[i + 1] <= -2) {
+                    row = rawtext[i] + 256 - 161;
+                    column = rawtext[i + 1] + 256 - 161;
+                    if (this.KRFreq[row][column] != 0) {
+                        krfreq += (long)this.KRFreq[row][column];
+                    }
                 }
             }
             ++i;
