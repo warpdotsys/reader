@@ -68,10 +68,10 @@ public class NCXDocumentV2 {
         List<TOCReference> result2 = new ArrayList<TOCReference>(navpoints.getLength());
         for (int i = 0; i < navpoints.getLength(); ++i) {
             Node node = navpoints.item(i);
-            if (node.getNodeType() == 1 && node.getLocalName().equals("navPoint")) {
-                TOCReference tocReference = NCXDocumentV2.readTOCReference((Element)node, book);
-                result2.add(tocReference);
-            }
+            if (node.getNodeType() != 1) continue;
+            if (!node.getLocalName().equals("navPoint")) continue;
+            TOCReference tocReference = NCXDocumentV2.readTOCReference((Element)node, book);
+            result2.add(tocReference);
         }
         return result2;
     }
