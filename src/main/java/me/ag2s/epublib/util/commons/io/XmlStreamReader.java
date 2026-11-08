@@ -270,20 +270,32 @@ extends Reader {
         String mime = null;
         if (httpContentType != null) {
             int i = httpContentType.indexOf(";");
-            mime = i >= 0 ? httpContentType.substring(0, i) : httpContentType;
+            if (i >= 0) {
+                mime = httpContentType.substring(0, i);
+            } else {
+                mime = httpContentType;
+            }
             mime = mime.trim();
         }
         return mime;
     }
 
     static String getContentTypeEncoding(String httpContentType) {
-        int i;
         String encoding = null;
+        int i;
         if (httpContentType != null && (i = httpContentType.indexOf(";")) > -1) {
             String postMime = httpContentType.substring(i + 1);
             Matcher m = CHARSET_PATTERN.matcher(postMime);
-            encoding = m.find() ? m.group(1) : null;
-            encoding = encoding != null ? encoding.toUpperCase(Locale.ROOT) : null;
+            if (m.find()) {
+                encoding = m.group(1);
+            } else {
+                encoding = null;
+            }
+            if (encoding != null) {
+                encoding = encoding.toUpperCase(Locale.ROOT);
+            } else {
+                encoding = null;
+            }
         }
         return encoding;
     }
