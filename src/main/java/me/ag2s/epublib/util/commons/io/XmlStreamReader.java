@@ -150,7 +150,6 @@ extends Reader {
     }
 
     private String doLenientDetection(String httpContentType, XmlStreamReaderException ex) throws IOException {
-        String encoding;
         if (httpContentType != null && httpContentType.startsWith("text/html")) {
             httpContentType = httpContentType.substring("text/html".length());
             httpContentType = "text/xml" + httpContentType;
@@ -161,7 +160,9 @@ extends Reader {
                 ex = ex2;
             }
         }
-        if ((encoding = ex.getXmlEncoding()) == null) {
+        String encoding;
+        encoding = ex.getXmlEncoding();
+        if (encoding == null) {
             encoding = ex.getContentTypeEncoding();
         }
         if (encoding == null) {
@@ -288,16 +289,8 @@ extends Reader {
             if (i > -1) {
                 String postMime = httpContentType.substring(i + 1);
                 Matcher m = CHARSET_PATTERN.matcher(postMime);
-                if (m.find()) {
-                    encoding = m.group(1);
-                } else {
-                    encoding = null;
-                }
-                if (encoding != null) {
-                    encoding = encoding.toUpperCase(Locale.ROOT);
-                } else {
-                    encoding = null;
-                }
+                encoding = m.find() ? m.group(1) : null;
+                encoding = encoding != null ? encoding.toUpperCase(Locale.ROOT) : null;
             }
         }
         return encoding;
