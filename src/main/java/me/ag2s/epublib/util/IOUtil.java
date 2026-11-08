@@ -152,15 +152,16 @@ public class IOUtil {
     }
 
     public static long copyLarge(InputStream input, OutputStream output, long inputOffset, long length, byte[] buffer) throws IOException {
-        int read;
         int bufferLength;
+        int read;
         if (inputOffset > 0L) {
             IOUtil.skipFully(input, inputOffset);
         }
         if (length == 0L) {
             return 0L;
         }
-        int bytesToRead = bufferLength = buffer.length;
+        bufferLength = buffer.length;
+        int bytesToRead = bufferLength;
         if (length > 0L && length < (long)bufferLength) {
             bytesToRead = (int)length;
         }
@@ -230,12 +231,13 @@ public class IOUtil {
     }
 
     public static long skip(ReadableByteChannel input, long toSkip) throws IOException {
+        ByteBuffer skipByteBuffer;
         long remain;
         int n;
         if (toSkip < 0L) {
             throw new IllegalArgumentException("Skip count must be non-negative, actual: " + toSkip);
         }
-        ByteBuffer skipByteBuffer = ByteBuffer.allocate((int)Math.min(toSkip, (long)SKIP_BYTE_BUFFER.length));
+        skipByteBuffer = ByteBuffer.allocate((int)Math.min(toSkip, (long)SKIP_BYTE_BUFFER.length));
         for (remain = toSkip; remain > 0L; remain -= (long)n) {
             skipByteBuffer.position(0);
             skipByteBuffer.limit((int)Math.min(remain, (long)SKIP_BYTE_BUFFER.length));
