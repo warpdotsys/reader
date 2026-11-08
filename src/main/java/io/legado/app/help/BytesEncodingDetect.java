@@ -575,8 +575,9 @@ extends Encoding {
     int iso_2022_kr_probability(byte[] rawtext) {
         int i;
         for (i = 0; i < rawtext.length; ++i) {
-            if (i + 3 >= rawtext.length || rawtext[i] != 27 || (char)rawtext[i + 1] != '$' || (char)rawtext[i + 2] != ')' || (char)rawtext[i + 3] != 'C') continue;
-            return 100;
+            if (i + 3 < rawtext.length && rawtext[i] == 27 && (char)rawtext[i + 1] == '$' && (char)rawtext[i + 2] == ')' && (char)rawtext[i + 3] == 'C') {
+                return 100;
+            }
         }
         return 0;
     }
@@ -615,8 +616,9 @@ extends Encoding {
     int iso_2022_jp_probability(byte[] rawtext) {
         int i;
         for (i = 0; i < rawtext.length; ++i) {
-            if (i + 2 >= rawtext.length || rawtext[i] != 27 || (char)rawtext[i + 1] != '$' || (char)rawtext[i + 2] != 'B') continue;
-            return 100;
+            if (i + 2 < rawtext.length && rawtext[i] == 27 && (char)rawtext[i + 1] == '$' && (char)rawtext[i + 2] == 'B') {
+                return 100;
+            }
         }
         return 0;
     }
