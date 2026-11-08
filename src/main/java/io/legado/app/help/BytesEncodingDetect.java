@@ -232,7 +232,7 @@ extends Encoding {
 
     int hz_probability(byte[] rawtext) {
         int i;
-        int rawtextlen = 0;
+        int rawtextlen;
         int hzchars = 0;
         int dbchars = 1;
         long hzfreq = 0L;
@@ -243,51 +243,52 @@ extends Encoding {
         int hzend = 0;
         rawtextlen = rawtext.length;
         block0: for (i = 0; i < rawtextlen; ++i) {
-            if (rawtext[i] != 126) continue;
-            if (rawtext[i + 1] == 123) {
-                ++hzstart;
-                i += 2;
-                while (i < rawtextlen - 1 && rawtext[i] != 10 && rawtext[i] != 13) {
-                    int row;
-                    int column;
-                    if (rawtext[i] == 126 && rawtext[i + 1] == 125) {
-                        ++hzend;
-                        ++i;
-                        continue block0;
-                    }
-                    if (33 <= rawtext[i] && rawtext[i] <= 119 && 33 <= rawtext[i + 1] && rawtext[i + 1] <= 119) {
-                        hzchars += 2;
-                        row = rawtext[i] - 33;
-                        column = rawtext[i + 1] - 33;
-                        totalfreq += 500L;
-                        if (this.GBFreq[row][column] != 0) {
-                            hzfreq += (long)this.GBFreq[row][column];
-                        } else if (15 <= row && row < 55) {
-                            hzfreq += 200L;
-                        }
-                    } else if (161 <= rawtext[i] && rawtext[i] <= 247 && 161 <= rawtext[i + 1] && rawtext[i + 1] <= 247) {
-                        hzchars += 2;
-                        row = rawtext[i] + 256 - 161;
-                        column = rawtext[i + 1] + 256 - 161;
-                        totalfreq += 500L;
-                        if (this.GBFreq[row][column] != 0) {
-                            hzfreq += (long)this.GBFreq[row][column];
-                        } else if (15 <= row && row < 55) {
-                            hzfreq += 200L;
-                        }
-                    }
-                    dbchars += 2;
+            if (rawtext[i] == 126) {
+                if (rawtext[i + 1] == 123) {
+                    ++hzstart;
                     i += 2;
+                    while (i < rawtextlen - 1 && rawtext[i] != 10 && rawtext[i] != 13) {
+                        int row;
+                        int column;
+                        if (rawtext[i] == 126 && rawtext[i + 1] == 125) {
+                            ++hzend;
+                            ++i;
+                            continue block0;
+                        }
+                        if (33 <= rawtext[i] && rawtext[i] <= 119 && 33 <= rawtext[i + 1] && rawtext[i + 1] <= 119) {
+                            hzchars += 2;
+                            row = rawtext[i] - 33;
+                            column = rawtext[i + 1] - 33;
+                            totalfreq += 500L;
+                            if (this.GBFreq[row][column] != 0) {
+                                hzfreq += (long)this.GBFreq[row][column];
+                            } else if (15 <= row && row < 55) {
+                                hzfreq += 200L;
+                            }
+                        } else if (161 <= rawtext[i] && rawtext[i] <= 247 && 161 <= rawtext[i + 1] && rawtext[i + 1] <= 247) {
+                            hzchars += 2;
+                            row = rawtext[i] + 256 - 161;
+                            column = rawtext[i + 1] + 256 - 161;
+                            totalfreq += 500L;
+                            if (this.GBFreq[row][column] != 0) {
+                                hzfreq += (long)this.GBFreq[row][column];
+                            } else if (15 <= row && row < 55) {
+                                hzfreq += 200L;
+                            }
+                        }
+                        dbchars += 2;
+                        i += 2;
+                    }
+                    continue;
                 }
-                continue;
-            }
-            if (rawtext[i + 1] == 125) {
-                ++hzend;
+                if (rawtext[i + 1] == 125) {
+                    ++hzend;
+                    ++i;
+                    continue;
+                }
+                if (rawtext[i + 1] != 126) continue;
                 ++i;
-                continue;
             }
-            if (rawtext[i + 1] != 126) continue;
-            ++i;
         }
         rangeval = hzstart > 4 ? 50.0f : (hzstart > 1 ? 41.0f : (hzstart > 0 ? 39.0f : 0.0f));
         freqval = 50.0f * ((float)hzfreq / (float)totalfreq);
