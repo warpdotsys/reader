@@ -152,8 +152,9 @@ public class CharsetDetector {
                 if (!inMarkup) {
                     this.fInputBytes[dsti++] = b;
                 }
-                if (b != 62) continue;
-                inMarkup = false;
+                if (b == 62) {
+                    inMarkup = false;
+                }
             }
             this.fInputLen = dsti;
         }
@@ -170,13 +171,14 @@ public class CharsetDetector {
         Arrays.fill(this.fByteStats, (short)0);
         for (srci = 0; srci < this.fInputLen; ++srci) {
             int val = this.fInputBytes[srci] & 0xFF;
-            this.fByteStats[val] = (short)(this.fByteStats[val] + 1);
+            this.fByteStats[val] += 1;
         }
         this.fC1Bytes = false;
         for (int i = 128; i <= 159; ++i) {
-            if (this.fByteStats[i] == 0) continue;
-            this.fC1Bytes = true;
-            break;
+            if (this.fByteStats[i] != 0) {
+                this.fC1Bytes = true;
+                break;
+            }
         }
     }
 
