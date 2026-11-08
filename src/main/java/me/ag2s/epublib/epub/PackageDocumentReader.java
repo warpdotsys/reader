@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import me.ag2s.epublib.domain.EpubBook;
@@ -56,7 +57,7 @@ extends PackageDocumentBase {
         Element manifestElement = DOMUtil.getFirstElementByTagNameNS(packageDocument.getDocumentElement(), "http://www.idpf.org/2007/opf", "manifest");
         Resources result2 = new Resources();
         if (manifestElement == null) {
-            System.err.println(TAG + " Package does not contain element " + "manifest");
+            System.err.println(new StringBuilder().append(TAG).append(" Package does not contain element").append("manifest").toString());
             return result2;
         }
         NodeList itemElements = manifestElement.getElementsByTagNameNS("http://www.idpf.org/2007/opf", "item");
@@ -147,7 +148,7 @@ extends PackageDocumentBase {
             System.err.println(TAG + " spineNodes is null");
             return result2;
         }
-        ArrayList<SpineReference> spineReferences = new ArrayList<SpineReference>(spineNodes.getLength());
+        List<SpineReference> spineReferences = new ArrayList<SpineReference>(spineNodes.getLength());
         for (int i = 0; i < spineNodes.getLength(); ++i) {
             Element spineItem = (Element)spineNodes.item(i);
             String itemref = DOMUtil.getAttribute(spineItem, "http://www.idpf.org/2007/opf", "idref");
@@ -229,7 +230,8 @@ extends PackageDocumentBase {
                 result.add(coverResourceId);
             }
         }
-        if (StringUtil.isNotBlank(coverHref = DOMUtil.getFindAttributeValue(packageDocument, "http://www.idpf.org/2007/opf", "reference", "type", "cover", "href"))) {
+        coverHref = DOMUtil.getFindAttributeValue(packageDocument, "http://www.idpf.org/2007/opf", "reference", "type", "cover", "href");
+        if (StringUtil.isNotBlank(coverHref)) {
             result.add(coverHref);
         }
         return result;
