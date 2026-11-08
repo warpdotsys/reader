@@ -223,6 +223,7 @@ extends Encoding {
 
     int hz_probability(byte[] rawtext) {
         int i;
+        int rawtextlen = 0;
         int hzchars = 0;
         int dbchars = 1;
         long hzfreq = 0L;
@@ -231,7 +232,7 @@ extends Encoding {
         float freqval = 0.0f;
         int hzstart = 0;
         int hzend = 0;
-        int rawtextlen = rawtext.length;
+        rawtextlen = rawtext.length;
         block0: for (i = 0; i < rawtextlen; ++i) {
             if (rawtext[i] != 126) continue;
             if (rawtext[i + 1] == 123) {
