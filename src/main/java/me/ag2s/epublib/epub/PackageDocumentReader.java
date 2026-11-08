@@ -160,7 +160,8 @@ extends PackageDocumentBase {
                 id = itemref;
             }
             Resource resource;
-            if ((resource = resources.getByIdOrHref(id)) == null) {
+            resource = resources.getByIdOrHref(id);
+            if (resource == null) {
                 System.err.println(TAG + " resource with id '" + id + "' not found");
                 continue;
             }
