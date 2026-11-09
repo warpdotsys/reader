@@ -3567,8 +3567,8 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                 }
             }
         }
-        getStorage("users")?.let {
-            saveStorage("users", value = it)
+        getStorage("users")?.let { content ->
+            saveStorage("users", value = content)
         }
         return returnData.setData("")
     }
@@ -3599,9 +3599,9 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             if (userMapJson != null) {
                 userMap = userMapJson.map as MutableMap<String, Map<String, Any>>
             }
-            userMap.forEach { entry ->
+            userMap.forEach {
                 try {
-                    val ns = entry.value.getOrDefault("username", "") as String? ?: ""
+                    val ns = it.value.getOrDefault("username", "") as String? ?: ""
                     if (ns.isNotEmpty()) {
                         handler(ns)
                     }
