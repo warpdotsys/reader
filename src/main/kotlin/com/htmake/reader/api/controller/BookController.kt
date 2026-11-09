@@ -181,8 +181,8 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         val invalidBookSourceList = arrayListOf<Map<String, Any>>()
         if (files != null) {
             for (f in files) {
-                invalidBookSourceCache.getByHashCode(f.name)?.let {
-                    invalidBookSourceList.add(it.toMap())
+                invalidBookSourceCache.getByHashCode(f.name)?.let { info ->
+                    invalidBookSourceList.add(info.toMap())
                 }
             }
         }
@@ -732,10 +732,12 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             var text1 = text
             val matcher = AppPattern.imgPattern.matcher(text)
             while (matcher.find()) {
-                val src = matcher.group(1) ?: continue
-                if ("__API_ROOT__" !in src) {
-                    val imageUrlSrc = NetworkUtils.getAbsoluteURL(chapter.url, src)
-                    val imageFile = BookHelp.getImage(book, imageUrlSrc)
+                matcher.group(1)?.let {
+                    if ("__API_ROOT__" in it) {
+                        return@let
+                    }
+                    val src = it
+                    val imageFile = BookHelp.getImage(book, NetworkUtils.getAbsoluteURL(chapter.url, src))
                     if (imageFile.exists()) {
                         val imageUrl = "__API_ROOT__" + imageFile.path.replace(dataDir, "/book-assets")
                         text1 = text1.replace(src, imageUrl + "\" data-error=\"" + src)
