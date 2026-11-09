@@ -195,7 +195,8 @@ open class BaseController(override val coroutineContext: CoroutineContext) : Cor
     }
 
     fun getUserInfoClass(username: String): User? {
-        return getUserInfoMap(username)?.toDataClass<User>()
+        val user = getUserInfoMap(username)?.toDataClass<User>()
+        return user
     }
 
     fun getUserInfoMap(username: String): Map<String, Any>? {
