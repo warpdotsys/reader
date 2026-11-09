@@ -1864,7 +1864,8 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         val localBookPath = File(getWorkDir("storage", "data", userNameSpace, bookName + '_' + bookAuthor))
         localBookPath.deleteRecursively()
         if (!existBook.getString("coverUrl").isNullOrEmpty() && existBook.getString("coverUrl")!!.startsWith("/")) {
-            FileUtils.deleteFile(getWorkDir("storage", existBook.getString("coverUrl")!!))
+            val cachePath = getWorkDir("storage", existBook.getString("coverUrl")!!)
+            FileUtils.deleteFile(cachePath)
         }
         return returnData.setData("删除书籍成功")
     }
