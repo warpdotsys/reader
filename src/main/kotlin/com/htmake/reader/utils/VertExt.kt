@@ -13,7 +13,7 @@ fun RoutingContext.success(any: Any?) {
     val toJson = when (any) {
         is JsonObject -> any.toString()
         else -> {
-            gson.toJson(any)!!
+            gson.toJson(any)
         }
     }
     response().putHeader("content-type", "application/json; charset=utf-8").end(toJson)

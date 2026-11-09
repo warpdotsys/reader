@@ -3589,8 +3589,9 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         val handler = { userNameSpace: String ->
             syncDataFileList.forEach { fileName ->
                 val file = File(getWorkDir("storage", "data", userNameSpace, "$fileName.json"))
-                if (!file.exists()) return@forEach
-                file.delete()
+                if (file.exists()) {
+                    file.delete()
+                }
             }
         }
         handler("default")
