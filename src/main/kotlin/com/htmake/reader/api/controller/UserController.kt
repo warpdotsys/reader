@@ -541,7 +541,7 @@ class UserController(coroutineContext: CoroutineContext) : BaseController(corout
         } else {
             url = context.queryParam("url").firstOrNull() ?: ""
         }
-        if (url.isEmpty()) {
+        if (url.isNullOrEmpty()) {
             return returnData.setErrorMsg("请输入文件链接")
         }
         val userNameSpace = getUserNameSpace(context)

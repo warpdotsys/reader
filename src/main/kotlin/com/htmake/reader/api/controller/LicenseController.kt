@@ -211,7 +211,7 @@ class LicenseController(coroutineContext: CoroutineContext) : BaseController(cor
     suspend fun decryptLicense(context: RoutingContext): ReturnData {
         val returnData = ReturnData()
         val content = context.bodyAsJson.getString("content") ?: ""
-        if (content.isEmpty()) {
+        if (content.isNullOrEmpty()) {
             return returnData.setErrorMsg("请输入密钥")
         }
         val license = decryptToLicense(content) ?: return returnData.setErrorMsg("密钥错误")
@@ -398,7 +398,7 @@ class LicenseController(coroutineContext: CoroutineContext) : BaseController(cor
         val returnData = ReturnData()
         val email = context.bodyAsJson.getString("email") ?: ""
         val code = context.bodyAsJson.getString("code") ?: ""
-        if (email.isEmpty() || code.isEmpty()) {
+        if (email.isNullOrEmpty() || code.isNullOrEmpty()) {
             return returnData.setErrorMsg("参数错误")
         }
         val verifyCode = tryCodeCache.getAsString(email)
