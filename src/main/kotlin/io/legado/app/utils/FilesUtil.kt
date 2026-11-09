@@ -355,7 +355,7 @@ object FileUtils {
         try {
             val data = readBytes(filepath)
             if (data != null) {
-                return String(data, Charset.forName(charset)).trim()
+                return String(data, Charset.forName(charset)).trim { it <= ' ' }
             }
         } catch (e: UnsupportedEncodingException) {
         }
