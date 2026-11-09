@@ -953,3 +953,14 @@ bcdiff 是更严口径（可能含注释/常量池文本残差），汇报全局
 **结论**：剩余差异（getfield vs getter、checkcast Object、inline 帧、槽位 ±1）**不是 kotlin 版本行为**，
 而是源码写法或编译配置级差异。版本线索关闭，不再实验。
 恢复：1.5.21 + 全量重建（b268），v63 = 787/934 已确认。
+
+## 2026-11-09 15:20 isNullOrEmpty 规律（重大突破口）
+
+**指纹**：`x.isEmpty()` = 单 inline 标记；`x.isNullOrEmpty()` = **双 inline 标记**（isNullOrEmpty 内部再调 isEmpty）；
+`x.isNullOrBlank()` = 双标记但用 `StringsKt.isBlank`。用 `scan_markers.py`（marker_diff.json）扫全类找 A>B 的方法。
+
+**战果**：UserController.login / resetPassword / addUser / deleteFile **四方法 1.0**；
+decryptLicense 0.92→0.94；UserController delta **1589 → 559（-65%）**；v64 类级仍 787/934。
+
+**注意**：同型改动在小方法上未必对齐（激活码/目录校验等），改一处验一处，回退快的留。
+UserController 剩余 = uploadFile/forEachUser/logout（状态机槽位族）+ deleteUsers（vararg 尾元素 temp 族）。
