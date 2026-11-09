@@ -80,7 +80,7 @@ class UserController(coroutineContext: CoroutineContext) : BaseController(corout
             }
             if (appConfig.inviteCode.isNotEmpty()) {
                 val code = context.bodyAsJson.getString("code") ?: ""
-                if (code.isEmpty()) {
+                if (code.isNullOrEmpty()) {
                     return returnData.setErrorMsg("请输入邀请码")
                 }
                 if (!appConfig.inviteCode.equals(code)) {
