@@ -590,7 +590,7 @@ class UserController(coroutineContext: CoroutineContext) : BaseController(corout
                     val user = entry.value
                     if (user != null) {
                         val username = user.getOrDefault("username", "") as String? ?: ""
-                        if (username.isNotEmpty()) {
+                        if (!username.isNullOrEmpty()) {
                             val existedUser = userMap.getOrDefault(username, null)?.toDataClass<User>()
                             if (existedUser != null) {
                                 if (handler(existedUser)) {
