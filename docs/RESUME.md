@@ -915,3 +915,14 @@ bcdiff 是更严口径（可能含注释/常量池文本残差），汇报全局
   try/catch 返回路径临时槽、`"" + long` 的空串 append —— 全部归「编译器行为边界」，判读时跳过
 - 后续优先打「源码形状差明显」的：getTxtTocRules / fixPic / refreshLocalBook / addBookGroupMulti
   （BookController 内 0.78~0.83 档，预期有可套用的结构重写）
+
+## 2026-11-09 09:20 上午巡扫描尾
+
+- BookController 0.78~0.83 档（getTxtTocRules/fixPic/refreshLocalBook）复查：余差全部落在已登记边界族
+  - getTxtTocRules：fromJsonArray 接收者二次捕获（`$this$fromJsonArray_u24lambda_u2d1$iv`，1.5.21 行为）
+  - fixPic：内联帧的 null-init 合并差异
+  - refreshLocalBook：续体前多一局部槽（same ±1 family）
+- 结论：BookController 的可见余差 = 5 大族（LDV 槽位 / 内联帧 / 接收者捕获 / 编译器合并 / 属性直读）
+  源码层可修项已基本穷尽；剩余 delta 靠编译版本对齐（1.5.1）才能进一步压低
+- 待处理清单：scan_methods.json（97 项）中未被三族覆盖的 = forEachUser 的 entries 内联帧、
+  toNumChapter 的 append(Object) 等，判读时按族标注
