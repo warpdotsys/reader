@@ -1053,7 +1053,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         if (urlMap.size <= 0) {
             return returnData.setErrorMsg("未配置书源")
         }
-        if (bookUrl.isEmpty()) {
+        if (bookUrl.isNullOrEmpty()) {
             return returnData.setErrorMsg("请输入书籍链接")
         }
         if (lastIndex.element >= urlMap.size - 1) {
@@ -2610,7 +2610,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             refresh = context.queryParam("refresh").firstOrNull()?.toInt() ?: 0
             concurrentCount = context.queryParam("concurrentCount").firstOrNull()?.toInt() ?: 24
         }
-        if (bookUrl.isEmpty()) {
+        if (bookUrl.isNullOrEmpty()) {
             response.write("event: error\n")
             response.end("data: " + jsonEncode(returnData.setErrorMsg("请输入书籍链接"), false) + "\n\n")
             return
