@@ -211,8 +211,7 @@ class BookSourceController(coroutineContext: CoroutineContext) : BaseController(
             startIndex = existIndex,
             endIndex = existIndex
         ) ?: return returnData.setErrorMsg("书源信息不存在")
-        val data = JsonObject(bookSourceList.getString(0)).map
-        return returnData.setData(data)
+        return returnData.setData(JsonObject(bookSourceList.getString(0)).map)
     }
 
     suspend fun getBookSources(context: RoutingContext): ReturnData {
