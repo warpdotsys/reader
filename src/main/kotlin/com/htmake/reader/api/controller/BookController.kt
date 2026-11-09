@@ -3045,7 +3045,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         fun add(headers: CaseInsensitiveHeaders, key: String, value: String) {
             headers.add(key, value)
         }
-        map.forEach { k, v -> add(multiMap, k, v) }
+        map.forEach(multiMap::add)
         val ttsUrl = "https://www.text-to-speech.cn/getSpeek.php"
         val result = awaitResult<HttpResponse<Buffer>> { handler ->
             webClient.postAbs(ttsUrl)
