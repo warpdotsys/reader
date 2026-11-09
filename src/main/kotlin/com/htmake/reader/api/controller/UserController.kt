@@ -49,10 +49,10 @@ class UserController(coroutineContext: CoroutineContext) : BaseController(corout
         val username = context.bodyAsJson.getString("username", "") ?: ""
         val password = context.bodyAsJson.getString("password", "") ?: ""
         val isLogin = context.bodyAsJson.getBoolean("isLogin", false) ?: false
-        if (username.isEmpty()) {
+        if (username.isNullOrEmpty()) {
             return returnData.setErrorMsg("请输入用户名")
         }
-        if (password.isEmpty()) {
+        if (password.isNullOrEmpty()) {
             return returnData.setErrorMsg("请输入密码")
         }
         var userMap: MutableMap<String, Map<String, Any>> = linkedMapOf()
@@ -197,10 +197,10 @@ class UserController(coroutineContext: CoroutineContext) : BaseController(corout
         }
         val username = context.bodyAsJson.getString("username") ?: ""
         val password = context.bodyAsJson.getString("password") ?: ""
-        if (username.isEmpty()) {
+        if (username.isNullOrEmpty()) {
             return returnData.setErrorMsg("请输入用户名")
         }
-        if (password.isEmpty()) {
+        if (password.isNullOrEmpty()) {
             return returnData.setErrorMsg("请输入密码")
         }
         if (username.length < 5) {
@@ -267,10 +267,10 @@ class UserController(coroutineContext: CoroutineContext) : BaseController(corout
         }
         val username = context.bodyAsJson.getString("username") ?: ""
         val password = context.bodyAsJson.getString("password") ?: ""
-        if (username.isEmpty()) {
+        if (username.isNullOrEmpty()) {
             return returnData.setErrorMsg("请输入用户名")
         }
-        if (password.isEmpty()) {
+        if (password.isNullOrEmpty()) {
             return returnData.setErrorMsg("请输入密码")
         }
         if (password.length < appConfig.minUserPasswordLength) {
