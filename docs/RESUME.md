@@ -976,3 +976,16 @@ BookSourceController.getBookSources（arrayListOf）、getBookSource（isNullOrE
 - **反向案例**：limitConcurrent 试验 ArrayList 失败（我方标记多是因方法结构差，不是数组构造）
 
 BaseController 剩余 5 个 = 「?.-临时槽」「append(Object/String)」「状态机」族，暂挂。
+
+## 2026-11-09 18:15 傍晚批：LVT 考古 + 「val+return」规律
+
+**新规律（高价值）**：
+- **「val x = expr; return x」两行式**：制品常保留中间变量（LVT 有尾部 var、槽位 +1），单表达式 `return expr` 会少一槽。
+  实证：getUserInfoClass（补 `val user = ...; return user` → 1.0）。
+- **LVT 变量名对齐（零指令风险）**：getBookChaptersCache/getInvalidBookSourceCache 字节码逐条相同，
+  只差 `cache` vs `bookChaptersCache`/`invalidBookSourceCache` 的 LVT 名；改名后 1.0。
+- **scan_lvt.py**（scratch/bc/）：对比方法级 LVT 变量名集合，列出「制品有、我方没有」的变量名。
+  产出 lvt_diff.json：含 setCover(缺 it)、searchBookContent(bookInfo,chapterIndex)、getAllContents(qy)、
+  getBookContent(isInBookShelf,nextChapterInfo)、saveBookSources(k,localBookSourceList)、
+  cacheBookOnServer(j)、ttsByEdge(ts)、analyzeUrl(entry,jsStr)、setCookie(newCookie) 等。
+  注意：参数名差异（getWorkDir 的 path vs subPath）也在其中，优先攻「val 缺失」型。
