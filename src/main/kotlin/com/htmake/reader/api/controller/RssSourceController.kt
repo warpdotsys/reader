@@ -167,8 +167,9 @@ class RssSourceController(coroutineContext: CoroutineContext) : BaseController(c
         val list = asJsonArray(getUserStorage(userNameSpace, "rssSources")) ?: return null
         for (i in 0 until list.size()) {
             val _rssSource = RssSource.fromJson(list.getJsonObject(i).toString()).getOrNull()
-            if (_rssSource == null || _rssSource.sourceUrl != url) continue
-            return _rssSource
+            if (_rssSource != null && _rssSource.sourceUrl.equals(url)) {
+                return _rssSource
+            }
         }
         return null
     }
