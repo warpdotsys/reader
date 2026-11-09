@@ -3243,17 +3243,17 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         bookSource: String,
         userNameSpace: String
     ): File {
-        val fileName = "《${book.name}》作者：${book.getRealAuthor()}.epub"
-        val filePath = FileUtils.getPath(exportDir, fileName)
-        val file = FileUtils.createFileWithReplace(filePath)
+        val filename = "《${book.name}》作者：${book.getRealAuthor()}.epub"
+        val bookPath = FileUtils.getPath(exportDir, filename)
+        val bookFile = FileUtils.createFileWithReplace(bookPath)
         val epubBook = EpubBook()
         epubBook.version = "2.0"
         setEpubMetadata(book, epubBook)
         setCover(book, epubBook, bookSource)
-        val assets = setAssets(book, epubBook)
-        setEpubContent(assets, book, epubBook, bookSource, userNameSpace)
-        EpubWriter().write(epubBook, FileOutputStream(file))
-        return file
+        val contentModel = setAssets(book, epubBook)
+        setEpubContent(contentModel, book, epubBook, bookSource, userNameSpace)
+        EpubWriter().write(epubBook, FileOutputStream(bookFile))
+        return bookFile
     }
 
     private fun setAssets(book: Book, epubBook: EpubBook): String {
