@@ -926,3 +926,13 @@ bcdiff 是更严口径（可能含注释/常量池文本残差），汇报全局
   源码层可修项已基本穷尽；剩余 delta 靠编译版本对齐（1.5.1）才能进一步压低
 - 待处理清单：scan_methods.json（97 项）中未被三族覆盖的 = forEachUser 的 entries 内联帧、
   toNumChapter 的 append(Object) 等，判读时按族标注
+
+## 2026-11-09 09:35 上午第二批
+
+- **v62 复核：787/934（tts 回退修复类配对；delta 全面下降：BookController 5965→5865、ExtKt 1633→1548）**
+- 新转正/收敛：StringExtensionsKt.safeTrim 0.57→0.97、isAbsUrl 0.70→0.97、htmlFormat 0.72→0.85；
+  TextFile.getChapterList 0.822→0.979（pattern 内联进 analyze 调用——制品是单表达式双 aload_0）
+- **教训：改共享方法（ttsByTextToSpeechCn 的 forEach 形态）会连锁类配对——回退后 934/936 恢复；
+  改前先看它对"自身类 + 内联调用方"的双向影响**
+- 边界族新增：Pattern.compile 的 checkNotNullExpressionValue 包装、inline 标记的 null-init 合并
+- 待办：analyze(Pattern)/(long,long) 两个大方法（0.53/0.80）余差均为已登记族，预计随编译版本对齐收敛
