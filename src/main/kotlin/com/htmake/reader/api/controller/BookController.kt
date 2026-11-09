@@ -3380,9 +3380,9 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                 val src = NetworkUtils.getAbsoluteURL(chapter.url, it)
                 val originalHref = MD5Utils.md5Encode16(src) + '.' + BookHelp.getImageSuffix(src)
                 val href = "Images/$originalHref"
-                val imageFile = BookHelp.getImage(book, src)
-                if (imageFile.exists()) {
-                    val fp = FileResourceProvider(imageFile.parent)
+                val vFile = BookHelp.getImage(book, src)
+                if (vFile.exists()) {
+                    val fp = FileResourceProvider(vFile.parent)
                     val img = LazyResource(fp, href, originalHref)
                     epubBook.resources.add(img)
                     text1 = text1.replace(it, "../$href")
