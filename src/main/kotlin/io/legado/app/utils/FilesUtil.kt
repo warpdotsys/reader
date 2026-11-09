@@ -92,9 +92,10 @@ object FileUtils {
 
     fun getPath(root: File, vararg subDirFiles: String): String {
         val path = StringBuilder(root.absolutePath)
-        for (it in subDirFiles) {
-            if (!(it.length > 0)) continue
-            path.append(File.separator).append(it)
+        subDirFiles.forEach { it ->
+            if (it.length > 0) {
+                path.append(File.separator).append(it)
+            }
         }
         return path.toString()
     }
