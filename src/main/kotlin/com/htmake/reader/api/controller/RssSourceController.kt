@@ -196,7 +196,8 @@ class RssSourceController(coroutineContext: CoroutineContext) : BaseController(c
         if (sortUrl.isEmpty()) {
             sortUrl = sourceUrl
         }
-        val rssSource = getRssSourceByURL(sourceUrl, getUserNameSpace(context))
+        val userNameSpace = getUserNameSpace(context)
+        val rssSource = getRssSourceByURL(sourceUrl, userNameSpace)
             ?: return returnData.setErrorMsg("RSS源不存在")
         val rssArtcles = Rss.getArticles(sortName, sortUrl, rssSource, page, Debug)
         return returnData.setData(rssArtcles)
