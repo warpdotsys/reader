@@ -208,7 +208,7 @@ open class BaseController(override val coroutineContext: CoroutineContext) : Cor
         if (userMapJson != null) {
             userMap = userMapJson.map as MutableMap<String, Map<String, Any>>
         }
-        return userMap[username]
+        return userMap.getOrDefault(username, null)
     }
 
     fun formatUser(userInfo: Any): Map<String, Any> {
