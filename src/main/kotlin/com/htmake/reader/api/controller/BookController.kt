@@ -3144,51 +3144,51 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             return
         }
         val userNameSpace = getUserNameSpace(context)
-        val book = getShelfBookByURL(bookUrl, userNameSpace)
-        if (book == null) {
+        val bookInfo = getShelfBookByURL(bookUrl, userNameSpace)
+        if (bookInfo == null) {
             context.success(returnData.setErrorMsg("请先加入书架"))
             return
         }
-        if (book.isLocalBook() && book.isLocalTxt()) {
-            val file = book.getLocalFile()
+        if (bookInfo.isLocalBook() && bookInfo.isLocalTxt()) {
+            val localFile = bookInfo.getLocalFile()
             context.response()
                 .putHeader("Cache-Control", "300")
                 .putHeader(
                     "Content-Disposition",
-                    "attachment; filename=" + java.net.URLEncoder.encode(file.name, "UTF-8")
+                    "attachment; filename=" + java.net.URLEncoder.encode(localFile.name, "UTF-8")
                 )
-                .sendFile(file.toString())
+                .sendFile(localFile.toString())
             return
         }
-        if (book.isLocalTxt()) {
-            val file = book.getLocalFile()
+        if (bookInfo.isLocalTxt()) {
+            val localFile = bookInfo.getLocalFile()
             context.response()
                 .putHeader("Cache-Control", "300")
                 .putHeader(
                     "Content-Disposition",
-                    "attachment; filename=" + java.net.URLEncoder.encode(file.name, "UTF-8")
+                    "attachment; filename=" + java.net.URLEncoder.encode(localFile.name, "UTF-8")
                 )
-                .sendFile(file.toString())
+                .sendFile(localFile.toString())
             return
         }
-        val bookSource = getBookSourceString(context, book.origin) ?: ""
-        if (!book.isLocalBook() && bookSource.isNullOrEmpty()) {
+        val bookSource = getBookSourceString(context, bookInfo.origin) ?: ""
+        if (!bookInfo.isLocalBook() && bookSource.isNullOrEmpty()) {
             context.success(returnData.setErrorMsg("未配置书源"))
             return
         }
         val exportDir = File(getWorkDir("storage", "assets", userNameSpace, "export"))
-        val file = if (isEpub > 0) {
-            exportToEpub(exportDir, book, bookSource, userNameSpace)
+        val bookFile = if (isEpub > 0) {
+            exportToEpub(exportDir, bookInfo, bookSource, userNameSpace)
         } else {
-            exportToTxt(exportDir, book, bookSource, userNameSpace)
+            exportToTxt(exportDir, bookInfo, bookSource, userNameSpace)
         }
         context.response()
             .putHeader("Cache-Control", "300")
             .putHeader(
                 "Content-Disposition",
-                "attachment; filename=" + java.net.URLEncoder.encode(file.name, "UTF-8")
+                "attachment; filename=" + java.net.URLEncoder.encode(bookFile.name, "UTF-8")
             )
-            .sendFile(file.toString())
+            .sendFile(bookFile.toString())
     }
 
     suspend fun exportToTxt(
