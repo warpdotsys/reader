@@ -182,13 +182,13 @@ fun File.zip(zipFilePath: String): Boolean {
     if (isDirectory) {
         val files = listFiles()
         val filesList = files.toList()
-        return filesList.zip(zipFilePath)
+        return zip(filesList, zipFilePath)
     }
-    return arrayListOf(this).zip(zipFilePath)
+    return zip(arrayListOf(this), zipFilePath)
 }
 
-fun List<File>.zip(zipFilePath: String): Boolean {
-    if (isEmpty()) {
+fun zip(files: List<File>, zipFilePath: String): Boolean {
+    if (files.isEmpty()) {
         return false
     }
     val zipFile = createFile(zipFilePath)
@@ -197,12 +197,12 @@ fun List<File>.zip(zipFilePath: String): Boolean {
     var inputStream: java.io.FileInputStream? = null
     try {
         zipOutputStream = ZipOutputStream(FileOutputStream(zipFile))
-        for (closeable in this) {
-            if (!closeable.exists()) {
+        for (file in files) {
+            if (!file.exists()) {
                 continue
             }
-            zipOutputStream.putNextEntry(ZipEntry(closeable.name))
-            inputStream = java.io.FileInputStream(closeable)
+            zipOutputStream.putNextEntry(ZipEntry(file.name))
+            inputStream = java.io.FileInputStream(file)
             var len = 0
             while (true) {
                 if (inputStream.read(buffer).also { len = it } <= 0) {
