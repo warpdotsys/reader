@@ -47,8 +47,7 @@ class TextFile(private val book: Book) {
                 }
             }
         }
-        val pattern = Pattern.compile(book.tocUrl, Pattern.MULTILINE)
-        val toc = analyze(pattern)
+        val toc = analyze(Pattern.compile(book.tocUrl, Pattern.MULTILINE))
         toc.forEachIndexed { index, bookChapter ->
             bookChapter.index = index
             bookChapter.bookUrl = book.bookUrl
