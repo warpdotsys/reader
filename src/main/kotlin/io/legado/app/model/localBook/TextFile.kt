@@ -105,8 +105,9 @@ class TextFile(private val book: Book) {
                     ) {
                         lastChapter?.let { it.end = it.start }
                         val lastTitle = toc.lastOrNull()?.title
+                        val lastTitleLength = lastTitle?.toByteArray(charset)?.size ?: 0
                         val chapters = analyze(
-                            lastStart + (lastTitle?.toByteArray(charset)?.size ?: 0),
+                            lastStart + lastTitleLength,
                             curOffset + chapterLength
                         )
                         if (lastTitle != null) {

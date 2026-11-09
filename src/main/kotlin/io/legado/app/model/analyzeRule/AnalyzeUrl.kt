@@ -182,7 +182,9 @@ class AnalyzeUrl(
                     }
                 }
                 option.getHeaderMap()?.let { headers ->
-                    headers.forEach { (k, v) -> headerMap[k.toString()] = v.toString() }
+                    headers.forEach { entry ->
+                        headerMap[entry.key.toString()] = entry.value.toString()
+                    }
                 }
                 option.getBody()?.let { body = it }
                 type = option.getType()
