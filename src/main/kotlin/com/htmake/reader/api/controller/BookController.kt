@@ -2877,7 +2877,7 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                 pitch = options["pitch"] + "%"
             }
         }
-        val ttsService = TTSService.builder().build()
+        val ts = TTSService.builder().build()
         val ssml = SSML.builder()
             .synthesisText(text)
             .voice(voice)
@@ -2885,12 +2885,11 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             .pitch(pitch)
             .style(TtsStyleEnum.chat)
             .build()
-        val mp3byte = ttsService.sendText(ssml)
+        val mp3byte = ts.sendText(ssml)
         if (options != null && "1".equals(options["base64"])) {
             val returnData = ReturnData()
             response.putHeader("content-type", "application/json; charset=utf-8")
-            val encoded = Base64.getEncoder().encodeToString(mp3byte)
-            returnData.setData(encoded)
+            returnData.setData(Base64.getEncoder().encodeToString(mp3byte))
             response.end(jsonEncode(returnData))
         } else {
             response.putHeader("Content-Type", "audio/mpeg")
