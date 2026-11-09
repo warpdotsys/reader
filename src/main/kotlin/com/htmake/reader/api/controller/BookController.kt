@@ -2746,27 +2746,27 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             val chapterList = getLocalChapterList(bookInfo, bookSource, false, userNameSpace)
             val cachedChapterContentSet = getCachedChapterContentSet(bookInfo, userNameSpace)
             val localCacheDir = getChapterCacheDir(bookInfo, userNameSpace)
-            for (chapterIndex in chapterList.indices) {
-                if (!cachedChapterContentSet.contains(chapterIndex)) {
-                    val index = chapterIndex
+            for (j in chapterList.indices) {
+                if (!cachedChapterContentSet.contains(j)) {
+                    val chapterIndex = j
                     val chapterInfo = chapterList[chapterIndex]
                     try {
                         var nextChapterUrl: String? = null
-                        if (index + 1 < chapterList.size) {
-                            val nextChapterInfo = chapterList[index + 1]
+                        if (chapterIndex + 1 < chapterList.size) {
+                            val nextChapterInfo = chapterList[chapterIndex + 1]
                             nextChapterUrl = nextChapterInfo.url
                         }
                         val content = WebBook(bookSource, appConfig.debugLog, userNameSpace = userNameSpace)
                             .getBookContent(bookInfo, chapterInfo, nextChapterUrl)
                         val chapterCacheFile =
-                            File(localCacheDir.absolutePath + File.separator + index + ".txt")
+                            File(localCacheDir.absolutePath + File.separator + chapterIndex + ".txt")
                         chapterCacheFile.writeText(content)
                         BookHelp.saveImages(
                             this,
                             BookSource.fromJson(bookSource).getOrNull() ?: BookSource(),
                             bookInfo, chapterInfo, content
                         )
-                        cachedChapterContentSet.add(index)
+                        cachedChapterContentSet.add(chapterIndex)
                     } catch (e: Exception) {
                         logger.info("cacheBookOnServer error: {}", e.message)
                     }
