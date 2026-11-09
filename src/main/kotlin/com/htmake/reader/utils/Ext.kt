@@ -785,9 +785,9 @@ fun sendEmail(toEmail: String, subject: String, body: String): Boolean {
     try {
         val sslSocketFactory = SSLSocketFactory.getDefault()
         val socket = sslSocketFactory.createSocket(host, port)
-        val outputStream = socket.getOutputStream()
+        val outputStream: OutputStream = socket.getOutputStream()
         val writer = OutputStreamWriter(outputStream)
-        val inputStream = socket.getInputStream()
+        val inputStream: InputStream = socket.getInputStream()
         val reader = inputStream.reader(Charsets.UTF_8).buffered()
         val response = reader.readLine()
         if (!response.startsWith("220")) {
