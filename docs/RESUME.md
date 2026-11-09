@@ -898,3 +898,11 @@ bcdiff 是更严口径（可能含注释/常量池文本残差），汇报全局
 - 新工具：`cache/scratch/bc/scan_close.py` + `scan_methods.json`（批量方法差异扫描器）
 - 规律：待收方法的判定看 `javap -c` 里 checkNotNullExpressionValue 的**消息字符串**——
   直接暴露源码表达式写法（如 "file.absolutePath" vs "file.absoluteFile"、"{\n gson.toJson(value)\n }" 块形态）
+
+## 2026-11-09 01:10 编译器行为边界（登记 loose）
+
+- **同类属性读 getfield vs getSource()**：制品（kotlin 1.5.1）对类内 final 属性读用 `getfield` 直读；
+  1.5.21 生成 `invokevirtual getSource()`。已核实者为 evalJS / getByteArrayAwait / getResponseAwait 的 `source` 读。
+  源码层无法强制（@JvmField 会改 ABI 且制品有 getter）。→ loose，判据：javap 比对时此类单指令差跳过。
+- 同族已知：launch 上下文的 inline 标记数差（login/resetPassword/importLicense 的 `iconst_0; istoreN` 多一枚）、
+  条件链尾单双跳合并（utf8/euc_tw/sjis/hz 的 `if_icmp` 镜像）。
