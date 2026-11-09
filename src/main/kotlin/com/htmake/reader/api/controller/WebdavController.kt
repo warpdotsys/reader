@@ -67,7 +67,8 @@ class WebdavController(
                     it.response().setStatusCode(401).end()
                     return@globalHandler
                 }
-                if (rawMethod.equals("OPTIONS") && it.request().getHeader("Authorization") != null) {
+                val authorization = it.request().getHeader("Authorization")
+                if (rawMethod.equals("OPTIONS") && authorization != null) {
                     it.response().setStatusCode(401).end()
                     return@globalHandler
                 }
