@@ -471,7 +471,7 @@ object FileUtils {
         return if (0 <= pos) {
             pathOrUrl.substring(pos + 1)
         } else {
-            "" + System.currentTimeMillis() + '.' + getExtension(pathOrUrl)
+            System.currentTimeMillis().toString() + '.' + getExtension(pathOrUrl)
         }
     }
 

@@ -109,7 +109,7 @@ fun File.deleteRecursively() {
         if (isFile) {
             delete()
         } else {
-            listFiles().forEach {
+            this.listFiles().forEach {
                 it.deleteRecursively()
             }
             delete()
