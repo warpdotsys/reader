@@ -906,3 +906,12 @@ bcdiff 是更严口径（可能含注释/常量池文本残差），汇报全局
   源码层无法强制（@JvmField 会改 ABI 且制品有 getter）。→ loose，判据：javap 比对时此类单指令差跳过。
 - 同族已知：launch 上下文的 inline 标记数差（login/resetPassword/importLicense 的 `iconst_0; istoreN` 多一枚）、
   条件链尾单双跳合并（utf8/euc_tw/sjis/hz 的 `if_icmp` 镜像）。
+
+## 2026-11-09 09:10 上午批次
+
+- ExtKt.deleteRecursively 1.0、FileUtils.getName 1.0（提交 71cc349）；FileUtils.listFiles 已 1.0
+- setBaseUrl 的 let 形态维持 0.95（if 形态崩到 0.44，说明制品确是 let；差在 let 接收者临时槽，属边界族）
+- 边界族补充：Ref 装箱 checkcast、inline-only 属性帧（`entries`）在 1.5.21 的省略、
+  try/catch 返回路径临时槽、`"" + long` 的空串 append —— 全部归「编译器行为边界」，判读时跳过
+- 后续优先打「源码形状差明显」的：getTxtTocRules / fixPic / refreshLocalBook / addBookGroupMulti
+  （BookController 内 0.78~0.83 档，预期有可套用的结构重写）
