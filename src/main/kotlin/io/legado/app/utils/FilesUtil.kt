@@ -143,7 +143,7 @@ object FileUtils {
     @JvmOverloads
     fun listDirs(
         startDirPath: String,
-        excludeDirs: Array<String>? = null,
+        excludeDirs1: Array<String>? = null,
         sortType: Int = 0
     ): Array<File> {
         val dirList = ArrayList<File>()
@@ -152,7 +152,7 @@ object FileUtils {
             return arrayOf()
         }
         val dirs = startDir.listFiles { f -> f?.isDirectory ?: false } ?: return arrayOf()
-        val excludes = excludeDirs ?: arrayOf()
+        val excludes = excludeDirs1 ?: arrayOf()
         for (dir in dirs) {
             val file = dir.absoluteFile
             if (excludes.contentDeepToString().contains(file.name)) continue
