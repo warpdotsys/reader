@@ -3209,9 +3209,9 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         userNameSpace: String,
         append: (String, ArrayList<Triple<String, Int, String>>?) -> Unit
     ) {
-        val text =
+        val qy =
             "${book.name}\n作者：${book.getRealAuthor()}\n简介：${HtmlFormatter.format(book.getDisplayIntro())}"
-        append(text, null)
+        append(qy, null)
         val chapterList = getLocalChapterList(book, bookSourceString, false, userNameSpace)
         val localCacheDir = getChapterCacheDir(book, userNameSpace)
         chapterList.forEachIndexed { index, chapter ->
@@ -3316,7 +3316,9 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
                 source = BookSource.fromJson(bookSourceString).getOrNull()
             )
             try {
-                epubBook.coverImage = Resource(analyzeUrl.getByteArrayAwait(), "Images/cover.jpg")
+                analyzeUrl.getByteArrayAwait().let {
+                    epubBook.coverImage = Resource(it, "Images/cover.jpg")
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
