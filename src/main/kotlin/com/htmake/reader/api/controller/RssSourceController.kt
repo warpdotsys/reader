@@ -30,7 +30,7 @@ class RssSourceController(coroutineContext: CoroutineContext) : BaseController(c
         if (list != null) {
             return returnData.setData(list.getList())
         }
-        return returnData.setData(ArrayList<Any>())
+        return returnData.setData(arrayListOf<Any>())
     }
 
     suspend fun canEditRssSource(context: RoutingContext): Boolean {
