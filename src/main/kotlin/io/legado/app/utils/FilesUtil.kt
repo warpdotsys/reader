@@ -495,15 +495,17 @@ object FileUtils {
 
     fun toFileSizeString(fileSize: Long): String {
         val df = DecimalFormat("0.00")
-        return if (fileSize < 1024) {
+        var fileSizeString: String? = null
+        fileSizeString = if (fileSize < KB) {
             "" + fileSize + 'B'
-        } else if (fileSize < 0x100000) {
-            df.format(fileSize.toDouble() / 1024.0) + "K"
-        } else if (fileSize < 0x40000000) {
-            df.format(fileSize.toDouble() / 0x100000.toDouble()) + "M"
+        } else if (fileSize < MB) {
+            df.format(fileSize.toDouble() / KB.toDouble()) + "K"
+        } else if (fileSize < GB) {
+            df.format(fileSize.toDouble() / MB.toDouble()) + "M"
         } else {
-            df.format(fileSize.toDouble() / 0x40000000.toDouble()) + "G"
+            df.format(fileSize.toDouble() / GB.toDouble()) + "G"
         }
+        return fileSizeString
     }
 
     fun getExtension(pathOrUrl: String): String {
