@@ -278,7 +278,8 @@ fun getWorkDir(subPath: String = ""): String {
         logger.info("Using workdir: {}", workDirPath)
         workDirInit = true
     }
-    return Paths.get(workDirPath, subPath).toString()
+    val path = Paths.get(workDirPath, subPath)
+    return path.toString()
 }
 
 fun getWorkDir(vararg subDirFiles: String): String {
