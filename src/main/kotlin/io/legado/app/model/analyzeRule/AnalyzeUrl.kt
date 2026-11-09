@@ -119,7 +119,7 @@ class AnalyzeUrl(
         val jsMatcher = AppPattern.JS_PATTERN.matcher(ruleUrl)
         while (jsMatcher.find()) {
             if (jsMatcher.start() > start) {
-                tmp = ruleUrl.substring(start, jsMatcher.start()).trim()
+                tmp = ruleUrl.substring(start, jsMatcher.start()).trim { it <= ' ' }
                 if (tmp.length > 0) {
                     ruleUrl = tmp.replace("@result", ruleUrl)
                 }
@@ -129,7 +129,7 @@ class AnalyzeUrl(
             start = jsMatcher.end()
         }
         if (ruleUrl.length > start) {
-            tmp = ruleUrl.substring(start).trim()
+            tmp = ruleUrl.substring(start).trim { it <= ' ' }
             if (tmp.length > 0) {
                 ruleUrl = tmp.replace("@result", ruleUrl)
             }
@@ -156,9 +156,9 @@ class AnalyzeUrl(
             while (matcher.find()) {
                 val pages = matcher.group(1)!!.split(",")
                 ruleUrl = if (page < pages.size) {
-                    ruleUrl.replace(matcher.group(), pages[page - 1].trim())
+                    ruleUrl.replace(matcher.group(), pages[page - 1].trim { it <= ' ' })
                 } else {
-                    ruleUrl.replace(matcher.group(), pages.last().trim())
+                    ruleUrl.replace(matcher.group(), pages.last().trim { it <= ' ' })
                 }
             }
         }
