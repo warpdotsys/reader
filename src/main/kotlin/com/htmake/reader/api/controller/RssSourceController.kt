@@ -71,9 +71,10 @@ class RssSourceController(coroutineContext: CoroutineContext) : BaseController(c
         for (i in 0 until rssSourceList.size()) {
             val _rssSource =
                 RssSource.fromJson(rssSourceList.getJsonObject(i).toString()).getOrNull()
-            if (_rssSource == null || _rssSource.sourceUrl != rssSource.sourceUrl) continue
-            existIndex = i
-            break
+            if (_rssSource != null && _rssSource.sourceUrl.equals(rssSource.sourceUrl)) {
+                existIndex = i
+                break
+            }
         }
         if (existIndex >= 0) {
             val list = rssSourceList.getList()
@@ -111,9 +112,10 @@ class RssSourceController(coroutineContext: CoroutineContext) : BaseController(c
             for (i in 0 until rssSourceList.size()) {
                 val _rssSource =
                     RssSource.fromJson(rssSourceList.getJsonObject(i).toString()).getOrNull()
-                if (_rssSource == null || _rssSource.sourceUrl != rssSource.sourceUrl) continue
-                existIndex = i
-                break
+                if (_rssSource != null && _rssSource.sourceUrl.equals(rssSource.sourceUrl)) {
+                    existIndex = i
+                    break
+                }
             }
             if (existIndex >= 0) {
                 val list = rssSourceList.getList()
@@ -146,9 +148,10 @@ class RssSourceController(coroutineContext: CoroutineContext) : BaseController(c
         for (i in 0 until rssSourceList.size()) {
             val _rssSource =
                 RssSource.fromJson(rssSourceList.getJsonObject(i).toString()).getOrNull()
-            if (_rssSource == null || _rssSource.sourceUrl != rssSource.sourceUrl) continue
-            existIndex = i
-            break
+            if (_rssSource != null && _rssSource.sourceUrl.equals(rssSource.sourceUrl)) {
+                existIndex = i
+                break
+            }
         }
         if (existIndex >= 0) {
             rssSourceList.remove(existIndex)
