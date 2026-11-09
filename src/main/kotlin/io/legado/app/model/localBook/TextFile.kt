@@ -287,9 +287,10 @@ class TextFile(private val book: Book) {
             if (book.charset == null) {
                 book.charset = EncodingDetect.getEncode(book.getLocalFile())
             }
-            return String(buffer, book.fileCharset())
+            val content = String(buffer, book.fileCharset())
                 .substringAfter(bookChapter.title)
-                .replace(Regex("^[\\n\\s]+"), "　　")
+            val pattern = "^[\\n\\s]+"
+            return content.replace(Regex(pattern), "　　")
         }
     }
 }
