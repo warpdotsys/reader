@@ -63,7 +63,7 @@ fun String?.isTrue(nullIsTrue: Boolean = false): Boolean {
 }
 
 fun String?.htmlFormat(): String {
-    if (this == null || this.isBlank()) {
+    if (isNullOrBlank()) {
         return ""
     }
     return this
