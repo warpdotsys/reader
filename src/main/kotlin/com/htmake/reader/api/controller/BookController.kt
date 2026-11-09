@@ -147,8 +147,8 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
 
     private fun getInvalidBookSourceCache(userNameSpace: String): ACache {
         val cacheDir = File(getWorkDir("storage", "cache", "invalidBookSourceCache", userNameSpace))
-        val cache = ACache.get(cacheDir, 5000000L, 1000000)
-        return cache
+        val invalidBookSourceCache = ACache.get(cacheDir, 5000000L, 1000000)
+        return invalidBookSourceCache
     }
 
     private fun isInvalidBookSource(bookSource: BookSource, userNameSpace: String): Boolean {
@@ -165,8 +165,8 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
 
     private fun getBookChaptersCache(userNameSpace: String): ACache {
         val cacheDir = File(getWorkDir("storage", "cache", "bookChaptersCache", userNameSpace))
-        val cache = ACache.get(cacheDir, 5000000L, 1000000)
-        return cache
+        val bookChaptersCache = ACache.get(cacheDir, 5000000L, 1000000)
+        return bookChaptersCache
     }
 
     suspend fun getInvalidBookSources(context: RoutingContext): ReturnData {
