@@ -233,7 +233,7 @@ class BookSourceController(coroutineContext: CoroutineContext) : BaseController(
         if (bookSourceList != null) {
             return returnData.setData(bookSourceList.list.map { JsonObject(it as String).map })
         }
-        return returnData.setData(ArrayList<Any>())
+        return returnData.setData(arrayListOf<Any>())
     }
 
     suspend fun deleteBookSource(context: RoutingContext): ReturnData {

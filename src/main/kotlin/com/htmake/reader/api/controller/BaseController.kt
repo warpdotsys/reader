@@ -62,7 +62,7 @@ open class BaseController(override val coroutineContext: CoroutineContext) : Cor
                 tokenMap.values.removeAll { it < user.last_login_at }
                 user.token_map = tokenMap
             }
-            var userMap: MutableMap<String, Map<String, Any>> = LinkedHashMap()
+            var userMap: MutableMap<String, Map<String, Any>> = linkedMapOf()
             val userMapJson = asJsonObject(getStorage("data", "users"))
             if (userMapJson != null) {
                 userMap = userMapJson.map as MutableMap<String, Map<String, Any>>
