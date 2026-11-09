@@ -106,8 +106,10 @@ object FileUtils {
             return
         }
         if (file.isDirectory) {
-            file.listFiles()?.forEach { subFile ->
-                deleteFile(subFile.path)
+            val files = file.listFiles()
+            files?.forEach { subFile ->
+                val path = subFile.path
+                deleteFile(path)
             }
         }
         file.delete()
