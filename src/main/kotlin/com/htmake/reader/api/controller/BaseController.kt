@@ -90,7 +90,7 @@ open class BaseController(override val coroutineContext: CoroutineContext) : Cor
             return true
         }
         val accessToken = context.queryParam("accessToken").firstOrNull() ?: ""
-        if (accessToken.isNotEmpty()) {
+        if (!accessToken.isNullOrEmpty()) {
             var userMap: MutableMap<String, Map<String, Any>> = LinkedHashMap()
             val userMapJson = asJsonObject(getStorage("data", "users"))
             if (userMapJson != null) {
@@ -103,8 +103,8 @@ open class BaseController(override val coroutineContext: CoroutineContext) : Cor
                 val existedUser = userMap[_username]?.toDataClass<User>()
                 if (existedUser != null) {
                     var isLogin = 0
-                    if (token.isNotEmpty()) {
-                        if (existedUser.token.isNotEmpty() && existedUser.token == token) {
+                    if (!token.isNullOrEmpty()) {
+                        if (!existedUser.token.isNullOrEmpty() && existedUser.token == token) {
                             isLogin = 1
                         }
                         if (isLogin == 0 && existedUser.token_map != null) {
@@ -199,7 +199,7 @@ open class BaseController(override val coroutineContext: CoroutineContext) : Cor
     }
 
     fun getUserInfoMap(username: String): Map<String, Any>? {
-        if (username.isEmpty()) {
+        if (username.isNullOrEmpty()) {
             return null
         }
         var userMap: MutableMap<String, Map<String, Any>> = LinkedHashMap()
