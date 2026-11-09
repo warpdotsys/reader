@@ -586,8 +586,8 @@ class UserController(coroutineContext: CoroutineContext) : BaseController(corout
             }
             var hasChanged = false
             with(userMap.entries.iterator()) {
-                forEach { entry ->
-                    val user = entry.value
+                forEach {
+                    val user = it.value
                     if (user != null) {
                         val username = user.getOrDefault("username", "") as String? ?: ""
                         if (!username.isNullOrEmpty()) {
