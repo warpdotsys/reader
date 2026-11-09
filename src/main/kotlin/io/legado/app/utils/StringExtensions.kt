@@ -8,7 +8,7 @@ fun String.cnCompare(other: String): Int {
 }
 
 fun String?.safeTrim(): String? {
-    return if (this == null || this.isBlank()) {
+    return if (isNullOrBlank()) {
         null
     } else {
         this.trim().toString()
@@ -16,7 +16,7 @@ fun String?.safeTrim(): String? {
 }
 
 fun String?.isAbsUrl(): Boolean {
-    if (this == null || this.isBlank()) {
+    if (isNullOrBlank()) {
         return false
     }
     return this.startsWith("http://", true) || this.startsWith("https://", true)
