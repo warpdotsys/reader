@@ -31,15 +31,15 @@ object BookHelp {
         return author
             ?.replace(Regex("作\\s*者[\\s:：]*"), "")
             ?.replace(Regex("\\s+"), " ")
-            ?.trim() ?: ""
+            ?.trim { it <= ' ' } ?: ""
     }
 
     fun formatBookName(name: String): String {
-        return name.replace(AppPattern.nameRegex, "").trim()
+        return name.replace(AppPattern.nameRegex, "").trim { it <= ' ' }
     }
 
     fun formatBookAuthor(author: String): String {
-        return author.replace(AppPattern.authorRegex, "").trim()
+        return author.replace(AppPattern.authorRegex, "").trim { it <= ' ' }
     }
 
     fun getBookCacheDir(book: Book): File {
