@@ -1014,3 +1014,18 @@ ttsByEdge 0.937→0.950、cacheBookOnServer(JsonArray) 0.998、searchBookContent
 - **for → forEach**：制品对数组遍历偏好 `arr.forEach { }`（本例 getPath/deleteFile）；
   `for (x in arr)` 的 1.5.21 展开会多出元素拷贝槽。
 - **常量常量池折叠**：`KB.toDouble()` 在 1.5.21 折叠成 double 常量，制品（1.5.1）保留 `ldc2 long + l2d`——版本残留，不可源码修复。
+
+## 2026-11-09 20:31 第六批：lambda 名 + trim 扩展 + zip 签名
+
+**#1.0**：getInvalidBookSources（info）、restoreFromMongodb（it）、backupToMongodb（content）、
+FileUtils.readText（trim 谓词）、WebdavController lambda-1、ExtKt zip(File) 。
+**大幅提升**：zip(List) 0.989（**扩展函数改普通函数**：`fun List<File>.zip(...)` → `fun zip(files: List<File>, ...)`）、
+updateImageLinkInContent 0.852→0.926（?.let 重构）、replaceKeyPageJs 0.981、forEachUser 0.973、getWorkDir 0.892。
+
+**新规律**：
+- **lambda 参数名也是签名**：制品大量用 `it`/`entry`/`info`/`content` 等直白名（我方写成语义名就错）——
+  LVT 里名字不同 = 要改。改完经常直接 1.0。
+- **`.trim()` vs `.trim { it <= ' ' }`**：JDK String.trim() 与 Kotlin CharSequence.trim 扩展是两种字节码；
+  制品用扩展形式（$iv$iv 帧 + `it: C`）。readText 1.0 实证。
+- **扩展函数 vs 普通函数**：制品 `zip(files: List<File>, ...)` 是普通函数，`fun List<File>.zip` 接收者形态
+  会多出 $this$zip 槽。
