@@ -221,7 +221,7 @@ open class BaseController(override val coroutineContext: CoroutineContext) : Cor
             user = userInfo
         }
         if (user == null) {
-            return LinkedHashMap()
+            return linkedMapOf()
         }
         return mutableMapOf(
             "username" to user.username,
