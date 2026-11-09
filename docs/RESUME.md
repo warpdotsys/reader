@@ -1029,3 +1029,13 @@ updateImageLinkInContent 0.852→0.926（?.let 重构）、replaceKeyPageJs 0.98
   制品用扩展形式（$iv$iv 帧 + `it: C`）。readText 1.0 实证。
 - **扩展函数 vs 普通函数**：制品 `zip(files: List<File>, ...)` 是普通函数，`fun List<File>.zip` 接收者形态
   会多出 $this$zip 槽。
+
+## 2026-11-09 21:15 第七批：LVT 清单收割（29→14）+ v66
+
+**#1.0**：getInvalidBookSources、restoreFromMongodb、backupToMongodb、FileUtils.readText、
+BookHelp.formatBookAuthor/formatBookName、exportToEpub、WebdavController lambda 大件（0.989）、deleteBook（0.995）。
+**大幅提升**：updateImageLinkInContent 0.852→0.926、setCookie 0.96、analyzeJs 0.908、replaceKeyPageJs 0.981。
+
+**v66 = 788/935**（比 v65 +1 类）。
+**LVT 清单剩余 14**：getBookContent(isInBookShelf 大分支)、syncFromWebdav(descDir:Object)、
+analyzeUrl(jsStr)、ttsByTextToSpeechCn$add、parseJsonStringList、TextFile.analyze、listFiles/listDirs/copy(数组循环族)、formatAuthor(?.-链)。
