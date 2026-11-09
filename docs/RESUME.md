@@ -1066,3 +1066,15 @@ UmdReader.ReadSection 0.99（default 正向包围）、VertExtKt.success 0.86、
 - mkdir 的 append(Object) vs append(String)：制品 home 静态类型非 String，kotlin 原生 `Any? +` 无法编译，登记 loose。
 
 **v69 = 790/935（84.5%）**。
+
+## 2026-11-10 凌晨续跑：槽位偏移扫描器 + getBookSource
+
+**scan_slots.py 产出**（42 个方法可识别槽位偏移）：Δ-1 = 23 个（我方多 1 槽）、Δ+1 = 8 个、
+Δ+2 = 5 个、其余零星。Δ-1 名单：checkAuth、getTxtTocRules、refreshLocalBook、getBookContent、
+saveBook、syncFromWebdav、saveToWebdav、cacheBookOnServer、getSpeakStream、setAssets、getBookSource、
+setAsDefaultBookSources、getBookSourceMap、decryptLicense、TextFile.analyze×2、logout、
+webdavUpload、webdavMove、webdavCopy、webdavLock、updateImageLinkInContent。
+**修复示例**：getBookSource 的 Δ-1 = 多余的 `val data` 中间量（内联后 0.975→0.987）。
+**方法论**：Δ-1 修复 = 在该方法前 1/3 处找「多出的中间 val」；Δ+1 = 补一个（常在条件/循环里）。
+
+**工具链现有**：scan_close / scan_markers / scan_lvt / scan_slots / classify_diffs / bytecode-diff / http-diff。
