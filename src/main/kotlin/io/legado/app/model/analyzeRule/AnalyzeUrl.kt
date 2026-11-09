@@ -535,7 +535,8 @@ class AnalyzeUrl(
             val cookieMap = cookieStore.cookieToMap(cookie)
             val customCookieMap = cookieStore.cookieToMap(headerMap["Cookie"] ?: "")
             cookieMap.putAll(customCookieMap)
-            cookieStore.mapToCookie(cookieMap)?.let {
+            val newCookie = cookieStore.mapToCookie(cookieMap)
+            newCookie?.let {
                 headerMap["Cookie"] = it
             }
         }
