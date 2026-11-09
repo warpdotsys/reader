@@ -193,7 +193,7 @@ class BookSourceController(coroutineContext: CoroutineContext) : BaseController(
         } else {
             bookSourceUrl = context.queryParam("bookSourceUrl").firstOrNull() ?: ""
         }
-        if (bookSourceUrl.isEmpty()) {
+        if (bookSourceUrl.isNullOrEmpty()) {
             return returnData.setErrorMsg("书源链接不能为空")
         }
         val userNameSpace = getUserNameSpace(context)
