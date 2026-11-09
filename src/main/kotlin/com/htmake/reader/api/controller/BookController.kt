@@ -515,14 +515,14 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         }
         var bookSource = getBookSourceString(context)
         val userNameSpace = getUserNameSpace(context)
-        var isInBookShelf = 0
+        var isInBookShelf = false
         var bookInfo: Book? = null
         var chapterInfo: BookChapter? = null
         var nextChapterUrl: String? = null
         if (chapterUrl.length > 0) {
             bookInfo = getShelfBookByURL(bookUrl, userNameSpace)
             if (bookInfo != null && bookInfo.origin.length > 0) {
-                isInBookShelf = 1
+                isInBookShelf = true
                 bookSource = (getBookSourceStringBySourceURLOpt(bookInfo.origin, userNameSpace) ?: "")
             }
         }
@@ -563,7 +563,8 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         }
         chapterUrl = chapterInfo.url
         if (chapterIndex + 1 < chapterList.size) {
-            nextChapterUrl = chapterList[chapterIndex + 1].url
+            val nextChapterInfo = chapterList[chapterIndex + 1]
+            nextChapterUrl = nextChapterInfo.url
         }
         if (chapterUrl.length == 0) {
             return returnData.setErrorMsg("获取章节链接失败")
