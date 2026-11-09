@@ -21,14 +21,14 @@ object StringUtils {
     private fun getChnMap(): HashMap<Char, Int> {
         val map = HashMap<Char, Int>()
         var cnStr = "零一二三四五六七八九十"
-        var cn = cnStr.toCharArray()
-        for (i in cn.indices) {
-            map[cn[i]] = i
+        var c = cnStr.toCharArray()
+        for (i in c.indices) {
+            map[c[i]] = i
         }
         cnStr = "〇壹贰叁肆伍陆柒捌玖拾"
-        cn = cnStr.toCharArray()
-        for (i in cn.indices) {
-            map[cn[i]] = i
+        c = cnStr.toCharArray()
+        for (i in c.indices) {
+            map[c[i]] = i
         }
         map['两'] = 2
         map['百'] = 100

@@ -1002,3 +1002,15 @@ ttsByEdge 0.937→0.950、cacheBookOnServer(JsonArray) 0.998、searchBookContent
 ② 只是名字不同 = 纯改名（零指令风险，如 bookChaptersCache/qy/localFile/bookFile）；
 ③ 显式类型 → 去类型可消 checkNotNullExpressionValue（saveBookSources 实证）。
 **v65 = 787/934**（类级持平，方法级 delta 继续大降）。
+
+## 2026-11-09 20:10 第五批：FileUtils 收割 + 两条新规律
+
+**1.0**：FileUtils.deleteFile（`val files = file.listFiles(); files?.forEach { subFile -> val path = subFile.path; deleteFile(path) }`）。
+**提升**：toFileSizeString 0.907、getPath 0.648→0.904。
+
+**新规律**：
+- **null-init + 流分析直返**：`var x: String? = null; x = <非空表达式>; return x`（不带 !! 和 ?:，靠数据流智能转换）——
+  toFileSizeString 实证；多写 ?: "" 或 !! 都会多出检查指令。
+- **for → forEach**：制品对数组遍历偏好 `arr.forEach { }`（本例 getPath/deleteFile）；
+  `for (x in arr)` 的 1.5.21 展开会多出元素拷贝槽。
+- **常量常量池折叠**：`KB.toDouble()` 在 1.5.21 折叠成 double 常量，制品（1.5.1）保留 `ldc2 long + l2d`——版本残留，不可源码修复。
