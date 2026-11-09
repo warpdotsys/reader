@@ -1051,3 +1051,18 @@ analyzeUrl(jsStr)、ttsByTextToSpeechCn$add、parseJsonStringList、TextFile.ana
   ByteConverter override 的 checkNotNullParameter 差异 = 版本族；方法名 `-24` mangle = 内联值类/版本族。
 
 **工具**：classify_diffs.py（差异归类器，作为 loose 登记素材）。
+
+## 2026-11-09 深夜批（23:20）：整类翻转 +2，v69 = 790/935
+
+**整类翻转**：
+- RemoteWebview$getStrResponse$strResponse$1（3/3 全等）——`var remoteApi = 远程属性 + "/render.html"` 被 lambda 捕获（原写为 val+另一个 remoteUrl 变量）。
+- （本批更早）BookController$restoreFromMongodb$handler$1。
+
+**提升**：BaseController.getUserInfoMap 0.855→0.974（`getOrDefault(username, null)` + isNullOrEmpty 双标记），
+UmdReader.ReadSection 0.99（default 正向包围）、VertExtKt.success 0.86、RemoteWebview 主方法重构中。
+
+**踩坑记录**：
+- getUserInfoMap 的空判 = isNullOrEmpty（第二标记在 early-return 之后）——单看一处会误判成 isEmpty，要靠整段字节码解读。
+- mkdir 的 append(Object) vs append(String)：制品 home 静态类型非 String，kotlin 原生 `Any? +` 无法编译，登记 loose。
+
+**v69 = 790/935（84.5%）**。
