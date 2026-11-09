@@ -1039,3 +1039,15 @@ BookHelp.formatBookAuthor/formatBookName、exportToEpub、WebdavController lambd
 **v66 = 788/935**（比 v65 +1 类）。
 **LVT 清单剩余 14**：getBookContent(isInBookShelf 大分支)、syncFromWebdav(descDir:Object)、
 analyzeUrl(jsStr)、ttsByTextToSpeechCn$add、parseJsonStringList、TextFile.analyze、listFiles/listDirs/copy(数组循环族)、formatAuthor(?.-链)。
+
+## 2026-11-10 凌晨批（用户休息期间续跑）：小 delta 类收割
+
+**#1.0/翻转**：
+- BookController$restoreFromMongodb$handler$1 = **整类翻转**（`if (!exists) return@forEach` → 正向 `if (exists) { delete }`；
+  同一规律再次奏效）。v67 = **789/935**（+1）。
+- Coroutine.executeBlock 可见性修复（public→private）。
+- VertExtKt.success 去 `!!`（0.83→0.86）；OkHttpUtilsKt/AnalyzeUrl 若干 delta≤12 的微差分析（多为版本残留）。
+- 新发现：lazy 属性 getter 的空检查（`<get-vertx>(...)` msg）= 1.5.21 新增发射，1.5.1 无——版本边界；
+  ByteConverter override 的 checkNotNullParameter 差异 = 版本族；方法名 `-24` mangle = 内联值类/版本族。
+
+**工具**：classify_diffs.py（差异归类器，作为 loose 登记素材）。
