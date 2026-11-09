@@ -989,3 +989,16 @@ BaseController 剩余 5 个 = 「?.-临时槽」「append(Object/String)」「�
   getBookContent(isInBookShelf,nextChapterInfo)、saveBookSources(k,localBookSourceList)、
   cacheBookOnServer(j)、ttsByEdge(ts)、analyzeUrl(entry,jsStr)、setCookie(newCookie) 等。
   注意：参数名差异（getWorkDir 的 path vs subPath）也在其中，优先攻「val 缺失」型。
+
+## 2026-11-09 晚 19:12 第四批：LVT 清单收割 + v65
+
+**#1.0**：getUserInfoClass、formatUser、saveUserSession、getBookSources、getBookChaptersCache、
+getInvalidBookSourceCache、getAllContents、cacheBookOnServer(RoutingContext)。
+**大幅提升**：exportBook 0.986（494/494 等长）、saveBookSources 0.989、setCover 0.858→0.986、
+ttsByEdge 0.937→0.950、cacheBookOnServer(JsonArray) 0.998、searchBookContent 0.778（状态机族）。
+
+**LVT 考古法（本轮主力）**：javap -l 对比两边 LocalVariableTable →
+① 「制品有我无」的变量 = 缺失的中间 val（如 user/bookInfo/ts/j/chapterIndex）→ 补上后 1.0；
+② 只是名字不同 = 纯改名（零指令风险，如 bookChaptersCache/qy/localFile/bookFile）；
+③ 显式类型 → 去类型可消 checkNotNullExpressionValue（saveBookSources 实证）。
+**v65 = 787/934**（类级持平，方法级 delta 继续大降）。
