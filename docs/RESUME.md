@@ -964,3 +964,15 @@ decryptLicense 0.92→0.94；UserController delta **1589 → 559（-65%）**；v
 
 **注意**：同型改动在小方法上未必对齐（激活码/目录校验等），改一处验一处，回退快的留。
 UserController 剩余 = uploadFile/forEachUser/logout（状态机槽位族）+ deleteUsers（vararg 尾元素 temp 族）。
+
+## 2026-11-09 16:15 下午第三批
+
+新转正：BaseController.saveUserSession（`* 1000L`→`* 1000` 全整数运算）、formatUser（linkedMapOf）、
+BookSourceController.getBookSources（arrayListOf）、getBookSource（isNullOrEmpty）。
+
+**新增规律**：
+- **整数字面量类型敏感**：`loginExpireDays * 86400 * 1000L` 与 `... * 1000` 生成不同字节码（后者 int 运算后 i2l）——
+  源码里的 L 后缀要与制品一致
+- **反向案例**：limitConcurrent 试验 ArrayList 失败（我方标记多是因方法结构差，不是数组构造）
+
+BaseController 剩余 5 个 = 「?.-临时槽」「append(Object/String)」「状态机」族，暂挂。
