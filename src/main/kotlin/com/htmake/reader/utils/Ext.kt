@@ -741,7 +741,7 @@ fun getInstalledLicense(ignoreInvalid: Boolean = false): License {
 }
 
 fun decryptToLicense(content: String): License? {
-    if (content.isEmpty()) {
+    if (content.isNullOrEmpty()) {
         return null
     }
     return decryptData(content)?.let {
