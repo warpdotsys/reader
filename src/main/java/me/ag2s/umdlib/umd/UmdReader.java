@@ -201,8 +201,9 @@ public class UmdReader {
                 break;
             }
             default: {
-                if (length <= 0) break;
-                byte[] byArray = reader.readBytes(length);
+                if (length > 0) {
+                    byte[] byArray = reader.readBytes(length);
+                }
             }
         }
     }
