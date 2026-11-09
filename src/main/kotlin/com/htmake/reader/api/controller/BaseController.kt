@@ -50,7 +50,7 @@ open class BaseController(override val coroutineContext: CoroutineContext) : Cor
             if (regenerateToken) {
                 user.token = genEncryptedPassword(user.username, System.currentTimeMillis().toString())
                 var tokenMap: MutableMap<String, Long>? = null
-                val expire = System.currentTimeMillis() + loginExpireDays * 86400 * 1000L
+                val expire = System.currentTimeMillis() + loginExpireDays * 86400 * 1000
                 if (user.token_map != null) {
                     tokenMap = user.token_map as? MutableMap<String, Long>
                 }
