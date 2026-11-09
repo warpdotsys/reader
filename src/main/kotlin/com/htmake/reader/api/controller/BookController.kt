@@ -3410,8 +3410,8 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
         val lastIndex: Int
         val size: Int
         if (context.request().method() == HttpMethod.POST) {
-            val url = context.bodyAsJson.getString("url")
-            bookUrl = url ?: context.bodyAsJson.getString("bookUrl") ?: ""
+            bookUrl = context.bodyAsJson.getString("url")
+                ?: context.bodyAsJson.getString("bookUrl") ?: ""
             keyword = context.bodyAsJson.getString("keyword") ?: ""
             lastIndex = context.bodyAsJson.getInteger("lastIndex", 0)!!
             size = context.bodyAsJson.getInteger("size", 20)!!
@@ -3428,30 +3428,31 @@ class BookController(coroutineContext: CoroutineContext) : BaseController(corout
             return returnData.setErrorMsg("请输入搜索关键字")
         }
         val userNameSpace = getUserNameSpace(context)
-        val book = getShelfBookByURL(bookUrl, userNameSpace)
-        if (book == null) {
+        val bookInfo = getShelfBookByURL(bookUrl, userNameSpace)
+        if (bookInfo == null) {
             return returnData.setErrorMsg("请先加入书架")
         }
         var bookSource: String? = null
-        if (!book.isLocalBook()) {
-            bookSource = getBookSourceString(context, book.origin)
+        if (!bookInfo.isLocalBook()) {
+            bookSource = getBookSourceString(context, bookInfo.origin)
             if (bookSource.isNullOrEmpty()) {
                 return returnData.setErrorMsg("未配置书源")
             }
         }
-        val chapterList = getLocalChapterList(book, bookSource ?: "", userNameSpace = userNameSpace)
+        val chapterList = getLocalChapterList(bookInfo, bookSource ?: "", userNameSpace = userNameSpace)
         if (lastIndex >= chapterList.size) {
             return returnData.setErrorMsg("没有更多了")
         }
-        val resultList: MutableList<SearchResult> = arrayListOf()
         val isEnd = Ref.BooleanRef()
+        val resultList: MutableList<SearchResult> = arrayListOf()
         context.request().connection().closeHandler { isEnd.element = true }
         logger.info("searchBookContent keyword: {} lastIndex: {}", keyword, lastIndex)
         var currentIndex = lastIndex + 1
         while (currentIndex < chapterList.size) {
-            val chapter = chapterList[currentIndex]
+            val chapterIndex = currentIndex
+            val chapter = chapterList[chapterIndex]
             currentIndex++
-            val chapterResult = searchChapter(book, chapter, keyword)
+            val chapterResult = searchChapter(bookInfo, chapter, keyword)
             if (chapterResult.size > 0) {
                 resultList.addAll(chapterResult)
             }
