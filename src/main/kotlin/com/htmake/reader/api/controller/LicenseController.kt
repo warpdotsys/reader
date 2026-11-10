@@ -214,7 +214,10 @@ class LicenseController(coroutineContext: CoroutineContext) : BaseController(cor
         if (content.isNullOrEmpty()) {
             return returnData.setErrorMsg("请输入密钥")
         }
-        val license = decryptToLicense(content) ?: return returnData.setErrorMsg("密钥错误")
+        val license = decryptToLicense(content)
+        if (license == null) {
+            return returnData.setErrorMsg("密钥错误")
+        }
         return returnData.setData(license)
     }
 
@@ -224,7 +227,10 @@ class LicenseController(coroutineContext: CoroutineContext) : BaseController(cor
         if (content.isEmpty()) {
             return returnData.setErrorMsg("请输入密钥")
         }
-        val license = decryptToLicense(content) ?: return returnData.setErrorMsg("密钥错误")
+        val license = decryptToLicense(content)
+        if (license == null) {
+            return returnData.setErrorMsg("密钥错误")
+        }
         if (license.verified) {
             return returnData.setErrorMsg("密钥已被使用")
         }
