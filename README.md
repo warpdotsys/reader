@@ -10,7 +10,7 @@ index.html                  入口页
 manifest.json               PWA manifest
 service-worker.js           离线缓存
 package.json
-css/                        4 个样式文件（app / chunk-vendors / index / reader / setting）
+css/                        5 个样式文件（app / chunk-vendors / index / reader / setting）
 img/                        图标与静态图（18 个）
 src/
   main.js                   应用主模块（views / store / router / api 引用入口）
