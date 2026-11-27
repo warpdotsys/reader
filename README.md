@@ -1,24 +1,28 @@
-# reader
+# reader-pro 3.2.14 服务端源码重建
 
-`reader-pro-3.2.14.jar` 的源码恢复工程 —— 一个用 Kotlin 写的 Spring Boot 2.1.6 / Vert.x 3.8.5 阅读服务。
+`reader-pro-3.2.14.jar` 的服务端源码重建工程：Kotlin + Java，Spring Boot 2.1.6 / Vert.x 3.8.5，Gradle 6.1.1。
 
-本仓库当前是**构建地基**。它的职责是把参考制品的精确工具链和依赖集合变成可复现的，这样应用源码才能按批次、可核验地迁入，而不是把无法验证的反编译产物直接倒进来。
+代码按原制品的字节码逐类还原，构建产物是可运行的 fat jar（javas 启动后监听 `/reader3/*`）。
 
-## 现状
+## 目录结构
 
-| 部分 | 状态 |
-| --- | --- |
-| 工具链（JDK 11、Gradle 6.1.1、Kotlin 1.5.21、Java 8 目标） | 已可复现 |
-| 依赖集合对齐制品 `BOOT-INF/lib` | 85/85 完全一致，由 `build` 强制校验 |
-| 应用资源（从制品提取） | 已在 `src/main/resources` |
-| 应用源码 | 第 1 批（86 个 Java 类）+ 第 2a 批（13 个 Kotlin 类）已迁入，ABI 已核验 — [docs/BATCHES.md](docs/BATCHES.md) |
-| fat jar 打包 | `bootJar` 已配置入口 `com.htmake.reader.ReaderApplicationKt` |
-
-目前 `gradlew build` 可以通过。已迁入的是内嵌格式库与解析器、常量与异常类；应用主流程尚未迁入，所以**它还不是可运行的服务**。
+```
+build.gradle.kts      构建脚本（Spring Boot / Kotlin / Java，Java 8 目标）
+settings.gradle.kts
+gradle.properties
+gradle/wrapper/       Gradle 6.1.1 wrapper
+gradlew / gradlew.bat
+src/main/kotlin/      145 个 Kotlin 源文件（带 @Metadata 的类）
+src/main/java/        104 个 Java 源文件
+src/main/resources/   157 个应用资源（含 simple-web、epub、书源默认数据等）
+src/lib/              2 个制品自带、无法从仓库解析的 jar（rhino、xmlpull）
+src/test/java/        1 个测试
+LICENSE               GNU GPL v3.0
+```
 
 ## 构建
 
-需要 **JDK 11**（参考制品早于 Gradle 与 Spring Boot 支持 Java 17+ 的版本）。完整说明（含固定版本的 AdoptOpenJDK 11.0.8 下载方式）见 [docs/BUILD.md](docs/BUILD.md)。
+需要 **JDK 11**（原制品的工具链早于 Gradle/Spring Boot 支持 Java 17+ 的版本）。
 
 ```bash
 export JAVA_HOME=/path/to/jdk-11
@@ -30,46 +34,35 @@ $env:JAVA_HOME = "D:\Tools\java\jdk-11.0.8+10"
 .\gradlew.bat build
 ```
 
-检查依赖相对参考制品的漂移（`build` 已包含此校验，不一致即失败）：
+产物：`build/libs/reader-pro-3.2.14.jar`。
+
+依赖版本对齐原制品 `BOOT-INF/lib`（86 个依赖），由构建脚本的 dependency parity 校验保证：
 
 ```bash
 ./gradlew verifyDependencyParity
-./gradlew build -PallowParityDrift   # 迁移期间临时放宽为警告
+./gradlew build -PallowParityDrift   # 临时放宽为警告
 ```
 
-## 目录结构
+## 运行
 
-```
-build.gradle.kts           Spring Boot / Kotlin / Java 构建脚本
-settings.gradle.kts
-gradle/wrapper/            Gradle 6.1.1 wrapper
-src/main/java/             应用源码 —— 纯 Java 来源的类
-src/main/kotlin/           应用源码 —— 带 @Metadata 的 Kotlin 来源类（见 docs/ROADMAP.md 还原规则）
-src/main/resources/        从制品提取的应用资源
-src/lib/                   制品自带、无法从仓库解析的 jar（rhino、xmlpull）
-src/test/java/             测试
-scripts/                   核验脚本（ABI 比对）
-docs/                      溯源、构建、架构、路线图、批次记录、依赖记录
-reference/decompiled/      CFR 反编译产物，仅作迁移证据，不参与构建
+```bash
+java -Dfile.encoding=UTF-8 -jar build/libs/reader-pro-3.2.14.jar \
+  --reader.server.port=4396 \
+  --server.port=4396 \
+  --reader.app.workDir=/path/to/data
 ```
 
-## 原则
+- 数据目录下会生成 `storage/`（`data/<userNS>/` 存书架、书源、替换规则等）与 `logs/`；
+- **不要**传 `--reader.server.contextPath=/reader3`：Vert.x 已自带 `/reader3/*` 路由，再加会让全部 API 404；
+- 接口鉴权用 `accessToken=<userNS>:<token>`，token 由 `POST /reader3/login`
+  （body `{"username","password","isLogin":true}`）签发。
 
-- **以制品为准。** 行为、资源字节和依赖版本都取自 `reader-pro-3.2.14.jar`，不靠记忆或猜测。
-- **反编译产物是证据，不是源码。** `reference/decompiled/` 永远不会进入构建路径，见 [reference/README.md](reference/README.md)。
-- **不做空实现。** 一个方法要么来自可辩护的来源被恢复，要么就不存在并登记在路线图里。
-- **任何声称的能力都必须可核验。** 未验证的内容在文档中一律标注为未验证。
+## 说明
 
-## 文档
-
-- [docs/GOAL.md](docs/GOAL.md) —— **目标、验收分档、判据与书写纪律**（先读这份）
-- [docs/ROADMAP.md](docs/ROADMAP.md) —— 批次与当前进度
-- [docs/BATCHES.md](docs/BATCHES.md) —— 已迁入批次的记录与未覆盖项
-- [docs/PROVENANCE.md](docs/PROVENANCE.md) —— 制品是什么，每条结论如何得出
-- [docs/BUILD.md](docs/BUILD.md) —— 工具链、构建与核验
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) —— 参考应用的模块地图
-- [docs/dependencies.txt](docs/dependencies.txt) —— 85 个内嵌依赖，逐项原样记录
+- 源码以原制品为准：行为、资源字节、依赖版本都取自 `reader-pro-3.2.14.jar`；
+- 恢复的代码库源自 `reader-pro` 所基于的 GPL-3.0 Legado 血统；
+- 未经验证的能力不在本仓库中声称。
 
 ## 许可
 
-GNU General Public License v3.0 —— 见 [LICENSE](LICENSE)。恢复的代码库源自 `reader-pro` 所基于的 GPL-3.0 Legado 血统。
+GNU General Public License v3.0 —— 见 [LICENSE](LICENSE)。
