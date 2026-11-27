@@ -14,7 +14,7 @@ gradle/wrapper/       Gradle 6.1.1 wrapper
 gradlew / gradlew.bat
 src/main/kotlin/      145 个 Kotlin 源文件（带 @Metadata 的类）
 src/main/java/        104 个 Java 源文件
-src/main/resources/   157 个应用资源（含 simple-web、epub、书源默认数据等）
+src/main/resources/   158 个应用资源（含 simple-web、epub、书源默认数据等）
 src/lib/              2 个制品自带、无法从仓库解析的 jar（rhino、xmlpull）
 src/test/java/        1 个测试
 LICENSE               GNU GPL v3.0
