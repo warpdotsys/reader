@@ -1,0 +1,3 @@
+@charset "UTF-8";.float-left { float:left }
+.dialog-footer { display:-ms-flexbox;display:flex;-ms-flex-direction:row-reverse;flex-direction:row-reverse;-ms-flex-wrap:wrap;flex-wrap:wrap;-ms-flex-pack:justify;justify-content:space-between }
+.dialog-footer .float-left { margin-right:5px;margin-bottom:5px }

@@ -1,0 +1,17 @@
+<div class="wrapper"><template v-for="o in bookList"><div :key="o.bookUrl" class="book" :style='showNavigation ? {
+                                minWidth: "360px !important"
+                            } : {}'><div class="cover-img" @click='(e) => {
+                                    return e.stopPropagation(), $emit("showBookInfoDialog", o)
+                                }'><el-image ref='"bookCoverList"' class="cover" :src="getCover(getBookCoverUrl(o), !0)" fit="cover" lazy="" /></div><div class="info" @click='(e) => {
+                                    return e.stopPropagation(), $emit("toDetail", o)
+                                }'><div class="book-operation"><template v-if="!isSearchResult && showBookEditButton"><i class="el-icon-close" @click='(e) => {
+                                    return e.stopPropagation(), $emit("deleteBook", o)
+                                }' /></template><template v-if="!isSearchResult && showBookEditButton"><i class="el-icon-edit" @click='(e) => {
+                                    return e.stopPropagation(), $emit("editBook", o)
+                                }' /></template><template v-if="isSearchResult"><i class="el-icon-edit" @click='(e) => {
+                                    return e.stopPropagation(), $emit("editBook", o, !0)
+                                }' /></template><template v-if="!isSearchResult && !showBookEditButton && o.totalChapterNum - 1 - o.durChapterIndex > 0"><el-badge class="unread-num-badge" :max="99" :value="o.totalChapterNum - 1 - o.durChapterIndex" /></template></div><div class="name" :class='showBookEditButton ? "edit" : ""' slot="reference">{{ " " + _s(o.name) + " " }}</div><div class="sub"><div class="author">{{ " " + _s(o.author || "") + " " }}</div><template v-if="o.totalChapterNum"><div class="dot">•</div></template><template v-if="o.totalChapterNum"><div class="size">{{ " 共" + _s(o.totalChapterNum) + "章 " }}</div></template></div><template v-if="!isSearchResult && o.durChapterTitle"><div class="dur-chapter">{{ " 已读：" + _s(o.durChapterTitle) + " " }}</div></template><template v-if="isSearchResult"><BookKind :book="o" /></template><template v-if="o.latestChapterTitle"><div class="last-chapter">{{ " " + _s(o.lastCheckTime ? dateFormat(o.lastCheckTime) : "最新") + "：" + _s(o.latestChapterTitle) + " " }}</div></template><template v-if="isSearchResult"><div><el-tag class="setting-connect" type="success" :effect='$store.getters.isNight ? "dark" : "light"' @click='(e) => {
+                                    return e.stopPropagation(), $emit("addBookToShelf", o)
+                                }'> 加入书架 </el-tag><template v-if="showSourceCount"><span class="source-count" @click='(e) => {
+                                    return e.stopPropagation(), $emit("showSearchBookSourceList", o)
+                                }'>{{ _s(o.sourceCount || 1) + " 个书源" }}</span></template></div></template></div></div></template></div>

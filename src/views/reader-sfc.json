@@ -1,0 +1,108 @@
+[
+ {
+  "id": "4f5b9f48",
+  "scopeId": "4f5b9f48",
+  "moduleId": "968f",
+  "optionKeys": [
+   "name",
+   "components",
+   "data",
+   "props",
+   "computed",
+   "mounted",
+   "watch",
+   "methods"
+  ]
+ },
+ {
+  "id": "062ccc78",
+  "scopeId": "062ccc78",
+  "moduleId": "968f",
+  "optionKeys": [
+   "name",
+   "data",
+   "props",
+   "mounted",
+   "computed",
+   "watch",
+   "methods"
+  ]
+ },
+ {
+  "id": "abde66a6",
+  "scopeId": "abde66a6",
+  "moduleId": "968f",
+  "optionKeys": [
+   "name",
+   "data",
+   "props",
+   "computed",
+   "mounted",
+   "watch",
+   "methods"
+  ]
+ },
+ {
+  "id": "510c7aa8",
+  "scopeId": "510c7aa8",
+  "moduleId": "968f",
+  "optionKeys": [
+   "name",
+   "data",
+   "components",
+   "props",
+   "computed",
+   "mounted",
+   "watch",
+   "methods"
+  ]
+ },
+ {
+  "id": "401db35b",
+  "scopeId": "401db35b",
+  "moduleId": "968f",
+  "optionKeys": [
+   "name",
+   "data",
+   "computed",
+   "watch",
+   "props",
+   "render",
+   "created",
+   "mounted",
+   "methods"
+  ]
+ },
+ {
+  "id": "59408c4f",
+  "scopeId": "59408c4f",
+  "moduleId": "968f",
+  "optionKeys": [
+   "name",
+   "data",
+   "components",
+   "props",
+   "render",
+   "mounted",
+   "unmounted",
+   "computed",
+   "watch",
+   "methods"
+  ]
+ },
+ {
+  "id": "9c1aae92",
+  "scopeId": "9c1aae92",
+  "moduleId": "968f",
+  "optionKeys": [
+   "components",
+   "mounted",
+   "activated",
+   "deactivated",
+   "watch",
+   "data",
+   "computed",
+   "methods"
+  ]
+ }
+]

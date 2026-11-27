@@ -1,0 +1,89 @@
+<div class="settings-wrapper" :class="{night: $store.getters.isNight, day: !$store.getters.isNight}" :style="popupTheme"><div class="settings-title"> 设置 <div class="title-btn" @click="resetConfig">重置</div><div class="title-btn" @click="restoreConfig">同步</div><div class="title-btn" @click="backupConfig">保存</div><div class="title-btn" @click="toggleNotAutoSync">{{ " " + _s(notAutoSync ? "自动同步" : "取消自动同步") + " " }}</div></div><div class="setting-list"><ul><li><span class="setting-item-title">配置方案</span><div class="selection-zone"><template v-for="(n, a) in $store.state.customConfigList"><span :key="a" class="span-item" :class="{selected: $store.getters.config.customConfig === n.name}" @click="(t) => {
+                                    return setCustomConfig(n)
+                                }"><span>{{ n.name }}</span><template v-if="a > 1 && $store.getters.config.customConfig !== n.name"><i class="el-icon-close delete-custom-config-icon" @click="(t) => {
+                                    return t.stopPropagation(), deleteCustomConfig(a, n.name)
+                                }" /></template></span></template><span :key='"addNewCustomConfig"' class="span-item" @click="addNewCustomConfig">新增方案</span><span :key='"autoTheme"' ref='"themes"' class="span-item" :class="{selected: $store.getters.config.autoTheme}" @click="setAutoTheme">自动切换</span></div></li><li><span class="setting-item-title">方案类型</span><div class="selection-zone"><template v-for="(n, a) in configDefaultTypeList"><span :key="a" class="span-item" :class="{selected: currentCustomConfig.configDefaultType === n}" @click="(t) => {
+                                    return setConfigDefaultType(n)
+                                }">{{ n }}</span></template></div></li><li><span class="setting-item-title">阅读主题</span><div class="selection-zone"><template v-for="(n, a) in themeColors"><span :key="a" ref='"themes"' class="theme-item" :class="{selected: config.theme === a}" :style="n" @click='(t) => {
+                                    return setConfig("theme", a)
+                                }'><template v-if="6 != a"><em class="iconfont"></em></template><template v-else><em class="moon-icon">{{ moonIcon }}</em></template></span></template><span :key='"custom"' ref='"themes"' class="span-item" :class='{selected: "custom" === config.theme}' @click='(t) => {
+                                return setConfig("theme", "custom")
+                            }'>自定义</span></div></li><template v-if='"custom" === config.theme'><li><span class="setting-item-title">自定义</span><div class="custom-theme"><div class="custom-theme-title"><span class="custom-theme-title">主题模式</span><template v-for="(n, a) in themeTypes"><span :key="a" class="span-item" :class="{selected: themeType == n}" @click='(t) => {
+                                    return setConfig("themeType", n)
+                                }'>{{ "day" === n ? "白天" : "黑夜" }}</span></template></div><span class="custom-theme-title">页面背景颜色 <el-color-picker v-model="config.bodyColor" /></span><span class="custom-theme-title">浮窗背景颜色 <el-color-picker v-model="config.popupColor" /></span><span class="custom-theme-title">阅读背景颜色 <el-color-picker v-model="config.contentColor" /></span><span class="custom-theme-title">阅读背景图片 <template v-for="(n, a) in builtinBG"><img :key="a" class="content-bg-preview" :class="{selected: $store.getters.config.contentBGImg == n.src}" :src="n.src" alt="" @click="(t) => {
+                                    return setBGImg(n.src)
+                                }" /></template><template v-for="n in $store.getters.config.customBGImgList || []"><div :key="n" class="content-bg-preview" :class="{selected: $store.getters.config.contentBGImg == n}"><img :src="getCustomBGImgURL(n)" alt="" @click="(t) => {
+                                    return setBGImg(n)
+                                }" /><i class="el-icon-close delete-bg-icon" @click="(t) => {
+                                    return t.stopPropagation(), deleteCustomBGImg(n)
+                                }" /></div></template><span class="upload-bg-btn" @click="uploadBGFile">上传</span><input ref='"bgFileRef"' style="display: none" type="file" @change="onBGFileChange" /></span></div></li></template><li><span class="setting-item-title">正文字体</span><div class="selection-zone"><template v-for="(n, a) in fonts"><span :key="a" class="span-item" :class="{selected: config.font == a}" @click='(t) => {
+                                    return setConfig("font", a)
+                                }'>{{ _s(n) + " " }}<i :class="{'el-icon-upload': !0, 'upload-font-icon': !0, active: config.customFontsMap && config.customFontsMap[customFonts[a]]}" @click="(t) => {
+                                    return t.stopPropagation(), uploadFontFile(customFonts[a], n)
+                                }" /></span></template><input ref='"fontFileRef"' style="display: none" type="file" @change="onFontFileChange" /></div></li><li><span class="setting-item-title">简繁转换</span><div class="selection-zone"><template v-for="(n, a) in chineseFonts"><span :key="a" class="span-item" :class="{selected: config.chineseFont == n}" @click='(t) => {
+                                    return setConfig("chineseFont", n)
+                                }'>{{ n }}</span></template></div></li><li><span class="setting-item-title">字体大小</span><div class="resize"><span class="less" @click='(t) => {
+                                return decConfig("fontSize")
+                            }'><em class="iconfont"></em></span><b /><span class="lang"><el-input class="setting-input" size="mini" v-model="config.fontSize" /></span><b /><span class="more" @click='(t) => {
+                                return incConfig("fontSize")
+                            }'><em class="iconfont"></em></span></div></li><li><span class="setting-item-title">字体粗细</span><div class="resize"><span class="less" @click='(t) => {
+                                return decConfig("fontWeight")
+                            }'><i class="el-icon-minus" /></span><b /><span class="lang"><el-input class="setting-input" size="mini" v-model="config.fontWeight" /></span><b /><span class="less" @click='(t) => {
+                                return incConfig("fontWeight")
+                            }'><i class="el-icon-plus" /></span></div></li><li><span class="setting-item-title font-color-title">字体颜色</span><el-color-picker v-model="config.fontColor" /></li><el-divider /><li><span class="setting-item-title">段落行高</span><div class="resize"><span class="less" @click='(t) => {
+                                return decConfig("lineHeight")
+                            }'><i class="el-icon-minus" /></span><b /><span class="lang"><el-input class="setting-input" size="mini" v-model="config.lineHeight" /></span><b /><span class="less" @click='(t) => {
+                                return incConfig("lineHeight")
+                            }'><i class="el-icon-plus" /></span></div></li><li><span class="setting-item-title">段落间距</span><div class="resize"><span class="less" @click='(t) => {
+                                return decConfig("paragraphSpace")
+                            }'><i class="el-icon-minus" /></span><b /><span class="lang"><el-input class="setting-input" size="mini" v-model="config.paragraphSpace" /></span><b /><span class="less" @click='(t) => {
+                                return incConfig("paragraphSpace")
+                            }'><i class="el-icon-plus" /></span></div></li><template v-if="$store.state.miniInterface"><li><span class="setting-item-title">左右边距</span><div class="resize"><span class="less" @click='(t) => {
+                                return decConfig("horizontalPadding")
+                            }'><i class="el-icon-minus" /></span><b /><span class="lang"><el-input class="setting-input" size="mini" v-model="config.horizontalPadding" /></span><b /><span class="less" @click='(t) => {
+                                return incConfig("horizontalPadding")
+                            }'><i class="el-icon-plus" /></span></div></li></template><template v-if="$store.state.miniInterface"><li><span class="setting-item-title">顶部边距</span><div class="resize"><span class="less" @click='(t) => {
+                                return decConfig("topPadding")
+                            }'><i class="el-icon-minus" /></span><b /><span class="lang"><el-input class="setting-input" size="mini" v-model="config.topPadding" /></span><b /><span class="less" @click='(t) => {
+                                return incConfig("topPadding")
+                            }'><i class="el-icon-plus" /></span></div></li></template><template v-if="$store.state.miniInterface"><li><span class="setting-item-title">底部边距</span><div class="resize"><span class="less" @click='(t) => {
+                                return decConfig("bottomPadding")
+                            }'><i class="el-icon-minus" /></span><b /><span class="lang"><el-input class="setting-input" size="mini" v-model="config.bottomPadding" /></span><b /><span class="less" @click='(t) => {
+                                return incConfig("bottomPadding")
+                            }'><i class="el-icon-plus" /></span></div></li></template><el-divider /><li><span class="setting-item-title">页面模式</span><div class="selection-zone"><template v-for="(n, a) in pageModes"><span :key="a" class="span-item" :class="{selected: config.pageMode == n}" @click="(t) => {
+                                    return setPageMode(n)
+                                }">{{ n }}</span></template></div></li><template v-if="!($store.state.miniInterface)"><li><span class="setting-item-title">页面宽度</span><div class="resize"><span class="less" @click='(t) => {
+                                return decConfig("readWidth")
+                            }'><em class="iconfont"></em></span><b /> <span class="lang">{{ config.readWidth }}</span><b /><span class="more" @click='(t) => {
+                                return incConfig("readWidth")
+                            }'><em class="iconfont"></em></span></div></li></template><el-divider /><li><span class="setting-item-title">翻页方式</span><div class="selection-zone"><template v-for="(n, a) in readMethods"><span :key="a" class="span-item" :class="{selected: config.readMethod == n}" v-show='!$store.state.miniInterface && "左右滑动" !== n || $store.state.miniInterface' @click="(t) => {
+                                    return setReadMethod(n)
+                                }">{{ n }}</span></template><span class="small-tip">❗️上下滚动2会自动隐藏看过的章节，但是可能会抖动</span></div></li><li><span class="setting-item-title">动画时长</span><div class="resize"><span class="less" @click='(t) => {
+                                return decConfig("animateMSTime")
+                            }'><i class="el-icon-minus" /></span><b /><span class="lang"><el-input class="setting-input" size="mini" v-model="config.animateMSTime" /></span><b /><span class="less" @click='(t) => {
+                                return incConfig("animateMSTime")
+                            }'><i class="el-icon-plus" /></span></div></li><li><span class="setting-item-title">自动翻页</span><div class="selection-zone"><template v-for="(n, a) in autoReadingMethods"><span :key="a" class="span-item" :class="{selected: config.autoReadingMethod === n}" @click='(t) => {
+                                    return setConfig("autoReadingMethod", n)
+                                }'>{{ n }}</span></template></div></li><template v-if='"像素滚动" === config.autoReadingMethod'><li><span class="setting-item-title">滚动像素</span><div class="resize"><span class="less" @click='(t) => {
+                                return decConfig("autoReadingPixel")
+                            }'><i class="el-icon-minus" /></span><b /><span class="lang"><el-input class="setting-input" size="mini" v-model="config.autoReadingPixel" /></span><b /><span class="less" @click='(t) => {
+                                return incConfig("autoReadingPixel")
+                            }'><i class="el-icon-plus" /></span></div></li></template><li><span class="setting-item-title">翻页速度</span><div class="resize"><span class="less" @click='(t) => {
+                                return decConfig("autoReadingLineTime")
+                            }'><i class="el-icon-minus" /></span><b /><span class="lang"><el-input class="setting-input" size="mini" v-model="config.autoReadingLineTime" /></span><b /><span class="less" @click='(t) => {
+                                return incConfig("autoReadingLineTime")
+                            }'><i class="el-icon-plus" /></span></div></li><li><span class="setting-item-title">全屏点击</span><div class="selection-zone"><template v-for="(n, a) in clickMethods"><span :key="a" class="span-item" :class="{selected: config.clickMethod == n}" @click='(t) => {
+                                    return setConfig("clickMethod", n)
+                                }'>{{ n }}</span></template></div></li><li><span class="setting-item-title">选择文字</span><div class="selection-zone"><template v-for="(n, a) in selectionActions"><span :key="a" class="span-item" :class="{selected: config.selectionAction == n}" @click='(t) => {
+                                    return setConfig("selectionAction", n)
+                                }'>{{ n }}</span></template></div></li><li><span class="setting-item-title">Epub解析</span><div class="selection-zone"><template v-for="(n, a) in epubModes"><span :key="a" class="span-item" :class="{selected: config.epubMode == n}" @click="(t) => {
+                                    return setEpubMode(n)
+                                }">{{ n }}</span></template><span class="small-tip">❗️解析可能导致显示问题，但是翻页性能较好，样式支持更多，也支持简繁切换。</span></div></li><li><span class="setting-item-title">请求超时</span><div class="resize"><span class="less" @click='(t) => {
+                                return decConfig("chapterRequestTimeout")
+                            }'><i class="el-icon-minus" /></span><b /><span class="lang"><el-input class="setting-input" size="mini" v-model="config.chapterRequestTimeout" /></span><b /><span class="less" @click='(t) => {
+                                return incConfig("chapterRequestTimeout")
+                            }'><i class="el-icon-plus" /></span></div></li><el-divider /><li><span class="setting-item-title">快捷键</span><div class="selection-zone"><template v-for="(n, a) in quickKeyModes"><span :key="a" class="span-item" :class="{selected: config.quickKeyMode === n}" @click="(t) => {
+                                    return setQuickKeyMode(n)
+                                }">{{ n }}</span></template></div></li><template v-if='"自定义" === config.quickKeyMode'><template v-for="(n, a) in quickKeyList"><li :key='"quickKey-" + a'><span class="setting-item-title">{{ n.label }}</span><div class="selection-zone"><template v-for="(a, u) in quickKeyOps"><span :key="u" class="span-item" :class="{selected: config.quickKey[n.key] === a}" @click="(t) => {
+                                        return setQuickKeyOpt(n.key, a)
+                                    }">{{ a }}</span></template></div></li></template></template><li class="operation-zone"><span class="span-btn" @click="showClickZone">显示翻页区域</span><span class="span-btn" @click="showRuleEditor">过滤规则管理</span></li></ul></div></div>

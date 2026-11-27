@@ -1,0 +1,71 @@
+[
+ {
+  "id": "e5965c98",
+  "scopeId": "e5965c98",
+  "moduleId": "d504",
+  "optionKeys": [
+   "name",
+   "data",
+   "props",
+   "computed",
+   "mounted",
+   "watch",
+   "methods"
+  ]
+ },
+ {
+  "id": "2fbafdaa",
+  "scopeId": "2fbafdaa",
+  "moduleId": "d504",
+  "optionKeys": [
+   "name",
+   "components",
+   "data",
+   "props",
+   "computed",
+   "methods"
+  ]
+ },
+ {
+  "id": "70ce2ba2",
+  "scopeId": "70ce2ba2",
+  "moduleId": "d504",
+  "optionKeys": [
+   "model",
+   "name",
+   "data",
+   "props",
+   "computed",
+   "watch",
+   "methods"
+  ]
+ },
+ {
+  "id": "b817d39e",
+  "scopeId": "b817d39e",
+  "moduleId": "d504",
+  "optionKeys": [
+   "components",
+   "data",
+   "watch",
+   "mounted",
+   "activated",
+   "methods",
+   "computed"
+  ]
+ },
+ {
+  "id": "77d83090",
+  "scopeId": "77d83090",
+  "moduleId": null,
+  "optionKeys": [
+   "name",
+   "data",
+   "props",
+   "computed",
+   "mounted",
+   "destroyed",
+   "methods"
+  ]
+ }
+]

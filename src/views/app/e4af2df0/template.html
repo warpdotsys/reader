@@ -1,0 +1,11 @@
+<el-dialog v-if="$store.getters.isNormalPage" :class='isWebApp && !$store.getters.isNight ? "status-bar-light-bg-dialog" : ""' title="书源订阅管理" :visible="show" :width="dialogWidth" :top="dialogTop" :fullscreen="$store.state.miniInterface" :before-close="cancel" @update:visible="(t) => {
+                            show = t
+                        }"><div class="custom-dialog-title" slot="title"><span class="el-dialog__title">书源订阅管理 </span></div><div class="source-container table-container"><el-table :data="remoteBookSourceList" :height="dialogContentHeight" @selection-change="(t) => {
+                            localSelection = t
+                        }"><el-table-column type="selection" width="25" :fixed="$store.state.miniInterface" /><el-table-column property="name" min-width="150px" label="名称" :fixed="$store.state.miniInterface" /><el-table-column property="link" label="链接" min-width="150px" /><el-table-column property="lastSyncTime" :formatter="formatTableField" label="上次同步" min-width="150px" /><el-table-column label="操作" width="120px"><template v-slot:default="o"><el-button type="text" @click="(t) => {
+                                        return showForm(o.row, o.$index)
+                                    }">修改</el-button><el-button type="text" :disabled="loadingIndex >= 0" @click="(t) => {
+                                        return sync(o.row, o.$index)
+                                    }"><template v-if="loadingIndex === o.$index"><i class="el-icon-loading" /></template>{{ loadingIndex === o.$index ? "同步中" : "同步" }}</el-button></template></el-table-column></el-table></div><div class="dialog-footer" slot="footer"><div><el-button class="float-left" type="primary" size="medium" @click="deleteRemoteBookSourceSub">批量删除<template v-if="localSelection.length"><span>{{ " (" + _s(localSelection.length) + ")" }}</span></template></el-button><el-button class="float-left" type="primary" size="medium" @click="(t) => {
+                            return showForm(!1)
+                        }">新增</el-button></div></div></el-dialog></el-dialog>

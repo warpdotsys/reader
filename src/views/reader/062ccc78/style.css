@@ -1,0 +1,55 @@
+.iconfont, .moon-icon { font-family:iconfont;font-style:normal }
+.settings-wrapper { -webkit-user-select:none;-ms-user-select:none;user-select:none;margin:-16px;margin-bottom:-13px;text-align:left;padding:24px;padding-top:calc(24px + constant(safe-area-inset-top));padding-top:calc(24px + env(safe-area-inset-top)) }
+.settings-wrapper .settings-title { font-size:18px;line-height:22px;margin-bottom:28px;font-family:-apple-system,Noto Sans,Helvetica Neue,Helvetica,Nimbus Sans L,Arial,Liberation Sans,PingFang SC,Hiragino Sans GB,Noto Sans CJK SC,Source Han Sans SC,Source Han Sans CN,Microsoft YaHei,Wenquanyi Micro Hei,WenQuanYi Zen Hei,ST Heiti,SimHei,WenQuanYi Zen Hei Sharp,sans-serif;font-weight:400 }
+.settings-wrapper .settings-title .title-btn { float:right;font-size:14px;color:#ed4259;cursor:pointer;display:inline-block;margin-left:5px }
+.settings-wrapper .setting-list { max-height:45vh;overflow-y:auto }
+.settings-wrapper .setting-list ul { list-style:none outside none;margin:0;padding:0 }
+.settings-wrapper .setting-list ul li:not(:first-child) { margin-top:20px }
+.settings-wrapper .setting-list ul li { list-style:none outside none }
+.settings-wrapper .setting-list ul li .setting-item-title { display:inline-block;width:56px;margin-right:16px;vertical-align:top;line-height:36px;color:#666 }
+.settings-wrapper .setting-list ul li .font-color-title { line-height:40px }
+.settings-wrapper .setting-list ul li .selection-zone { display:inline-block;width:calc(100% - 72px);word-wrap:break-word }
+.settings-wrapper .setting-list ul li .selection-zone span { margin-bottom:5px }
+.settings-wrapper .setting-list ul li .span-item { width:78px;height:34px;cursor:pointer;margin-right:16px;border-radius:2px;text-align:center;vertical-align:middle;display:inline-block;font:14px/34px PingFangSC-Regular,HelveticaNeue-Light,Helvetica Neue Light,Microsoft YaHei,sans-serif;position:relative }
+.settings-wrapper .setting-list ul li .span-item .delete-custom-config-icon { display:inline-block;cursor:pointer;position:absolute;top:-10px;right:-10px;font-size:20px;color:#ed4259;z-index:10 }
+.settings-wrapper .setting-list ul li .span-item .upload-font-icon { display:inline-block;cursor:pointer;position:absolute;top:-10px;right:-10px;font-size:20px;z-index:10;color:#606266 }
+.settings-wrapper .setting-list ul li .span-item .upload-font-icon.active { color:#ed4259 }
+.settings-wrapper .setting-list ul li .span-item.selected { border:1px solid #ed4259;color:#ed4259 }
+.settings-wrapper .setting-list ul li .custom-theme { width:calc(100% - 72px);display:inline-block }
+.settings-wrapper .setting-list ul li .custom-theme .custom-theme-title { display:inline-block;margin-right:28px;margin-bottom:5px }
+.settings-wrapper .setting-list ul li .custom-theme .content-bg-preview { width:36px;height:36px;display:inline-block;vertical-align:middle;margin-left:10px;margin-bottom:8px;position:relative;box-sizing:border-box }
+.settings-wrapper .setting-list ul li .custom-theme .content-bg-preview img { width:100%;height:100%;display:inline-block;vertical-align:middle }
+.settings-wrapper .setting-list ul li .custom-theme .content-bg-preview .delete-bg-icon { position:absolute;top:-6px;right:-6px;font-size:18px;color:#ed4259 }
+.settings-wrapper .setting-list ul li .custom-theme .selected { color:#ed4259;border:1px solid #ed4259 }
+.settings-wrapper .setting-list ul li .custom-theme .upload-bg-btn { display:inline-block;margin-left:10px;color:#ed4259;cursor:pointer }
+.settings-wrapper .setting-list ul li .theme-item { line-height:32px;width:34px;height:34px;margin-right:16px;border-radius:100%;display:inline-block;cursor:pointer;text-align:center;vertical-align:middle }
+.settings-wrapper .setting-list ul li .theme-item .iconfont { display:none }
+.settings-wrapper .setting-list ul li .selected { color:#ed4259 }
+.settings-wrapper .setting-list ul li .selected .iconfont { display:inline }
+.settings-wrapper .setting-list ul li .resize { display:inline-block;height:34px;vertical-align:middle;border-radius:2px }
+.settings-wrapper .setting-list ul li .resize span { min-width:72px;height:34px;line-height:34px;display:inline-block;cursor:pointer;text-align:center;vertical-align:middle }
+.settings-wrapper .setting-list ul li .resize span em { font-style:normal }
+.settings-wrapper .setting-list ul li .resize .lang { color:#a6a6a6;font-weight:400;font-family:-apple-system,Noto Sans,Helvetica Neue,Helvetica,Nimbus Sans L,Arial,Liberation Sans,PingFang SC,Hiragino Sans GB,Noto Sans CJK SC,Source Han Sans SC,Source Han Sans CN,Microsoft YaHei,Wenquanyi Micro Hei,WenQuanYi Zen Hei,ST Heiti,SimHei,WenQuanYi Zen Hei Sharp,sans-serif }
+.settings-wrapper .setting-list ul li .resize b { display:inline-block;height:20px;vertical-align:middle }
+.settings-wrapper .setting-list ul .operation-zone { display:-ms-flexbox;display:flex;-ms-flex-direction:row;flex-direction:row;-ms-flex-pack:justify;justify-content:space-between }
+.settings-wrapper .setting-list ul .operation-zone .span-btn { cursor:pointer;color:#ed4259 }
+.settings-wrapper .setting-list ul .small-tip { font-size:13px }
+.settings-wrapper .setting-list::-webkit-scrollbar { width:0!important }
+.settings-wrapper .el-color-picker { vertical-align:middle }
+.night .selected, .night .theme-item { border:1px solid #666 }
+.night .moon-icon { color:#ed4259 }
+.night .span-item, .night .resize { border:1px solid #666;background:rgba(45,45,45,.5) }
+.night .resize b { border-right:1px solid #666 }
+.day .theme-item { border:1px solid #e5e5e5 }
+.day .selected { border:1px solid #ed4259 }
+.day .moon-icon { display:inline;color:hsla(0,0%,100%,.2) }
+.day .span-item { background:hsla(0,0%,100%,.5);border:1px solid rgba(0,0,0,.1) }
+.day .resize { border:1px solid #e5e5e5;background:hsla(0,0%,100%,.5) }
+.day .resize b { border-right:1px solid #e5e5e5 }
+.span-item:hover { border:1px solid #ed4259;color:#ed4259 }
+li .less:hover, li .more:hover { color:#ed4259 }
+
+@media (hover:hover) {
+  .span-item:hover{border:1px solid #ed4259;color:#ed4259}
+  li .less:hover,li .more:hover{color:#ed4259}
+}

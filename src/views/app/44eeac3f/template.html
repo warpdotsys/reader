@@ -1,0 +1,11 @@
+<el-dialog v-if="$store.getters.isNormalPage" :class='isWebApp && !$store.getters.isNight ? "status-bar-light-bg-dialog" : ""' title="替换规则管理" :visible="show" :width="dialogWidth" :top="dialogTop" :fullscreen="$store.state.miniInterface" :before-close="cancel" @update:visible="(t) => {
+                            show = t
+                        }"><div class="custom-dialog-title" slot="title"><span class="el-dialog__title">替换规则管理</span></div><div class="source-container table-container"><el-table :data="$store.state.filterRules" :height="dialogContentHeight" @selection-change="(t) => {
+                            localSelection = t
+                        }"><el-table-column type="selection" width="25" :fixed="$store.state.miniInterface" /><el-table-column property="name" min-width="150px" label="规则名称" :fixed="$store.state.miniInterface" /><el-table-column property="scope" label="替换范围" min-width="150px" /><el-table-column property="isEnabled" label="是否启用" min-width="80"><template v-slot:default="o"><el-switch active-color="#13ce66" inactive-color="#ff4949" :active-value="true" :inactive-value="false" v-model="o.row.isEnabled" @change="(t) => {
+                                        return toggleRuleEnabled(o.row, t)
+                                    }" /></template></el-table-column><el-table-column label="操作" width="100px"><template v-slot:default="o"><el-button type="text" @click="(t) => {
+                                        return editReplaceRule(o.row)
+                                    }">编辑</el-button></template></el-table-column></el-table></div><div class="dialog-footer" slot="footer"><div><el-button class="float-left" type="primary" size="medium" @click="deleteReplaceRules">批量删除<template v-if="localSelection.length"><span>{{ " (" + _s(localSelection.length) + ")" }}</span></template></el-button><el-button class="float-left" type="primary" size="medium" @click="uploadFile">导入</el-button><el-button class="float-left" type="primary" size="medium" @click="addNew">添加</el-button><input ref='"fileRef"' style="display: none" type="file" @change="(t) => {
+                            return onFileChange(t)
+                        }" /></div></div></el-dialog></el-dialog>

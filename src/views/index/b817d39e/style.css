@@ -1,0 +1,101 @@
+.index-wrapper { height:100%;width:100%;display:-ms-flexbox;display:flex;-ms-flex-direction:row;flex-direction:row }
+.index-wrapper .navigation-wrapper { width:260px;min-width:260px;height:100%;box-sizing:border-box;background-color:#f7f7f7;position:relative;padding-top:0;padding-top:constant(safe-area-inset-top)!important;padding-top:env(safe-area-inset-top)!important }
+.index-wrapper .navigation-wrapper .navigation-inner-wrapper { padding:48px 36px 66px 36px;height:100%;overflow-y:auto;box-sizing:border-box }
+.index-wrapper .navigation-wrapper .navigation-title { font-size:24px;font-weight:600;font-family:-apple-system,Noto Sans,Helvetica Neue,Helvetica,Nimbus Sans L,Arial,Liberation Sans,PingFang SC,Hiragino Sans GB,Noto Sans CJK SC,Source Han Sans SC,Source Han Sans CN,Microsoft YaHei,Wenquanyi Micro Hei,WenQuanYi Zen Hei,ST Heiti,SimHei,WenQuanYi Zen Hei Sharp,sans-serif }
+.index-wrapper .navigation-wrapper .navigation-title .version-text { float:right;font-size:14px;line-height:33px;font-weight:400;color:#b1b1b1;display:inline-block;cursor:pointer }
+.index-wrapper .navigation-wrapper .navigation-sub-title { font-size:16px;font-weight:500;font-family:-apple-system,Noto Sans,Helvetica Neue,Helvetica,Nimbus Sans L,Arial,Liberation Sans,PingFang SC,Hiragino Sans GB,Noto Sans CJK SC,Source Han Sans SC,Source Han Sans CN,Microsoft YaHei,Wenquanyi Micro Hei,WenQuanYi Zen Hei,ST Heiti,SimHei,WenQuanYi Zen Hei Sharp,sans-serif;margin-top:16px;color:#b1b1b1 }
+.index-wrapper .navigation-wrapper .search-wrapper .search-input { border-radius:50%;margin-top:24px }
+.index-wrapper .navigation-wrapper .search-wrapper .search-input .el-input__inner { border-radius:50px;border-color:#e3e3e3 }
+.index-wrapper .navigation-wrapper .recent-wrapper { margin-top:36px }
+.index-wrapper .navigation-wrapper .recent-wrapper .recent-title { font-size:14px;color:#b1b1b1;font-family:-apple-system,Noto Sans,Helvetica Neue,Helvetica,Nimbus Sans L,Arial,Liberation Sans,PingFang SC,Hiragino Sans GB,Noto Sans CJK SC,Source Han Sans SC,Source Han Sans CN,Microsoft YaHei,Wenquanyi Micro Hei,WenQuanYi Zen Hei,ST Heiti,SimHei,WenQuanYi Zen Hei Sharp,sans-serif }
+.index-wrapper .navigation-wrapper .recent-wrapper .recent-title .right-text { float:right;display:inline-block;height:20px;line-height:20px;cursor:pointer;-webkit-user-select:none;-ms-user-select:none;user-select:none }
+.index-wrapper .navigation-wrapper .recent-wrapper .reading-recent { margin:18px 0 }
+.index-wrapper .navigation-wrapper .recent-wrapper .reading-recent .recent-book { cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis }
+.index-wrapper .navigation-wrapper .setting-wrapper { margin-top:36px }
+.index-wrapper .navigation-wrapper .setting-wrapper .setting-title { font-size:14px;color:#b1b1b1;font-family:-apple-system,Noto Sans,Helvetica Neue,Helvetica,Nimbus Sans L,Arial,Liberation Sans,PingFang SC,Hiragino Sans GB,Noto Sans CJK SC,Source Han Sans SC,Source Han Sans CN,Microsoft YaHei,Wenquanyi Micro Hei,WenQuanYi Zen Hei,ST Heiti,SimHei,WenQuanYi Zen Hei Sharp,sans-serif }
+.index-wrapper .navigation-wrapper .setting-wrapper .setting-title .right-text { float:right;display:inline-block;height:20px;line-height:20px;cursor:pointer;-webkit-user-select:none;-ms-user-select:none;user-select:none }
+.index-wrapper .navigation-wrapper .setting-wrapper .no-point { pointer-events:none }
+.index-wrapper .navigation-wrapper .setting-wrapper .setting-connect { cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis }
+.index-wrapper .navigation-wrapper .setting-wrapper .setting-item { padding-top:16px }
+.index-wrapper .navigation-wrapper .setting-wrapper .setting-btn { margin-right:15px;margin-bottom:15px;cursor:pointer }
+.index-wrapper .navigation-wrapper .setting-wrapper .setting-select { width:100% }
+.index-wrapper .navigation-wrapper .search-setting { margin-top:28px }
+.index-wrapper .navigation-wrapper .bottom-icons { position:absolute;bottom:30px;width:188px;left:36px;-ms-flex-align:center;align-items:center;display:-ms-flexbox;display:flex;-ms-flex-direction:row;flex-direction:row;-ms-flex-pack:justify;justify-content:space-between;pointer-events:none }
+.index-wrapper .navigation-wrapper .bottom-icons .bottom-icon { height:36px;pointer-events:all }
+.index-wrapper .navigation-wrapper .bottom-icons .bottom-icon img { width:36px;height:36px }
+.index-wrapper .navigation-wrapper .bottom-icons .theme-item { line-height:32px;width:36px;height:36px;border-radius:100%;display:inline-block;cursor:pointer;text-align:center;vertical-align:middle;pointer-events:all }
+.index-wrapper .navigation-wrapper .bottom-icons .theme-item .el-icon-moon { color:#f7f7f7;line-height:34px }
+.index-wrapper .navigation-wrapper .bottom-icons .theme-item .el-icon-sunny { color:#121212;line-height:34px }
+.index-wrapper .navigation-wrapper .setting-wrapper:last-child { padding-bottom:20px }
+.index-wrapper .shelf-wrapper { padding:48px 48px;height:100%;max-height:100%;width:100%;background-color:#fff;display:-ms-flexbox;display:flex;-ms-flex-direction:column;flex-direction:column;box-sizing:border-box }
+.index-wrapper .shelf-wrapper .shelf-title { font-size:20px;font-weight:600;font-family:-apple-system,Noto Sans,Helvetica Neue,Helvetica,Nimbus Sans L,Arial,Liberation Sans,PingFang SC,Hiragino Sans GB,Noto Sans CJK SC,Source Han Sans SC,Source Han Sans CN,Microsoft YaHei,Wenquanyi Micro Hei,WenQuanYi Zen Hei,ST Heiti,SimHei,WenQuanYi Zen Hei Sharp,sans-serif;margin-bottom:5px;min-width:320px;box-sizing:border-box }
+.index-wrapper .shelf-wrapper .shelf-title .el-icon-menu { cursor:pointer }
+.index-wrapper .shelf-wrapper .shelf-title .title-btn { font-size:14px;line-height:28px;float:right;cursor:pointer;-webkit-user-select:none;-ms-user-select:none;user-select:none;margin-left:10px }
+.index-wrapper .shelf-wrapper .shelf-title .title-btn .el-icon-loading { font-size:16px }
+.index-wrapper .shelf-wrapper .el-icon-loading { font-size:36px;color:#b5b5b5 }
+.index-wrapper .shelf-wrapper .el-loading-text { font-weight:500;color:#b5b5b5 }
+.index-wrapper .shelf-wrapper .book-group-wrapper { padding:5px 0;margin-bottom:10px }
+.index-wrapper .shelf-wrapper .book-group-wrapper .book-group-tabs { width:100% }
+.index-wrapper .shelf-wrapper .book-group-wrapper .book-group-btn { margin-right:10px;cursor:pointer }
+.index-wrapper .shelf-wrapper .book-group-wrapper .book-group-btn.selected { color:#fff;background:#409eff;border-color:#409eff }
+.index-wrapper .shelf-wrapper .books-wrapper { -ms-flex:1;flex:1;overflow-x:hidden;overflow-y:scroll }
+.index-wrapper .shelf-wrapper .books-wrapper::-webkit-scrollbar { width:0!important }
+.unread-num-badge .el-badge__content { border:none }
+.night .navigation-wrapper { background-color:#121212;border-right:1px solid #555 }
+.night .navigation-title, .night .shelf-title { color:#bbb }
+.night .shelf-wrapper { background-color:#222 }
+.night .el-input__inner { background-color:#444;border:1px solid #444!important;color:#aaa }
+.night .book .info .name { color:#bbb!important }
+.night .book .info .book-operation, .night .book .info .sub { color:#6b6b6b!important }
+.night .book .info .dur-chapter, .night .book .info .intro, .night .book .info .last-chapter { color:#969ba3!important }
+.night .check-tip { color:#bbb }
+.source-container { padding:0 10px }
+.source-container.table-container { padding:0 }
+.source-container .check-form { display:-ms-flexbox;display:flex;-ms-flex-direction:row;flex-direction:row;overflow-x:auto;-ms-flex-align:center;align-items:center }
+.source-container .check-form .check-form-label { min-width:60px }
+.source-container .check-form .el-input { width:auto;min-width:100px;margin-right:10px }
+.source-container .check-form .el-input-number { min-width:130px;margin-right:10px }
+.source-container .check-form .book-cover .cover, .source-container .check-form .book-cover { width:84px;height:112px }
+.source-container .check-form .book-info { display:-ms-flexbox;display:flex;-ms-flex-direction:column;flex-direction:column;margin-left:30px;-ms-flex-pack:justify;justify-content:space-between;min-height:100px }
+.source-container .check-form .book-info .toc-refresh-btn { margin-left:5px }
+.source-container .check-form .book-info span { display:inline-block;min-width:56px;text-align-last:justify }
+.source-container .check-form .book-info .el-input { width:auto;min-width:100px;margin-right:10px }
+.source-container .check-form .book-info .el-input-number { min-width:130px;margin-right:10px }
+.source-container .chapter-title { font-size:15px;padding:5px 0;font-weight:600;margin-top:10px }
+.source-container .chapter-list { overflow-y:auto;box-sizing:border-box;padding:0 5px }
+.source-container .chapter-list p { margin-top:.4em;margin-bottom:.4em }
+.source-container .source-group-wrapper { display:-ms-flexbox;display:flex;-ms-flex-direction:row;flex-direction:row;overflow-x:auto;padding:5px 0 }
+.source-container .source-group-wrapper .booksource-group-tabs { width:100% }
+.source-container .source-group-wrapper .source-group-btn { margin-right:10px;cursor:pointer }
+.source-container .source-group-wrapper .source-group-btn.selected { color:#fff;background:#409eff;border-color:#409eff }
+.source-container .el-pagination { margin-top:8px;float:right;max-width:100%;overflow-x:auto;box-sizing:border-box }
+.source-container .source-checkbox { display:block;padding:8px 0;width:100% }
+.source-container pre { margin:0 }
+.source-container .source-pagination:after { display:table;content:"";clear:both }
+.source-list-container { max-height:calc(var(--vh, 1vh)*70 - 180px);overflow-y:auto;overflow-x:auto }
+.night .source-container .source-group-wrapper .source-group-btn.selected { color:#fff;background:#185798;border-color:#185798 }
+.night .book-group-wrapper .book-group-btn.selected { color:#fff;background:#185798!important;border-color:#185798!important }
+.navigation-inner-wrapper::-webkit-scrollbar, .source-container::-webkit-scrollbar { width:0!important }
+.el-dialog__wrapper::-webkit-scrollbar, .el-table__body-wrapper::-webkit-scrollbar { width:0!important }
+.dialog-footer { display:-ms-flexbox;display:flex;-ms-flex-direction:row;flex-direction:row;-ms-flex-wrap:wrap;flex-wrap:wrap;-ms-flex-pack:justify;justify-content:space-between }
+.dialog-footer .float-left { margin-right:5px;margin-bottom:5px }
+.index-wrapper { overflow-x:hidden }
+.index-wrapper .navigation-wrapper .navigation-inner-wrapper { padding:20px 36px 66px 36px }
+.index-wrapper .shelf-wrapper { padding:0;padding-top:constant(safe-area-inset-top)!important;padding-top:env(safe-area-inset-top)!important }
+.index-wrapper .shelf-wrapper .shelf-title { padding:20px 24px 0 24px }
+.index-wrapper .shelf-wrapper .book-group-wrapper { margin-left:24px;margin-right:24px }
+.source-list-container { max-height:calc(var(--vh, 1vh)*100 - 160px) }
+.source-container.table-container { margin:-15px -5px }
+
+@media screen and (max-width:750px) {
+  .index-wrapper{overflow-x:hidden}
+  .index-wrapper .navigation-wrapper .navigation-inner-wrapper{padding:20px 36px 66px 36px}
+  .index-wrapper .shelf-wrapper{padding:0;padding-top:constant(safe-area-inset-top)!important;padding-top:env(safe-area-inset-top)!important}
+  .index-wrapper .shelf-wrapper .shelf-title{padding:20px 24px 0 24px}
+  .index-wrapper .shelf-wrapper .book-group-wrapper{margin-left:24px;margin-right:24px}
+  .source-list-container{max-height:calc(var(--vh, 1vh)*100 - 160px)}
+}
+
+@media screen and (max-width:480px) {
+  .source-container.table-container{margin:-15px -5px}
+}

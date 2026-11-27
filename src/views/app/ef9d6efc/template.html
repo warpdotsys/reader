@@ -1,0 +1,15 @@
+<el-dialog :class='isWebApp && !$store.getters.isNight ? "status-bar-light-bg-dialog" : ""' :visible="show" :width="dialogSmallWidth" :fullscreen="$store.state.miniInterface" :before-close="cancel" @update:visible="(t) => {
+                            show = t
+                        }"><div class="custom-dialog-title" slot="title"><span class="el-dialog__title">{{ "RSS订阅(" + _s(rssSourceList.length) + ") " }}<span class="float-right span-btn" @click="(t) => {
+                            showRssSourceEditButton = !showRssSourceEditButton
+                        }">{{ showRssSourceEditButton ? "取消" : "编辑" }}</span><span class="float-right span-btn" @click="uploadRssSource">导入</span><span class="float-right span-btn" @click="(t) => {
+                            return editRssSource(!1)
+                        }">新增</span></span><input ref='"rssInputRef"' style="display: none" type="file" @change="(t) => {
+                            return onSourceFileChange(t, !0)
+                        }" /></div><div class="rss-source-list-container"><template v-for="(o, n) in rssSourceList"><div :key='"rss-" + n' class="rss-source" @click="(t) => {
+                                return showRssArticleListDialog(o)
+                            }"><template v-if="showRssSourceEditButton"><i class="el-icon-close" @click="(t) => {
+                                return t.stopPropagation(), deleteRssSource(o)
+                            }" /></template><template v-if="showRssSourceEditButton"><i class="el-icon-edit" @click="(t) => {
+                                return t.stopPropagation(), editRssSource(o)
+                            }" /></template><el-image class="rss-icon" :src="getImage(o.sourceIcon, !0)" fit="cover" lazy="" /><div class="rss-title">{{ o.sourceName }}</div></div></template></div></el-dialog>
