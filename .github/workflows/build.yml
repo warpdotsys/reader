@@ -112,13 +112,22 @@ jobs:
       - id: meta
         uses: docker/metadata-action@v5
         with:
-          # 注意：不叫 reader —— ghcr.io/warpdotsys/reader 已被一个 2026-05 的旧镜像占用，
-          # 用 GITHUB_TOKEN 推同名包会 permission_denied（包所有权绑在原推送者凭据上）
-          images: ghcr.io/${{ github.repository_owner }}/reader-pro
+          images: ghcr.io/${{ github.repository_owner }}/reader
           tags: |
             type=semver,pattern={{version}},latest=false
             type=raw,value=legacy,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
             type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+      - name: 诊断——目标包是否已被其他镜像占用
+        run: |
+          set +e
+          # 本仓库推的包会带 org.opencontainers.image.source 标签；没有该标签说明是别人/旧镜像
+          if docker manifest inspect "ghcr.io/${{ github.repository_owner }}/reader:3.2.14" >/dev/null 2>&1; then
+            echo "::warning::ghcr.io/${{ github.repository_owner }}/reader:3.2.14 已存在。"
+            echo "若推送报 permission_denied: write_package，说明该包由其他凭据创建，"
+            echo "需要在 GitHub → Packages → reader → Settings 里把本仓库加为 Write 权限，或重命名/删除旧包。"
+          else
+            echo "目标包当前不存在，本次推送将创建它"
+          fi
       - name: 构建并推送
         uses: docker/build-push-action@v6
         with:
