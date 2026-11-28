@@ -36,3 +36,13 @@ Thumbs.db
 .bcdiff.txt
 .hermes-tmp.*
 __pycache__/
+
+# 过程资料与本地数据（不入库）
+docs/
+reference/
+scripts/
+tools/
+dist-deliverable/
+js/
+.gate-best*.json
+*.log
