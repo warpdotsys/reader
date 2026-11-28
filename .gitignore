@@ -46,3 +46,17 @@ dist-deliverable/
 /js/
 .gate-best*.json
 *.log
+
+# 前端工程依赖与构建产物
+node_modules/
+dev/node_modules/
+dev/dist/
+dev/build/
+dist/
+.cache/
+
+# 本地日志
+*.log
+hs_err_pid*.log
+replay_pid*.log
+.wip/
