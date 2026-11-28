@@ -74,7 +74,16 @@ module.exports = {
     }),
     new CleanWebpackPlugin({
       // 只删本工程产出的东西，保留原版的 simple-web / bookSourceDebug / img / fonts
-      cleanOnceBeforeBuildPatterns: ['js/*', 'css/*', 'index.html'],
+      // 只清本工程产出的：main/chunk-vendors/数字分块 + css
+      // 保留原版的第三方库（dash/flv/hls/pear-player/webtorrent）与 simple-web 等
+      cleanOnceBeforeBuildPatterns: [
+        'js/main.*.js',
+        'js/chunk-vendors.*.js',
+        'js/[0-9]*.js',
+        'css/main.*.css',
+        'css/chunk-vendors.*.css',
+        'index.html',
+      ],
       dangerouslyAllowCleanPatternsOutsideProject: false,
     }),
     new CopyPlugin([
