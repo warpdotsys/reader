@@ -1,10 +1,5 @@
 <template>
   <div id="app-root">
-    <div class="dev-banner">
-      <strong>reader-vue 工程骨架</strong>
-      <span>路由: {{ $route.path }}</span>
-      <span>mini: {{ $store.state.miniInterface ? '是' : '否' }}</span>
-    </div>
     <router-view />
 
     <!-- 全局弹出层：22 个业务对话框，由 eventBus 驱动 -->
@@ -154,6 +149,11 @@ export default {
       }
     } catch (e) {
       console.warn('getUserInfo 失败', e)
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+      // eslint-disable-next-line no-console
+      console.log('[reader-vue] dev build，路由', this.$route && this.$route.path)
     }
 
     // 拉首屏数据（书架/分组/书源等），与原版 App 的 init 行为一致
