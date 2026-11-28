@@ -99,6 +99,9 @@ jobs:
     needs: build-jar
     runs-on: ubuntu-latest
     if: github.event_name == 'push' || inputs.push_image == 'true'
+    # GHCR 推送需要组织允许 Actions 创建包，或用有 write:packages 的 PAT（secret GHCR_TOKEN）。
+    # 未配置时本 job 会失败但不阻塞 jar 产物，详见 README 的"镜像推送"一节。
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -107,13 +110,14 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}   # 内置令牌，非硬编码
+          # 优先用有 write:packages 的 PAT；未配置时回落到内置令牌
+          password: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}   # 内置令牌，非硬编码
       - id: meta
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository_owner }}/reader
           tags: |
-            type=semver,pattern={{version}}
+            type=semver,pattern={{version}},latest=false
             type=raw,value=legacy,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
             type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
       - name: 构建并推送
