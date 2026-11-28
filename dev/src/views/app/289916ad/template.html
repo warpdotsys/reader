@@ -1,0 +1,15 @@
+<el-dialog v-if="$store.getters.isNormalPage" :class='isWebApp && !$store.getters.isNight ? "status-bar-light-bg-dialog" : ""' :title='isShowBookGroupSettingDialog ? "设置分组" : "分组管理"' :visible="show" :width="dialogWidth" :top="dialogTop" :fullscreen="$store.state.miniInterface" :before-close="cancel" @update:visible="(t) => {
+                            show = t
+                        }" @opened="opened"><div class="source-container table-container"><el-table :key="isShowBookGroupSettingDialog" ref='"bookGroupTableRef"' :data="showBookGroupList" :height="dialogContentHeight" @selection-change="(t) => {
+                            bookGroupSelection = t
+                        }"><template v-if="isShowBookGroupSettingDialog"><el-table-column type="selection" width="25" /></template><el-table-column property="groupName" label="分组名" min-width="100"><template v-slot:default="o"><div class="drag-icon"><i class="el-icon-rank" /></div><span>{{ " " + _s(displayBookGroupName(o.row)) }}</span></template></el-table-column><template v-if="!(isShowBookGroupSettingDialog)"><el-table-column property="show" label="显示" min-width="80"><template v-slot:default="o"><el-switch active-color="#13ce66" inactive-color="#ff4949" :active-value="true" :inactive-value="false" v-model="o.row.show" @change="(t) => {
+                                        return toggleBookGroupShow(o.row, t)
+                                    }" /></template></el-table-column></template><el-table-column label="操作" width="100px"><template v-slot:default="o"><el-button type="text" @click="(t) => {
+                                        return saveBookGroup(o.row)
+                                    }">编辑</el-button><template v-if="!isShowBookGroupSettingDialog && o.row.groupId > 0 && !getShowShelfBooks(o.row.groupId).length"><el-button style="color: #f56c6c" type="text" @click="(t) => {
+                                        return deleteBookGroup(o.row)
+                                    }">删除</el-button></template></template></el-table-column></el-table></div><div class="dialog-footer" slot="footer"><el-button class="float-left" type="primary" size="medium" @click="(t) => {
+                            return saveBookGroup()
+                        }">添加分组</el-button><template v-if="isShowSaveOrderButton"><el-button class="float-left" type="primary" size="medium" @click="(t) => {
+                            return saveOrder()
+                        }">保存排序</el-button></template><template v-if="isShowBookGroupSettingDialog"><el-button type="primary" size="medium" @click="setBookGroup">确认</el-button></template><el-button size="medium" @click="cancel">取消</el-button></div></el-dialog></el-dialog>

@@ -1,0 +1,20 @@
+.wrapper { display:grid;grid-template-columns:repeat(auto-fill,380px);-ms-flex-pack:distribute;justify-content:space-around;grid-gap:10px }
+.wrapper .book { -webkit-user-select:none;-ms-user-select:none;user-select:none;display:-ms-flexbox;display:flex;cursor:pointer;margin-bottom:18px;padding:24px 24px;width:360px;-ms-flex-direction:row;flex-direction:row;-ms-flex-pack:distribute;justify-content:space-around }
+.wrapper .book .cover-img .cover, .wrapper .book .cover-img { width:84px;height:112px }
+.wrapper .book .info { position:relative;display:-ms-flexbox;display:flex;-ms-flex-direction:column;flex-direction:column;-ms-flex-pack:justify;justify-content:space-between;-ms-flex-align:left;align-items:left;height:112px;margin-left:20px;-ms-flex:1;flex:1 }
+.wrapper .book .info .book-operation { position:absolute;right:5px;top:0;font-size:24px;color:#969ba3 }
+.wrapper .book .info .book-operation i { margin-left:10px }
+.wrapper .book .info .name { width:-moz-fit-content;width:fit-content;font-size:16px;font-weight:700;color:#33373d;margin-right:38px;max-height:45px;word-wrap:break-word;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2 }
+.wrapper .book .info .name.edit { margin-right:62px }
+.wrapper .book .info .sub { display:-ms-flexbox;display:flex;-ms-flex-direction:row;flex-direction:row;font-size:12px;font-weight:600;color:#969ba3 }
+.wrapper .book .info .sub .dot { margin:0 7px }
+.wrapper .book .info .dur-chapter, .wrapper .book .info .intro, .wrapper .book .info .last-chapter { color:#6b6b6b;font-size:13px;margin-top:3px;font-weight:500;word-wrap:break-word;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:1;text-align:left }
+.wrapper .book .info .source-count { color:#6b6b6b;font-size:14px;display:inline-block;margin-left:10px;cursor:pointer }
+.wrapper:last-child { margin-right:auto }
+.wrapper { display:-ms-flexbox;display:flex;-ms-flex-direction:column;flex-direction:column }
+.wrapper .book { box-sizing:border-box;width:100%;margin-bottom:0;padding:10px 20px }
+
+@media screen and (max-width:750px) {
+  .wrapper{display:-ms-flexbox;display:flex;-ms-flex-direction:column;flex-direction:column}
+  .wrapper .book{box-sizing:border-box;width:100%;margin-bottom:0;padding:10px 20px}
+}

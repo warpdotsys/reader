@@ -1,0 +1,9 @@
+<el-dialog :class='isWebApp && !$store.getters.isNight ? "status-bar-light-bg-dialog" : ""' :title="rssSource.sourceName" :visible="show" :width="dialogSmallWidth" :fullscreen="$store.state.miniInterface" :before-close="cancel" @update:visible="(t) => {
+                            show = t
+                        }"><template v-if="sortUrls.length > 1"><el-tabs v-model="sortName" @tab-click="onTabClick"><template v-for="(e, o) in sortUrls"><el-tab-pane :key='"sort-" + o + e.name' :label="e.name" :name="e.name" /></template></el-tabs></template><div ref='"rssArticleListRef"' class="rss-article-list-container"><template v-for="(o, n) in rssArticleList"><div :key='"rss-article-" + n' class="rss-article" @click="(t) => {
+                                return getRssArticleContent(o)
+                            }"><div class="rss-article-info"><div class="rss-article-title">{{ o.title }}</div><div class="rss-article-date">{{ o.pubDate }}</div></div><template v-if="o.image"><div class="rss-article-image"><div class="image-wrapper"><el-image class="rss-article-img" :src="getCover(o.image, !0, !0)" :preview-src-list="rssArticleImageList" fit="cover" lazy="" @click="(t) => {
+                                return t.stopPropagation(), noop.apply(null, arguments)
+                            }" /></div></div></template></div></template><div class="load-more-rss" @click="(t) => {
+                            hasMoreRssArticles && getRssArticles(page + 1)
+                        }">{{ " " + _s(hasMoreRssArticles ? "加载更多" : "没有更多啦") + " " }}</div></div></el-dialog>

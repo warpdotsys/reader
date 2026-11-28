@@ -1,0 +1,3 @@
+<el-dialog :class='isWebApp && !$store.getters.isNight ? "status-bar-light-bg-dialog" : ""' :title="rssArticleInfo.title" :visible="show" :width="dialogSmallWidth" :fullscreen="$store.state.miniInterface" :before-close="cancel" @update:visible="(t) => {
+                            show = t
+                        }"><template v-if="show"><div class="rss-article-info-container"><div ref='"rssArticleContentRef"' class="rss-article-content" @click="rssArticleClickHandler" /></div></template></el-dialog>

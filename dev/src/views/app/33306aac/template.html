@@ -1,0 +1,39 @@
+<el-dialog v-if="$store.getters.isNormalPage" :class='isWebApp && !$store.getters.isNight ? "status-bar-light-bg-dialog" : ""' title="用户管理" :visible="show" :width="dialogWidth" :top="dialogTop" :fullscreen="$store.state.miniInterface" :before-close="cancel" @update:visible="(t) => {
+                            show = t
+                        }"><div class="custom-dialog-title flex-title" slot="title"><span class="el-dialog__title">用户管理 </span><span class="title-center"><el-input class="search-input" size="mini" placeholder="输入关键字搜索" v-model="search" /></span></div><div class="source-container table-container"><el-table :data="showList" :height="dialogContentHeight - 42" @selection-change="(t) => {
+                            manageUserSelection = t
+                        }" @sort-change="sortChange"><el-table-column type="selection" width="25" :selectable="isUserSelectable" :fixed="$store.state.miniInterface" /><el-table-column property="username" label="用户名" min-width="100" sortable="custom" :fixed="$store.state.miniInterface" /><el-table-column property="lastLoginAt" label="上次登录" sortable="custom" :formatter="formatTableField" min-width="120" /><el-table-column property="createdAt" label="注册时间" sortable="custom" :formatter="formatTableField" min-width="120" /><el-table-column property="enableWebdav" label="WebDAV" min-width="80" :filters='[{
+                            text: "开启",
+                            value: !0
+                        }, {
+                            text: "关闭",
+                            value: !1
+                        }]' :filter-method="filterHandler"><template v-slot:default="o"><template v-if='"default" !== o.row.userNS'><el-switch active-color="#13ce66" inactive-color="#ff4949" :active-value="true" :inactive-value="false" v-model="o.row.enableWebdav" @change="(t) => {
+                                        return toggleUserWebdav(o.row, t)
+                                    }" /></template></template></el-table-column><el-table-column property="enableLocalStore" label="书仓" min-width="80" :filters='[{
+                            text: "开启",
+                            value: !0
+                        }, {
+                            text: "关闭",
+                            value: !1
+                        }]' :filter-method="filterHandler"><template v-slot:default="o"><template v-if='"default" !== o.row.userNS'><el-switch active-color="#13ce66" inactive-color="#ff4949" :active-value="true" :inactive-value="false" v-model="o.row.enableLocalStore" @change="(t) => {
+                                        return toggleUserLocalStore(o.row, t)
+                                    }" /></template></template></el-table-column><el-table-column label="操作" width="100px"><template v-slot:default="o"><template v-if='"default" != o.row.userNS'><el-button class="text-button" type="text" @click="(t) => {
+                                        return editUser(o.row)
+                                    }">修改</el-button></template><template v-if='"default" != o.row.userNS'><el-button class="text-button" type="text" @click="(t) => {
+                                        return resetPassword(o.row)
+                                    }">重置密码</el-button></template><template v-if='"default" != o.row.userNS'><el-button class="text-button" type="text" @click="(t) => {
+                                        return setAsDefaultBookSources(o.row)
+                                    }">设为默认书源</el-button></template></template></el-table-column></el-table></div><div class="dialog-footer" slot="footer"><div><el-button class="float-left" type="primary" size="medium" @click="deleteUserList">批量删除<template v-if="manageUserSelection.length"><span>{{ " (" + _s(manageUserSelection.length) + ")" }}</span></template></el-button><el-button class="float-left" type="primary" size="medium" @click="deleteUserBookSource">使用默认书源</el-button><el-button class="float-left" type="primary" size="medium" @click="(t) => {
+                            return clearInactiveUser()
+                        }">清理</el-button><el-button class="float-left" type="primary" size="medium" @click="(t) => {
+                            return showAddUserDialog()
+                        }">新增</el-button></div><div class="source-pagination"><el-pagination :current-page="pagination.page" :page-sizes="[25, 50, 100, 200, 300, 400, filterList.length]" :page-size="pagination.size" layout="total, sizes, prev, pager, next" :total="filterList.length" :pager-count="$store.state.miniInterface ? 5 : 7" @update:currentPage='(t) => {
+                            return $set(pagination, "page", t)
+                        }' @update:current-page='(t) => {
+                            return $set(pagination, "page", t)
+                        }' @update:pageSize='(t) => {
+                            return $set(pagination, "size", t)
+                        }' @update:page-size='(t) => {
+                            return $set(pagination, "size", t)
+                        }' /></div></div></el-dialog></el-dialog>

@@ -1,0 +1,27 @@
+.popup-wrapper { margin:-16px;margin-bottom:-13px;padding:24px;padding-top:calc(24px + constant(safe-area-inset-top));padding-top:calc(24px + env(safe-area-inset-top)) }
+.popup-wrapper .title-zone { margin:0 0 20px 0;width:100%;display:-ms-flexbox;display:flex;-ms-flex-direction:row;flex-direction:row;-ms-flex-wrap:wrap;flex-wrap:wrap;-ms-flex-pack:justify;justify-content:space-between }
+.popup-wrapper .title { font-size:18px;font-weight:400;font-family:-apple-system,Noto Sans,Helvetica Neue,Helvetica,Nimbus Sans L,Arial,Liberation Sans,PingFang SC,Hiragino Sans GB,Noto Sans CJK SC,Source Han Sans SC,Source Han Sans CN,Microsoft YaHei,Wenquanyi Micro Hei,WenQuanYi Zen Hei,ST Heiti,SimHei,WenQuanYi Zen Hei Sharp,sans-serif;color:#ed4259;border-bottom:1px solid #ed4259;width:-moz-fit-content;width:fit-content }
+.popup-wrapper .title-btn { font-size:14px;line-height:26px;color:#606266 }
+.popup-wrapper .title-btn .progress-percent { display:inline-block;margin-right:25px }
+.popup-wrapper .title-btn .span-btn { display:inline-block;color:#ed4259;margin-left:15px;cursor:pointer }
+.popup-wrapper .title-btn .booksource-filter-input { width:200px }
+.popup-wrapper .title-btn .refresh-btn { display:inline-block;margin-left:15px;color:#ed4259;cursor:pointer }
+.popup-wrapper .title-btn .refresh-btn.loading { color:#606266 }
+.popup-wrapper .data-wrapper { height:300px;overflow:auto }
+.popup-wrapper .data-wrapper .cata { height:100% }
+.popup-wrapper .data-wrapper .cata .cached { color:#444 }
+.popup-wrapper .data-wrapper .cata .selected .log-text { color:#eb4259!important }
+.popup-wrapper .data-wrapper .cata .log { width:100%;height:40px;cursor:pointer;font:16px/40px PingFangSC-Regular,HelveticaNeue-Light,Helvetica Neue Light,Microsoft YaHei,sans-serif }
+.popup-wrapper .data-wrapper .cata .log .log-text { margin-right:26px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis }
+.popup-wrapper .data-wrapper.expand { height:85vh }
+.popup-wrapper .data-wrapper::-webkit-scrollbar { width:0!important }
+.popup-wrapper .night .log { border-bottom:1px solid #333 }
+.popup-wrapper .day .log { border-bottom:1px solid #eee }
+.popup-wrapper .day .cached { color:#bbb!important }
+.popup-wrapper .data-wrapper .cata .log { width:100% }
+.popup-wrapper .data-wrapper .cata .log .log-text { margin-right:0 }
+
+@media screen and (max-width:500px) {
+  .popup-wrapper .data-wrapper .cata .log{width:100%}
+  .popup-wrapper .data-wrapper .cata .log .log-text{margin-right:0}
+}

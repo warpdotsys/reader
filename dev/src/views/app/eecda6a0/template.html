@@ -1,0 +1,25 @@
+<el-dialog v-if="$store.getters.isNormalPage" :class='isWebApp && !$store.getters.isNight ? "status-bar-light-bg-dialog" : ""' :title="title" :visible="show" :width="dialogWidth" :top="dialogTop" :fullscreen="$store.state.miniInterface" :before-close="cancel" @update:visible="(t) => {
+                            show = t
+                        }"><div class="custom-dialog-title" slot="title"><span class="el-dialog__title">{{ _s(this.title) + " " }}<span class="float-right span-btn" @click="resolveAndImportBooks">一键导入</span><span class="float-right span-btn" @click="resolveBooks">解析书籍</span></span></div><div class="source-container table-container"><el-table ref='"fileTable"' :data="filteredFileList" :height="dialogContentHeight" @selection-change="(t) => {
+                            fileSelection = t
+                        }"><el-table-column type="selection" width="25" :fixed="$store.state.miniInterface" :selectable="function(e) {
+                            return !toParent
+                        }" /><el-table-column property="name" min-width="150px" :label='resolveMode ? "书名" : "文件名"' sortable="" :sort-method="sortMethod" :filters='[{
+                            text: "已导入",
+                            value: "imported"
+                        }, {
+                            text: "未导入",
+                            value: "unImport"
+                        }, {
+                            text: "可导入",
+                            value: "canImport"
+                        }, {
+                            text: "目录",
+                            value: "directory"
+                        }]' :filter-method="filterHandler" :fixed="$store.state.miniInterface"><template v-slot:default="o"><template v-if="o.row.isImported"><span class="imported-book-name">{{ o.row.name }}</span></template><template v-else><template v-if="!(o.row.isDirectory)"><span>{{ o.row.name }}</span></template></template><template v-if="o.row.isDirectory"><el-link type="primary" @click="(t) => {
+                                        return showFileList(o.row.path)
+                                    }">{{ o.row.name }}</el-link></template></template></el-table-column><template v-if="resolveMode"><el-table-column property="book.author" label="作者名" min-width="100px" sortable="" :filters="authorList" :filter-method="filterAuthor" /></template><el-table-column property="size" label="大小" sortable="" :formatter="formatTableField" min-width="100px" /><el-table-column property="lastModified" label="修改时间" sortable="" :formatter="formatTableField" width="120px" /><el-table-column align="right" width="140px"><template slot='"header"'><el-input size="mini" placeholder="搜索本页" v-model="keyword" /></template><template v-slot:default="o"><template v-if="!(o.row.isDirectory)"><el-dropdown :trigger='$store.state.touchable ? "click" : "hover"' @command="(t) => {
+                                        return operateFile(o.row, t)
+                                    }"><el-button class="text-button" type="text" size="medium"> 操作<i class="el-icon-arrow-down el-icon--right" /></el-button><el-dropdown-menu slot="dropdown"><template v-if="!(o.row.isDirectory)"><el-dropdown-item command="downloadFile">下载</el-dropdown-item></template><template v-if='!o.row.isDirectory && o.row.name.endsWith(".zip")'><el-dropdown-item command="restoreFromFile">还原</el-dropdown-item></template><template v-if='!o.row.isDirectory && o.row.name.endsWith(".json")'><el-dropdown-item command="editFile">编辑</el-dropdown-item></template><template v-if="o.row.canImport"><el-dropdown-item command="importFromFile">加入书架</el-dropdown-item></template></el-dropdown-menu></el-dropdown></template><template v-if="!(o.row.toParent)"><el-button style="color: #f56c6c" type="text" @click="(t) => {
+                                        return deleteFile(o.row)
+                                    }">删除</el-button></template></template></el-table-column></el-table></div><div class="dialog-footer" slot="footer"><el-dropdown class="float-left" :trigger='$store.state.touchable ? "click" : "hover"' @command="operate"><el-button type="primary" size="medium"> 操作<template v-if="fileSelection.length"><span>{{ " (" + _s(fileSelection.length) + ")" }}</span></template><i class="el-icon-arrow-down el-icon--right" /></el-button><el-dropdown-menu slot="dropdown"><el-dropdown-item command="deleteFileList">批量删除</el-dropdown-item><el-dropdown-item command="importFromFile">批量加入书架</el-dropdown-item><el-dropdown-item command="mkdir">新建目录</el-dropdown-item><el-dropdown-item command="upload">上传文件</el-dropdown-item></el-dropdown-menu></el-dropdown><input ref='"bookRef"' style="display: none" type="file" multiple="multiple" @change="onFileChange" /></div></el-dialog></el-dialog>

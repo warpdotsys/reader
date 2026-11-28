@@ -1,0 +1,1 @@
+.rss-article-info-container { max-height:calc(var(--vh, 1vh)*70 - 114px);overflow-y:auto }

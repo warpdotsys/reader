@@ -1,0 +1,5 @@
+.float-left { float:left }
+.license-item { font-size:14px;padding:10px 5px }
+.license-item .license-name { display:inline-block;width:65px;margin-right:5px;font-weight:700 }
+.license-item .span-btn { display:inline-block;cursor:pointer;font-size:15px;margin-left:10px }
+.night-theme .license-item { color:#888 }

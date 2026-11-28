@@ -1,0 +1,6 @@
+.rss-source-list-container { max-height:calc(var(--vh, 1vh)*70 - 114px);overflow-y:auto }
+.rss-source-list-container .rss-source { display:inline-block;width:25%;box-sizing:border-box;padding:10px;text-align:center;vertical-align:top;margin-bottom:10px;cursor:pointer;position:relative }
+.rss-source-list-container .rss-source .el-icon-close { position:absolute;right:6px;top:8px;font-size:18px }
+.rss-source-list-container .rss-source .el-icon-edit { position:absolute;right:6px;top:42px;font-size:18px }
+.rss-source-list-container .rss-source .rss-icon { display:inline-block;width:50px;height:50px;border-radius:5px }
+.rss-source-list-container .rss-source .rss-title { margin-top:5px;text-align:center }
