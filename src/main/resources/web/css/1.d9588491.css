@@ -1,0 +1,46 @@
+
+p[data-v-9d5eaf46] { display:block;word-wrap:break-word;word-break:break-all;text-indent:2em
+}
+p.reading[data-v-9d5eaf46] { color:red!important
+}
+h3[data-v-9d5eaf46] { font-size:28px;line-height:1.2;margin:1em 0;text-align:center
+}
+h3.reading[data-v-9d5eaf46] { color:red!important
+}
+.volume-chapter[data-v-9d5eaf46] { min-height:100vh;display:-ms-flexbox;display:flex;-ms-flex-direction:column;flex-direction:column;-ms-flex-align:center;align-items:center
+}
+.volume-chapter .volume-content[data-v-9d5eaf46] { text-align:center
+}
+.volume-chapter .volume-tag[data-v-9d5eaf46] { text-align:right
+}
+.content-audio[data-v-9d5eaf46] { margin:0 auto;width:100%
+}
+.content-audio .book-cover img[data-v-9d5eaf46] { max-width:200px;margin:0 auto;display:block
+}
+.content-audio .book-progress[data-v-9d5eaf46] { padding:25px 15px;display:-ms-flexbox;display:flex;-ms-flex-direction:row;flex-direction:row;-ms-flex-align:center;align-items:center
+}
+.content-audio .book-progress .progress-tip[data-v-9d5eaf46] { padding-top:5px;padding-bottom:5px;font-size:14px;width:45px
+}
+.content-audio .book-progress .progress-container[data-v-9d5eaf46] { -ms-flex:1;flex:1;margin-left:10px;margin-right:10px
+}
+.content-audio .book-progress .total-time[data-v-9d5eaf46] { text-align:right
+}
+.content-audio .book-operation[data-v-9d5eaf46] { padding:0 15px 25px;display:-ms-flexbox;display:flex;-ms-flex-direction:row;flex-direction:row;-ms-flex-pack:distribute;justify-content:space-around
+}
+.content-audio .book-operation i[data-v-9d5eaf46] { display:inline-block;cursor:pointer;font-size:24px;line-height:1
+}
+.content-audio .book-info[data-v-9d5eaf46] { padding:10px 15px;display:-ms-flexbox;display:flex;-ms-flex-direction:row;flex-direction:row;-ms-flex-align:center;align-items:center
+}
+.content-audio .book-info .book-cover[data-v-9d5eaf46] { width:50px
+}
+.content-audio .book-info .book-cover img[data-v-9d5eaf46] { width:100%;max-height:100%
+}
+.content-audio .book-info .book-intro[data-v-9d5eaf46] { -ms-flex:1;flex:1;padding-left:15px
+}
+.content-audio .book-info .book-intro .title[data-v-9d5eaf46] { font-size:16px
+}
+.content-audio .book-info .book-intro .subtitle[data-v-9d5eaf46] { margin-top:5px;font-size:14px
+}
+.epub-iframe[data-v-9d5eaf46] { border:none;width:100%;min-height:calc(var(--vh, 1vh)*50)
+}
+

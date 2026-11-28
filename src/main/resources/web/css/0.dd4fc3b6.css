@@ -1,0 +1,106 @@
+
+.iconfont[data-v-b035b8f4], .moon-icon[data-v-b035b8f4] { font-family:iconfont;font-style:normal
+}
+.settings-wrapper[data-v-b035b8f4] { -webkit-user-select:none;-ms-user-select:none;user-select:none;margin:-16px;margin-bottom:-13px;text-align:left;padding:24px;padding-top:calc(24px + constant(safe-area-inset-top));padding-top:calc(24px + env(safe-area-inset-top))
+}
+.settings-wrapper .settings-title[data-v-b035b8f4] { font-size:18px;line-height:22px;margin-bottom:28px;font-family:-apple-system,Noto Sans,Helvetica Neue,Helvetica,Nimbus Sans L,Arial,Liberation Sans,PingFang SC,Hiragino Sans GB,Noto Sans CJK SC,Source Han Sans SC,Source Han Sans CN,Microsoft YaHei,Wenquanyi Micro Hei,WenQuanYi Zen Hei,ST Heiti,SimHei,WenQuanYi Zen Hei Sharp,sans-serif;font-weight:400
+}
+.settings-wrapper .settings-title .title-btn[data-v-b035b8f4] { float:right;font-size:14px;color:#ed4259;cursor:pointer;display:inline-block;margin-left:5px
+}
+.settings-wrapper .setting-list[data-v-b035b8f4] { max-height:45vh;overflow-y:auto
+}
+.settings-wrapper .setting-list ul[data-v-b035b8f4] { list-style:none outside none;margin:0;padding:0
+}
+.settings-wrapper .setting-list ul li[data-v-b035b8f4]:not(:first-child) { margin-top:20px
+}
+.settings-wrapper .setting-list ul li[data-v-b035b8f4] { list-style:none outside none
+}
+.settings-wrapper .setting-list ul li .setting-item-title[data-v-b035b8f4] { display:inline-block;width:56px;margin-right:16px;vertical-align:top;line-height:36px;color:#666
+}
+.settings-wrapper .setting-list ul li .font-color-title[data-v-b035b8f4] { line-height:40px
+}
+.settings-wrapper .setting-list ul li .selection-zone[data-v-b035b8f4] { display:inline-block;width:calc(100% - 72px);word-wrap:break-word
+}
+.settings-wrapper .setting-list ul li .selection-zone span[data-v-b035b8f4] { margin-bottom:5px
+}
+.settings-wrapper .setting-list ul li .span-item[data-v-b035b8f4] { width:78px;height:34px;cursor:pointer;margin-right:16px;border-radius:2px;text-align:center;vertical-align:middle;display:inline-block;font:14px/34px PingFangSC-Regular,HelveticaNeue-Light,Helvetica Neue Light,Microsoft YaHei,sans-serif;position:relative
+}
+.settings-wrapper .setting-list ul li .span-item .delete-custom-config-icon[data-v-b035b8f4] { display:inline-block;cursor:pointer;position:absolute;top:-10px;right:-10px;font-size:20px;color:#ed4259;z-index:10
+}
+.settings-wrapper .setting-list ul li .span-item .upload-font-icon[data-v-b035b8f4] { display:inline-block;cursor:pointer;position:absolute;top:-10px;right:-10px;font-size:20px;z-index:10;color:#606266
+}
+.settings-wrapper .setting-list ul li .span-item .upload-font-icon.active[data-v-b035b8f4] { color:#ed4259
+}
+.settings-wrapper .setting-list ul li .span-item.selected[data-v-b035b8f4] { border:1px solid #ed4259;color:#ed4259
+}
+.settings-wrapper .setting-list ul li .custom-theme[data-v-b035b8f4] { width:calc(100% - 72px);display:inline-block
+}
+.settings-wrapper .setting-list ul li .custom-theme .custom-theme-title[data-v-b035b8f4] { display:inline-block;margin-right:28px;margin-bottom:5px
+}
+.settings-wrapper .setting-list ul li .custom-theme .content-bg-preview[data-v-b035b8f4] { width:36px;height:36px;display:inline-block;vertical-align:middle;margin-left:10px;margin-bottom:8px;position:relative;box-sizing:border-box
+}
+.settings-wrapper .setting-list ul li .custom-theme .content-bg-preview img[data-v-b035b8f4] { width:100%;height:100%;display:inline-block;vertical-align:middle
+}
+.settings-wrapper .setting-list ul li .custom-theme .content-bg-preview .delete-bg-icon[data-v-b035b8f4] { position:absolute;top:-6px;right:-6px;font-size:18px;color:#ed4259
+}
+.settings-wrapper .setting-list ul li .custom-theme .selected[data-v-b035b8f4] { color:#ed4259;border:1px solid #ed4259
+}
+.settings-wrapper .setting-list ul li .custom-theme .upload-bg-btn[data-v-b035b8f4] { display:inline-block;margin-left:10px;color:#ed4259;cursor:pointer
+}
+.settings-wrapper .setting-list ul li .theme-item[data-v-b035b8f4] { line-height:32px;width:34px;height:34px;margin-right:16px;border-radius:100%;display:inline-block;cursor:pointer;text-align:center;vertical-align:middle
+}
+.settings-wrapper .setting-list ul li .theme-item .iconfont[data-v-b035b8f4] { display:none
+}
+.settings-wrapper .setting-list ul li .selected[data-v-b035b8f4] { color:#ed4259
+}
+.settings-wrapper .setting-list ul li .selected .iconfont[data-v-b035b8f4] { display:inline
+}
+.settings-wrapper .setting-list ul li .resize[data-v-b035b8f4] { display:inline-block;height:34px;vertical-align:middle;border-radius:2px
+}
+.settings-wrapper .setting-list ul li .resize span[data-v-b035b8f4] { min-width:72px;height:34px;line-height:34px;display:inline-block;cursor:pointer;text-align:center;vertical-align:middle
+}
+.settings-wrapper .setting-list ul li .resize span em[data-v-b035b8f4] { font-style:normal
+}
+.settings-wrapper .setting-list ul li .resize .lang[data-v-b035b8f4] { color:#a6a6a6;font-weight:400;font-family:-apple-system,Noto Sans,Helvetica Neue,Helvetica,Nimbus Sans L,Arial,Liberation Sans,PingFang SC,Hiragino Sans GB,Noto Sans CJK SC,Source Han Sans SC,Source Han Sans CN,Microsoft YaHei,Wenquanyi Micro Hei,WenQuanYi Zen Hei,ST Heiti,SimHei,WenQuanYi Zen Hei Sharp,sans-serif
+}
+.settings-wrapper .setting-list ul li .resize b[data-v-b035b8f4] { display:inline-block;height:20px;vertical-align:middle
+}
+.settings-wrapper .setting-list ul .operation-zone[data-v-b035b8f4] { display:-ms-flexbox;display:flex;-ms-flex-direction:row;flex-direction:row;-ms-flex-pack:justify;justify-content:space-between
+}
+.settings-wrapper .setting-list ul .operation-zone .span-btn[data-v-b035b8f4] { cursor:pointer;color:#ed4259
+}
+.settings-wrapper .setting-list ul .small-tip[data-v-b035b8f4] { font-size:13px
+}
+.settings-wrapper .setting-list[data-v-b035b8f4]::-webkit-scrollbar { width:0!important
+}
+.settings-wrapper .el-color-picker[data-v-b035b8f4] { vertical-align:middle
+}
+.night .selected[data-v-b035b8f4], .night .theme-item[data-v-b035b8f4] { border:1px solid #666
+}
+.night .moon-icon[data-v-b035b8f4] { color:#ed4259
+}
+.night .span-item[data-v-b035b8f4], .night .resize[data-v-b035b8f4] { border:1px solid #666;background:rgba(45,45,45,.5)
+}
+.night .resize b[data-v-b035b8f4] { border-right:1px solid #666
+}
+.day .theme-item[data-v-b035b8f4] { border:1px solid #e5e5e5
+}
+.day .selected[data-v-b035b8f4] { border:1px solid #ed4259
+}
+.day .moon-icon[data-v-b035b8f4] { display:inline;color:hsla(0,0%,100%,.2)
+}
+.day .span-item[data-v-b035b8f4] { background:hsla(0,0%,100%,.5);border:1px solid rgba(0,0,0,.1)
+}
+.day .resize[data-v-b035b8f4] { border:1px solid #e5e5e5;background:hsla(0,0%,100%,.5)
+}
+.day .resize b[data-v-b035b8f4] { border-right:1px solid #e5e5e5
+}
+.span-item[data-v-b035b8f4]:hover { border:1px solid #ed4259;color:#ed4259
+}
+li .less[data-v-b035b8f4]:hover, li .more[data-v-b035b8f4]:hover { color:#ed4259
+}
+@media (hover:hover) {
+.span-item[data-v-b035b8f4]:hover{border:1px solid #ed4259;color:#ed4259}
+li .less[data-v-b035b8f4]:hover,li .more[data-v-b035b8f4]:hover{color:#ed4259}
+}
+

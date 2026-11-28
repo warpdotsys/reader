@@ -1,0 +1,14 @@
+
+.wrapper[data-v-456f663b] { display:grid;-ms-flex-pack:distribute;justify-content:space-around;grid-gap:15px;padding:0 20px
+}
+.wrapper .book[data-v-456f663b] { -webkit-user-select:none;-ms-user-select:none;user-select:none;display:-ms-flexbox;display:flex;cursor:pointer;padding:0;width:var(--book-item-width,100px);-ms-flex-direction:column;flex-direction:column;box-sizing:border-box;position:relative
+}
+.wrapper .book .cover-img .cover[data-v-456f663b], .wrapper .book .cover-img[data-v-456f663b] { width:100%;height:calc(var(--book-item-width, 100px)*1.5)
+}
+.wrapper .book .name[data-v-456f663b] { width:100%;text-align:center;font-size:14px;font-weight:700;color:#33373d;max-height:40px;word-wrap:break-word;overflow:hidden;margin-top:5px;text-overflow:ellipsis;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2
+}
+.wrapper .book .book-operation[data-v-456f663b] { position:absolute;right:0;top:0;font-size:24px;color:#969ba3
+}
+.wrapper .book .book-operation i[data-v-456f663b] { margin-left:10px;display:block;color:#8abcff
+}
+
