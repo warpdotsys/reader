@@ -43,6 +43,6 @@ reference/
 scripts/
 tools/
 dist-deliverable/
-js/
+/js/
 .gate-best*.json
 *.log
