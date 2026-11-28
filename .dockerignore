@@ -1,0 +1,39 @@
+# 构建上下文裁剪：以下内容不进入镜像
+# 目的：镜像里只放「源码 + 构建产物」，不放过程资料与本地数据
+
+# 过程文档与参考（不入库，也不入镜像）
+docs/
+reference/
+scripts/
+tools/
+dist-deliverable/
+js/
+
+# 构建产物（镜像内自行构建）
+build/
+.gradle/
+gradle/wrapper/*.jar 的缓存体积不影响，但 wrapper 需要保留 → 不排除 gradlew
+
+# 依赖与缓存
+node_modules/
+.git/
+.gitignore
+
+# 本地数据与凭据
+*.env
+.env*
+storage/
+data/
+logs/
+tmp/
+*.log
+*.db
+*.db-wal
+*.db-shm
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.DS_Store
+Thumbs.db
