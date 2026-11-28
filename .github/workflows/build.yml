@@ -99,9 +99,6 @@ jobs:
     needs: build-jar
     runs-on: ubuntu-latest
     if: github.event_name == 'push' || inputs.push_image == 'true'
-    # GHCR 推送需要组织允许 Actions 创建包，或用有 write:packages 的 PAT（secret GHCR_TOKEN）。
-    # 未配置时本 job 会失败但不阻塞 jar 产物，详见 README 的"镜像推送"一节。
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -115,7 +112,9 @@ jobs:
       - id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/reader
+          # 注意：不叫 reader —— ghcr.io/warpdotsys/reader 已被一个 2026-05 的旧镜像占用，
+          # 用 GITHUB_TOKEN 推同名包会 permission_denied（包所有权绑在原推送者凭据上）
+          images: ghcr.io/${{ github.repository_owner }}/reader-pro
           tags: |
             type=semver,pattern={{version}},latest=false
             type=raw,value=legacy,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
